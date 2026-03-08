@@ -48,7 +48,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - QBO_CLIENT_ID=${QBO_CLIENT_ID:-}
       - QBO_CLIENT_SECRET=${QBO_CLIENT_SECRET:-}
-      - QBO_REDIRECT_URI=${QBO_REDIRECT_URI:-http://localhost:8000/api/v1/quickbooks/callback}
+      - QBO_REDIRECT_URI=${QBO_REDIRECT_URI:-https://mdjerbaka.github.io/bill-processor/callback.html}
       - QBO_ENVIRONMENT=${QBO_ENVIRONMENT:-sandbox}
       - MS_CLIENT_ID=${MS_CLIENT_ID:-}
       - MS_CLIENT_SECRET=${MS_CLIENT_SECRET:-}
@@ -85,7 +85,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - QBO_CLIENT_ID=${QBO_CLIENT_ID:-}
       - QBO_CLIENT_SECRET=${QBO_CLIENT_SECRET:-}
-      - QBO_REDIRECT_URI=${QBO_REDIRECT_URI:-http://localhost:8000/api/v1/quickbooks/callback}
+      - QBO_REDIRECT_URI=${QBO_REDIRECT_URI:-https://mdjerbaka.github.io/bill-processor/callback.html}
       - QBO_ENVIRONMENT=${QBO_ENVIRONMENT:-sandbox}
       - MS_CLIENT_ID=${MS_CLIENT_ID:-}
       - MS_CLIENT_SECRET=${MS_CLIENT_SECRET:-}
