@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { settingsAPI, quickbooksAPI, healthAPI, microsoftAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function SettingsPage() {
-  const [searchParams] = useSearchParams()
   const [emailConfig, setEmailConfig] = useState({
     imap_host: '', imap_port: 993, imap_username: '', imap_password: '', use_ssl: true
   })
@@ -34,19 +32,6 @@ export default function SettingsPage() {
   const [savingQBDefaults, setSavingQBDefaults] = useState(false)
 
   useEffect(() => {
-    // Handle QBO OAuth callback params
-    if (searchParams.get('qbo_connected') === 'true') {
-      toast.success('QuickBooks connected successfully!')
-    }
-    if (searchParams.get('qbo_error')) {
-      toast.error(`QuickBooks: ${searchParams.get('qbo_error')}`)
-    }
-    if (searchParams.get('ms_connected') === 'true') {
-      toast.success('Microsoft 365 connected successfully!')
-    }
-    if (searchParams.get('ms_error')) {
-      toast.error(`Microsoft 365: ${searchParams.get('ms_error')}`)
-    }
     loadSettings()
   }, [])
 
@@ -174,7 +159,23 @@ export default function SettingsPage() {
   async function handleConnectQB() {
     try {
       const res = await quickbooksAPI.connect()
-      window.location.href = res.data.auth_url
+      const popup = window.open(res.data.auth_url, '_blank')
+      // Poll for connection status while popup is open
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await quickbooksAPI.status()
+          if (statusRes.data.connected) {
+            clearInterval(poll)
+            setQbStatus(statusRes.data)
+            toast.success('QuickBooks connected!')
+            // Reload accounts
+            const accts = await quickbooksAPI.getAccounts()
+            if (accts.data) setQbAccounts(accts.data)
+          }
+        } catch {}
+      }, 2000)
+      // Stop polling after 5 minutes
+      setTimeout(() => clearInterval(poll), 300000)
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to start QuickBooks connection. Check your credentials in the form above.')
     }
@@ -217,7 +218,20 @@ export default function SettingsPage() {
   async function handleConnectMS() {
     try {
       const res = await microsoftAPI.connect()
-      window.location.href = res.data.auth_url
+      const popup = window.open(res.data.auth_url, '_blank')
+      // Poll for connection status while popup is open
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await microsoftAPI.status()
+          if (statusRes.data.connected) {
+            clearInterval(poll)
+            setMsStatus(statusRes.data)
+            toast.success('Microsoft 365 connected!')
+          }
+        } catch {}
+      }, 2000)
+      // Stop polling after 5 minutes
+      setTimeout(() => clearInterval(poll), 300000)
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to start Microsoft 365 connection')
     }

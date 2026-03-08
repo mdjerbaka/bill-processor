@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: ── Always run from the folder where install.bat lives ──
+cd /d "%~dp0"
+
 title Bill Processor - Installer
 color 0A
 echo.
@@ -41,17 +44,22 @@ echo  [OK] Docker found.
 :: ── Check if Docker daemon is running ───────────────────
 echo  [2/6] Checking Docker is running...
 docker info >nul 2>&1
-if %errorlevel% neq 0 (
-    echo.
-    echo  Docker Desktop is installed but not running.
-    echo  Starting Docker Desktop...
-    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-    echo  Waiting for Docker to start (this may take a minute)...
-    :wait_docker
-    timeout /t 5 /nobreak >nul
-    docker info >nul 2>&1
-    if %errorlevel% neq 0 goto wait_docker
-)
+if %errorlevel% neq 0 goto start_docker
+goto docker_ready
+
+:start_docker
+echo.
+echo  Docker Desktop is installed but not running.
+echo  Starting Docker Desktop...
+start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+echo  Waiting for Docker to start (this may take a minute)...
+
+:wait_docker
+timeout /t 5 /nobreak >nul
+docker info >nul 2>&1
+if %errorlevel% neq 0 goto wait_docker
+
+:docker_ready
 echo  [OK] Docker is running.
 
 :: ── Generate .env if it doesn't exist ───────────────────

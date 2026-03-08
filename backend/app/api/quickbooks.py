@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
@@ -56,13 +56,13 @@ async def qbo_callback(
     success = await svc.exchange_code(code, realmId)
 
     if not success:
-        return RedirectResponse(
-            url=f"{settings.app_url}/settings?qbo_error=token_exchange_failed"
+        return HTMLResponse(
+            content="<html><body><h2>QuickBooks connection failed.</h2><p>You can close this tab and try again.</p><script>window.close()</script></body></html>"
         )
 
     await db.commit()
-    return RedirectResponse(
-        url=f"{settings.app_url}/settings?qbo_connected=true"
+    return HTMLResponse(
+        content="<html><body><h2>QuickBooks connected successfully!</h2><p>You can close this tab.</p><script>window.close()</script></body></html>"
     )
 
 

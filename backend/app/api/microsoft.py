@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
@@ -47,8 +47,8 @@ async def ms_callback(
     """Microsoft OAuth2 callback — exchanges code for tokens."""
     if error:
         logger.error(f"MS OAuth error: {error} — {error_description}")
-        return RedirectResponse(
-            url=f"{settings.app_url}/settings?ms_error={error_description or error}"
+        return HTMLResponse(
+            content=f"<html><body><h2>Microsoft 365 connection failed.</h2><p>{error_description or error}</p><p>You can close this tab and try again.</p><script>window.close()</script></body></html>"
         )
 
     async with async_session_factory() as db:
@@ -56,13 +56,13 @@ async def ms_callback(
         success = await svc.exchange_code(code)
 
         if not success:
-            return RedirectResponse(
-                url=f"{settings.app_url}/settings?ms_error=token_exchange_failed"
+            return HTMLResponse(
+                content="<html><body><h2>Microsoft 365 connection failed.</h2><p>Token exchange failed. You can close this tab and try again.</p><script>window.close()</script></body></html>"
             )
 
         await db.commit()
-        return RedirectResponse(
-            url=f"{settings.app_url}/settings?ms_connected=true"
+        return HTMLResponse(
+            content="<html><body><h2>Microsoft 365 connected successfully!</h2><p>You can close this tab.</p><script>window.close()</script></body></html>"
         )
 
 
