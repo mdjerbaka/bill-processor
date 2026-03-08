@@ -518,11 +518,15 @@ async def get_qb_config(
     if not values.get("qbo_environment"):
         values["qbo_environment"] = settings.qbo_environment or "sandbox"
 
+    # Flag: are credentials pre-configured via .env (not entered in UI)?
+    env_configured = bool(settings.qbo_client_id and settings.qbo_client_secret)
+
     return {
         "client_id": values.get("qbo_client_id", ""),
         "client_secret_set": bool(values.get("qbo_client_secret")),
         "redirect_uri": values.get("qbo_redirect_uri", ""),
         "environment": values.get("qbo_environment", "sandbox"),
+        "env_configured": env_configured,
     }
 
 

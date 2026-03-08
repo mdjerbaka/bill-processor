@@ -263,57 +263,52 @@ export default function HelpPage() {
       >
         <p>
           Connecting QuickBooks allows the app to automatically create bills from
-          extracted invoices and sync payments.
+          extracted invoices and sync payments. Your QuickBooks app credentials have
+          been pre-configured — you just need to sign in.
         </p>
 
         <div className="space-y-3 ml-1">
-          <Step number="1" title="Create a QuickBooks app">
+          <Step number="1" title="Go to Settings">
             <p>
-              Go to the{' '}
-              <a href="https://developer.intuit.com/app/developer/dashboard" target="_blank" rel="noopener noreferrer"
-                className="text-blue-400 underline inline-flex items-center gap-1">
-                Intuit Developer Dashboard
-                <ArrowTopRightOnSquareIcon className="h-3 w-3" />
-              </a>
+              Navigate to{' '}
+              <Link to="/settings" className="text-blue-400 underline">Settings</Link>
+              {' '}and scroll to the <strong>QuickBooks Online</strong> section. You'll see a
+              green banner confirming credentials are pre-configured.
+            </p>
+          </Step>
+          <Step number="2" title="Click Connect to QuickBooks">
+            <p>
+              Click the green <strong>"Connect QuickBooks"</strong> button. A QuickBooks login
+              page will open in your browser.
+            </p>
+          </Step>
+          <Step number="3" title="Sign in with your QuickBooks account">
+            <p>
+              Sign in with your <strong>regular QuickBooks Online account</strong> (the same
+              email and password you use to log into QuickBooks). You do NOT need a
+              developer account — your normal login works.
+            </p>
+            <p>
+              If you have multiple companies, select the one you want bills posted to.
+              Click <strong>"Connect"</strong> to authorize.
+            </p>
+          </Step>
+          <Step number="4" title="Set default accounts">
+            <p>
+              After connecting, two dropdowns will appear:
             </p>
             <ul className="list-disc ml-4 space-y-1">
-              <li>Click <strong>"Create an app"</strong> → Select <strong>"QuickBooks Online and Payments"</strong></li>
-              <li>App name: <code className="bg-gray-700 px-1 rounded text-xs">Bill Processor</code></li>
-              <li>Select the scopes: <strong>Accounting</strong></li>
+              <li><strong>Expense Account</strong> — the account where bills are categorized (e.g., "Accounts Payable" or a specific expense category)</li>
+              <li><strong>Bank Account</strong> — the bank account used when marking bills as paid</li>
             </ul>
-          </Step>
-          <Step number="2" title="Configure redirect URI">
-            <p>In your app settings, go to <strong>Keys & credentials</strong> (use the <strong>Production</strong> tab for real data).</p>
-            <p>Add this redirect URI:</p>
-            <code className="block bg-gray-700 px-3 py-2 rounded text-xs text-green-300 mt-1">
-              http://localhost:8000/api/v1/quickbooks/callback
-            </code>
-          </Step>
-          <Step number="3" title="Copy your Client ID and Secret">
-            <p>From the <strong>Keys & credentials</strong> page, copy:</p>
-            <ul className="list-disc ml-4 space-y-1">
-              <li><strong>Client ID</strong></li>
-              <li><strong>Client Secret</strong></li>
-            </ul>
-          </Step>
-          <Step number="4" title="Enter credentials and connect">
-            <p>Go to <Link to="/settings" className="text-blue-400 underline">Settings</Link> → <strong>QuickBooks Configuration</strong>.</p>
-            <ul className="list-disc ml-4 space-y-1">
-              <li>Paste the Client ID and Client Secret</li>
-              <li>Set Environment to <strong>Production</strong> (or Sandbox for testing)</li>
-              <li>Click <strong>"Save Credentials"</strong></li>
-              <li>Click <strong>"Connect to QuickBooks"</strong> and authorize when prompted</li>
-            </ul>
-          </Step>
-          <Step number="5" title="Set default accounts">
-            <p>After connecting, select your default <strong>Expense Account</strong> (where bills are categorized) and <strong>Bank Account</strong> (for payments). Click <strong>"Save Defaults"</strong>.</p>
+            <p>Select the appropriate accounts and click <strong>"Save Defaults"</strong>.</p>
           </Step>
         </div>
 
         <Tip>
-          <strong>Sandbox vs Production:</strong> Use <strong>Sandbox</strong> to test with
-          fake data. Switch to <strong>Production</strong> when ready for real invoices.
-          You'll need to re-enter credentials and reconnect when switching.
+          QuickBooks tokens refresh automatically, but may expire after extended periods.
+          If you see a "Disconnected" status, just click <strong>"Reconnect"</strong> and
+          sign in again — all your data is preserved.
         </Tip>
       </Section>
 

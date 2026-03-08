@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const [msStatus, setMsStatus] = useState({ connected: false, email: '' })
   const [pollingMs, setPollingMs] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [qbEnvConfigured, setQbEnvConfigured] = useState(false)
   const [qbConfig, setQbConfig] = useState({
     client_id: '', client_secret: '', redirect_uri: '', environment: 'sandbox'
   })
@@ -104,6 +105,7 @@ export default function SettingsPage() {
           client_secret: '',
           _secret_set: qbConfigRes.data.client_secret_set || false,
         }))
+        setQbEnvConfigured(qbConfigRes.data.env_configured || false)
       }
     } catch {}
     setLoading(false)
@@ -569,62 +571,71 @@ export default function SettingsPage() {
           Connect to QuickBooks to automatically push approved bills as accounts-payable entries.
         </p>
 
-        {/* QB Credentials Form */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Client ID</label>
-            <input
-              type="text"
-              value={qbConfig.client_id}
-              onChange={(e) => setQbConfig(prev => ({ ...prev, client_id: e.target.value }))}
-              className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              placeholder="Your QuickBooks Client ID"
-            />
+        {/* QB Credentials Form — hidden when pre-configured via .env */}
+        {qbEnvConfigured ? (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2.5 bg-green-900/30 border border-green-800/50 rounded-lg">
+            <span className="w-2 h-2 bg-green-500 rounded-full" />
+            <span className="text-sm text-green-300">QuickBooks credentials are pre-configured. Just click Connect below to sign in with your QuickBooks account.</span>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Client Secret {qbConfig._secret_set && <span className="text-green-400 text-xs">(saved)</span>}
-            </label>
-            <input
-              type="password"
-              value={qbConfig.client_secret}
-              onChange={(e) => setQbConfig(prev => ({ ...prev, client_secret: e.target.value }))}
-              className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              placeholder={qbConfig._secret_set ? '••••••••' : 'Your QuickBooks Client Secret'}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Redirect URI</label>
-            <input
-              type="text"
-              value={qbConfig.redirect_uri}
-              onChange={(e) => setQbConfig(prev => ({ ...prev, redirect_uri: e.target.value }))}
-              className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              placeholder="http://localhost:8000/api/v1/quickbooks/callback"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Environment</label>
-            <select
-              value={qbConfig.environment}
-              onChange={(e) => setQbConfig(prev => ({ ...prev, environment: e.target.value }))}
-              className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-            >
-              <option value="sandbox">Sandbox</option>
-              <option value="production">Production</option>
-            </select>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Client ID</label>
+                <input
+                  type="text"
+                  value={qbConfig.client_id}
+                  onChange={(e) => setQbConfig(prev => ({ ...prev, client_id: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="Your QuickBooks Client ID"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Client Secret {qbConfig._secret_set && <span className="text-green-400 text-xs">(saved)</span>}
+                </label>
+                <input
+                  type="password"
+                  value={qbConfig.client_secret}
+                  onChange={(e) => setQbConfig(prev => ({ ...prev, client_secret: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder={qbConfig._secret_set ? '••••••••' : 'Your QuickBooks Client Secret'}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Redirect URI</label>
+                <input
+                  type="text"
+                  value={qbConfig.redirect_uri}
+                  onChange={(e) => setQbConfig(prev => ({ ...prev, redirect_uri: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="http://localhost:8000/api/v1/quickbooks/callback"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Environment</label>
+                <select
+                  value={qbConfig.environment}
+                  onChange={(e) => setQbConfig(prev => ({ ...prev, environment: e.target.value }))}
+                  className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="sandbox">Sandbox</option>
+                  <option value="production">Production</option>
+                </select>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={handleSaveQBConfig}
-            disabled={savingQB}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {savingQB ? 'Saving...' : 'Save Credentials'}
-          </button>
-        </div>
+            <div className="flex items-center gap-3 mb-4">
+              <button
+                onClick={handleSaveQBConfig}
+                disabled={savingQB}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingQB ? 'Saving...' : 'Save Credentials'}
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="border-t border-gray-700 pt-4">
           <div className="flex items-center gap-4">
