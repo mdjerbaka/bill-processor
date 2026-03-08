@@ -1,0 +1,51 @@
+# docker-compose.prod.yml — Production overrides
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# This removes volume mounts, disables --reload, and adds restart policies.
+
+services:
+  api:
+    volumes:
+      - upload_data:/app/data        # persist uploaded files only
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    volumes:
+      - upload_data:/app/data
+    command: >
+      arq app.workers.worker.WorkerSettings
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    restart: always
+
+  redis:
+    restart: always
+    volumes:
+      - redis_data:/data
+
+volumes:
+  upload_data:
+  redis_data:

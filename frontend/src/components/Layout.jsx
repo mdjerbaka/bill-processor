@@ -1,0 +1,88 @@
+import { NavLink, Outlet } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
+import {
+  InboxIcon,
+  CurrencyDollarIcon,
+  WrenchScrewdriverIcon,
+  Cog6ToothIcon,
+  HomeIcon,
+  TrashIcon,
+  ArrowRightOnRectangleIcon,
+  QuestionMarkCircleIcon,
+} from '@heroicons/react/24/outline'
+
+const navigation = [
+  { name: 'Dashboard', href: '/', icon: HomeIcon },
+  { name: 'Invoices', href: '/invoices', icon: InboxIcon },
+  { name: 'Payables', href: '/payables', icon: CurrencyDollarIcon },
+  { name: 'Jobs', href: '/jobs', icon: WrenchScrewdriverIcon },
+  { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
+  { name: 'Help', href: '/help', icon: QuestionMarkCircleIcon },
+]
+
+export default function Layout() {
+  const { logout } = useAuth()
+
+  return (
+    <div className="min-h-screen flex">
+      {/* Sidebar */}
+      <aside className="w-64 bg-gray-900 text-white flex flex-col">
+        <div className="p-6">
+          <img src="/logo.avif" alt="Logo" className="h-12 w-auto mb-3" />
+          <h1 className="text-xl font-bold">Bill Processor</h1>
+          <p className="text-gray-400 text-sm mt-1">Invoice Automation</p>
+        </div>
+
+        <nav className="flex-1 px-4 space-y-1">
+          {navigation.map((item) => (
+            <NavLink
+              key={item.name}
+              to={item.href}
+              end={item.href === '/'}
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                }`
+              }
+            >
+              <item.icon className="h-5 w-5 mr-3" />
+              {item.name}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-gray-800">
+          <NavLink
+            to="/junk"
+            className={({ isActive }) =>
+              `flex items-center px-3 py-2 text-sm rounded-lg transition-colors mb-2 ${
+                isActive
+                  ? 'bg-gray-800 text-gray-200'
+                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+              }`
+            }
+          >
+            <TrashIcon className="h-4 w-4 mr-3" />
+            Junk Bin
+          </NavLink>
+          <button
+            onClick={logout}
+            className="flex items-center w-full px-3 py-2 text-sm text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            <ArrowRightOnRectangleIcon className="h-5 w-5 mr-3" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-auto bg-gray-950">
+        <div className="p-8">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  )
+}

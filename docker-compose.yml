@@ -1,0 +1,118 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-billproc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-billproc_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-billprocessor}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-billproc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://billproc:billproc_dev@db:5432/billprocessor}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - OCR_PROVIDER=${OCR_PROVIDER:-none}
+      - AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT:-}
+      - AZURE_DOCUMENT_INTELLIGENCE_KEY=${AZURE_DOCUMENT_INTELLIGENCE_KEY:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - QBO_CLIENT_ID=${QBO_CLIENT_ID:-}
+      - QBO_CLIENT_SECRET=${QBO_CLIENT_SECRET:-}
+      - QBO_REDIRECT_URI=${QBO_REDIRECT_URI:-http://localhost:8000/api/v1/quickbooks/callback}
+      - QBO_ENVIRONMENT=${QBO_ENVIRONMENT:-sandbox}
+      - MS_CLIENT_ID=${MS_CLIENT_ID:-}
+      - MS_CLIENT_SECRET=${MS_CLIENT_SECRET:-}
+      - MS_TENANT_ID=${MS_TENANT_ID:-common}
+      - MS_REDIRECT_URI=${MS_REDIRECT_URI:-http://localhost:8000/api/v1/microsoft/callback}
+      - APP_URL=${APP_URL:-http://localhost:3000}
+    volumes:
+      - ./backend:/app
+      - upload_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://billproc:billproc_dev@db:5432/billprocessor}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - OCR_PROVIDER=${OCR_PROVIDER:-none}
+      - AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT:-}
+      - AZURE_DOCUMENT_INTELLIGENCE_KEY=${AZURE_DOCUMENT_INTELLIGENCE_KEY:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - QBO_CLIENT_ID=${QBO_CLIENT_ID:-}
+      - QBO_CLIENT_SECRET=${QBO_CLIENT_SECRET:-}
+      - QBO_REDIRECT_URI=${QBO_REDIRECT_URI:-http://localhost:8000/api/v1/quickbooks/callback}
+      - QBO_ENVIRONMENT=${QBO_ENVIRONMENT:-sandbox}
+      - MS_CLIENT_ID=${MS_CLIENT_ID:-}
+      - MS_CLIENT_SECRET=${MS_CLIENT_SECRET:-}
+      - MS_TENANT_ID=${MS_TENANT_ID:-common}
+      - MS_REDIRECT_URI=${MS_REDIRECT_URI:-http://localhost:8000/api/v1/microsoft/callback}
+      - APP_URL=${APP_URL:-http://localhost:3000}
+    volumes:
+      - ./backend:/app
+      - upload_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      watchmedo auto-restart --directory=/app --pattern="*.py" --recursive -- arq app.workers.worker.WorkerSettings
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  upload_data:
+  pgdata:

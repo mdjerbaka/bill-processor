@@ -1,0 +1,51 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.18
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.1
+greenlet==3.1.1
+
+# Redis & task queue
+redis==5.2.1
+arq==0.26.1
+
+# Auth & security
+python-jose[cryptography]==3.3.0
+bcrypt==4.0.1
+cryptography==44.0.0
+
+# HTTP client
+httpx==0.28.1
+
+# Email
+imapclient==3.0.1
+
+# OCR / Document processing
+Pillow==11.1.0
+PyMuPDF==1.25.3
+
+# Excel export
+openpyxl==3.1.5
+
+# Microsoft Graph API
+msal==1.31.0
+
+# AI / LLM
+openai==1.59.3
+
+# Pydantic
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.0
+aiosqlite==0.21.0
+
+# Utilities
+python-dateutil==2.9.0
+watchdog==4.0.0
