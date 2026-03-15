@@ -224,3 +224,110 @@ class SetupStatusResponse(BaseModel):
     has_email_config: bool
     has_qbo_connection: bool
     has_jobs: bool
+
+
+# ── Recurring Bills ──────────────────────────────────────
+class RecurringBillCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=500)
+    vendor_name: str = Field(min_length=1, max_length=500)
+    amount: float = Field(gt=0)
+    frequency: str  # monthly, quarterly, semi_annual, annual, biennial
+    due_day_of_month: int = Field(ge=1, le=31)
+    due_month: Optional[int] = Field(default=None, ge=1, le=12)
+    category: str = "other"
+    notes: Optional[str] = None
+    is_auto_pay: bool = False
+    alert_days_before: int = Field(default=7, ge=1, le=90)
+
+
+class RecurringBillUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=500)
+    vendor_name: Optional[str] = Field(default=None, max_length=500)
+    amount: Optional[float] = Field(default=None, gt=0)
+    frequency: Optional[str] = None
+    due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
+    due_month: Optional[int] = Field(default=None, ge=1, le=12)
+    category: Optional[str] = None
+    notes: Optional[str] = None
+    is_auto_pay: Optional[bool] = None
+    alert_days_before: Optional[int] = Field(default=None, ge=1, le=90)
+
+
+class RecurringBillSchema(BaseModel):
+    id: int
+    name: str
+    vendor_name: str
+    amount: float
+    frequency: str
+    due_day_of_month: int
+    due_month: Optional[int] = None
+    category: str
+    notes: Optional[str] = None
+    is_auto_pay: bool
+    is_active: bool
+    next_due_date: Optional[datetime] = None
+    alert_days_before: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RecurringBillListResponse(BaseModel):
+    items: List[RecurringBillSchema]
+    total: int
+
+
+class BillOccurrenceSchema(BaseModel):
+    id: int
+    recurring_bill_id: int
+    due_date: datetime
+    amount: float
+    status: str
+    notes: Optional[str] = None
+    bill_name: Optional[str] = None
+    vendor_name: Optional[str] = None
+    category: Optional[str] = None
+    is_auto_pay: Optional[bool] = None
+    paid_at: Optional[datetime] = None
+    matched_invoice_id: Optional[int] = None
+    days_overdue: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BillOccurrenceListResponse(BaseModel):
+    items: List[BillOccurrenceSchema]
+    total: int
+
+
+class NotificationSchema(BaseModel):
+    id: int
+    type: str
+    title: str
+    message: str
+    is_read: bool
+    related_bill_id: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationListResponse(BaseModel):
+    items: List[NotificationSchema]
+    total: int
+
+
+class CashFlowSummary(BaseModel):
+    bank_balance: float
+    outstanding_checks: float
+    total_upcoming_7d: float
+    total_upcoming_30d: float
+    total_overdue: float
+    real_available: float
+    bills_due_soon: List[BillOccurrenceSchema] = []
+    overdue_bills: List[BillOccurrenceSchema] = []

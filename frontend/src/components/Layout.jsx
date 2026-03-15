@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import NotificationBell from './NotificationBell'
 import {
   InboxIcon,
   CurrencyDollarIcon,
@@ -9,12 +10,14 @@ import {
   TrashIcon,
   ArrowRightOnRectangleIcon,
   QuestionMarkCircleIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Invoices', href: '/invoices', icon: InboxIcon },
   { name: 'Payables', href: '/payables', icon: CurrencyDollarIcon },
+  { name: 'Bills', href: '/bills', icon: CalendarDaysIcon },
   { name: 'Jobs', href: '/jobs', icon: WrenchScrewdriverIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   { name: 'Help', href: '/help', icon: QuestionMarkCircleIcon },
@@ -29,8 +32,13 @@ export default function Layout() {
       <aside className="w-64 bg-gray-900 text-white flex flex-col">
         <div className="p-6">
           <img src="/logo.avif" alt="Logo" className="h-12 w-auto mb-3" />
-          <h1 className="text-xl font-bold">Bill Processor</h1>
-          <p className="text-gray-400 text-sm mt-1">Invoice Automation</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold">Bill Processor</h1>
+              <p className="text-gray-400 text-sm mt-1">Invoice Automation</p>
+            </div>
+            <NotificationBell />
+          </div>
         </div>
 
         <nav className="flex-1 px-4 space-y-1">

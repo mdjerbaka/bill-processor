@@ -196,19 +196,3 @@ class TestInvoiceApprove:
             f"/api/v1/invoices/{inv.id}/approve", headers=auth_headers
         )
         assert resp.status_code == 400
-
-
-# ── Mark Paid ────────────────────────────────────────────────────
-
-class TestInvoiceMarkPaid:
-
-    async def test_mark_paid(
-        self, client: AsyncClient, auth_headers, db_session
-    ):
-        inv = await _create_invoice(db_session, status=InvoiceStatus.APPROVED)
-        await db_session.commit()
-        resp = await client.post(
-            f"/api/v1/invoices/{inv.id}/mark-paid", headers=auth_headers
-        )
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "paid"

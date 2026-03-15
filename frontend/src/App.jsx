@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage'
 import InvoiceListPage from './pages/InvoiceListPage'
 import InvoiceDetailPage from './pages/InvoiceDetailPage'
 import PayablesPage from './pages/PayablesPage'
+import BillsPage from './pages/BillsPage'
 import JobsPage from './pages/JobsPage'
 import SettingsPage from './pages/SettingsPage'
 import JunkBinPage from './pages/JunkBinPage'
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="invoices" element={<InvoiceListPage />} />
         <Route path="invoices/:id" element={<InvoiceDetailPage />} />
         <Route path="payables" element={<PayablesPage />} />
+        <Route path="bills" element={<BillsPage />} />
         <Route path="jobs" element={<JobsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="junk" element={<JunkBinPage />} />

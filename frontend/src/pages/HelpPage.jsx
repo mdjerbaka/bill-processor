@@ -7,6 +7,7 @@ import {
   ArrowTopRightOnSquareIcon,
   InformationCircleIcon,
   BoltIcon,
+  BanknotesIcon,
   ChevronDownIcon,
   ChevronRightIcon,
 } from '@heroicons/react/24/outline'
@@ -401,7 +402,56 @@ export default function HelpPage() {
           <p><Link to="/payables" className="text-blue-400 underline font-medium">Payables</Link> — Bills that have been sent to QuickBooks. Track outstanding vs. paid. Export to CSV.</p>
           <p><Link to="/jobs" className="text-blue-400 underline font-medium">Jobs</Link> — Manage your projects/addresses. Add, edit, or import from CSV.</p>
           <p><Link to="/settings" className="text-blue-400 underline font-medium">Settings</Link> — Configure email, OCR, QuickBooks, and Microsoft 365 connections.</p>
+          <p><Link to="/bills" className="text-blue-400 underline font-medium">Recurring Bills</Link> — Enter and track every recurring obligation. Upload a CSV to get started. See real-time cash flow, overdue alerts, and auto-match with incoming invoices.</p>
           <p><Link to="/junk" className="text-blue-400 underline font-medium">Junk Bin</Link> — Non-invoice attachments and dismissed items. You can restore anything accidentally junked.</p>
+        </div>
+      </Section>
+
+      {/* ── Recurring Bills & Cash Flow ── */}
+      <Section
+        icon={BanknotesIcon}
+        title="Recurring Bills & Cash Flow — How It Works"
+        color="bg-emerald-600"
+      >
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-gray-100 font-semibold">First-Time Setup</h3>
+            <p className="mt-1">Go to the <Link to="/bills" className="text-blue-400 underline font-medium">Recurring Bills</Link> tab. Click <strong>"Download CSV Template"</strong> — you'll get a spreadsheet pre-loaded with every common bill type (rent/mortgage, vehicles, insurance, utilities, credit cards, subscriptions, payroll, subcontractor payments, etc.). Fill in the ones that apply to your company, delete the ones that don't, then upload the file. All your bills appear in the table instantly.</p>
+            <p className="mt-1">You can also add, edit, or delete individual bills right from the page.</p>
+          </div>
+
+          <div>
+            <h3 className="text-gray-100 font-semibold">What Happens Automatically</h3>
+            <ul className="list-disc ml-4 mt-1 space-y-1">
+              <li>Every night the system checks every bill against its due date and payment frequency.</li>
+              <li>The <strong>"Days"</strong> column turns <strong className="text-orange-400">orange</strong> when a bill is 15–24 days overdue, <strong className="text-red-400">red</strong> under 15 days from the next due date, and <strong className="text-red-500">pulsing red with a "CREDIT DANGER" tag</strong> once a bill goes 25+ days past due (the window where late payments start hitting your credit report).</li>
+              <li>When a new invoice arrives by email and matches one of your recurring bills (same vendor name, similar amount), the system <strong>auto-marks that bill as paid</strong> for the current cycle and logs the date — no manual clicking required.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-gray-100 font-semibold">The Cash Flow Dashboard</h3>
+            <p className="mt-1">At the top of the <Link to="/bills" className="text-blue-400 underline font-medium">Recurring Bills</Link> page you'll see a row of cards:</p>
+            <ul className="list-disc ml-4 mt-1 space-y-1">
+              <li><strong>Monthly Bills</strong> — total of all recurring obligations for the month.</li>
+              <li><strong>Paid / Unpaid</strong> — how much has been covered vs. what's still outstanding.</li>
+              <li><strong>Bank Balance</strong> — enter your current checking-account balance (update it whenever you check the bank). You can set this on the <Link to="/payables" className="text-blue-400 underline">Payables</Link> page.</li>
+              <li><strong>Outstanding Checks</strong> — enter the dollar amount of checks you've written that haven't cleared yet.</li>
+              <li><strong>Real Available Cash</strong> = Bank Balance − Unpaid Bills − Outstanding Checks. This is the number that actually matters before you spend anything.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-gray-100 font-semibold">Day-to-Day Use</h3>
+            <ul className="list-disc ml-4 mt-1 space-y-1">
+              <li>Glance at the <strong>Days</strong> column — any orange or red means something needs attention.</li>
+              <li>Check <strong>Real Available Cash</strong> before writing a check or approving a purchase.</li>
+              <li>When you pay a bill manually, click the <strong>dollar icon</strong> on that row to mark it paid (the system timestamps it and moves the next due date forward automatically).</li>
+              <li>Right-click any bill for a context menu with edit, mark paid, and delete options.</li>
+            </ul>
+          </div>
+
+          <Tip>The entire point is to <strong>never be surprised by a bill</strong> and to always know your real available cash — not just the number the bank shows, but the number after every obligation is accounted for.</Tip>
         </div>
       </Section>
 

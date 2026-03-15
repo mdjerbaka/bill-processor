@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
@@ -18,7 +20,6 @@ from app.schemas.schemas import (
     RealBalanceResponse,
 )
 from app.services.payables_service import PayablesService
-from app.services.quickbooks_service import QuickBooksService
 
 logger = __import__('logging').getLogger(__name__)
 
@@ -71,73 +72,6 @@ async def list_payables(
         total=len(items),
         total_outstanding=summary["total_outstanding"],
         total_overdue=summary["total_overdue"],
-    )
-
-
-@router.post("/{payable_id}/mark-paid", response_model=PayableSchema)
-async def mark_payable_paid(
-    payable_id: int,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Mark a payable as paid (also marks the linked invoice as paid)."""
-    svc = PayablesService(db)
-    payable = await svc.mark_paid(payable_id)
-    if not payable:
-        raise HTTPException(status_code=404, detail="Payable not found")
-
-    # Also mark the linked invoice as paid
-    inv_result = await db.execute(
-        select(Invoice, Job)
-        .outerjoin(Job, Invoice.job_id == Job.id)
-        .where(Invoice.id == payable.invoice_id)
-    )
-    row = inv_result.one_or_none()
-    inv, job = row if row else (None, None)
-    if inv and inv.status != InvoiceStatus.PAID:
-        inv.status = InvoiceStatus.PAID
-        await db.flush()
-
-        # Sync payment to QuickBooks if connected
-        try:
-            qb_svc = QuickBooksService(db)
-            if await qb_svc.is_connected():
-                # If bill wasn't sent to QB yet, send it now
-                if not inv.qbo_bill_id:
-                    bill_id, vendor_id = await qb_svc.auto_send_bill(inv)
-                    if bill_id:
-                        inv.qbo_bill_id = bill_id
-                        inv.qbo_vendor_id = vendor_id
-                        await db.flush()
-                        logger.info(f"Sent invoice {inv.id} to QB as bill {bill_id} (on mark-paid)")
-                # Now mark the QB bill as paid
-                if inv.qbo_bill_id:
-                    payment_id = await qb_svc.auto_pay_bill(inv)
-                    if payment_id:
-                        inv.qbo_payment_id = payment_id
-                        await db.flush()
-                        logger.info(f"Synced payment to QB for invoice {inv.id}, payment {payment_id}")
-                    else:
-                        logger.warning(
-                            f"QB payment sync returned no payment ID for invoice {inv.id} "
-                            f"(qbo_bill_id={inv.qbo_bill_id}, qbo_vendor_id={inv.qbo_vendor_id})"
-                        )
-                else:
-                    logger.warning(f"No QBO bill ID after send attempt for invoice {inv.id}, skipping payment")
-        except Exception as e:
-            logger.error(f"QB payment sync failed for invoice {inv.id}: {e}")
-
-    return PayableSchema(
-        id=payable.id,
-        invoice_id=payable.invoice_id,
-        vendor_name=payable.vendor_name,
-        amount=payable.amount,
-        due_date=payable.due_date,
-        status=payable.status.value,
-        paid_at=payable.paid_at,
-        created_at=payable.created_at,
-        invoice_number=inv.invoice_number if inv else None,
-        job_name=job.name if job else None,
     )
 
 
@@ -284,7 +218,9 @@ async def backfill_missing_payables(
             payable = await svc.create_payable(inv)
             # If the invoice is already paid, mark the payable as paid too
             if inv.status == InvoiceStatus.PAID:
-                await svc.mark_paid(payable.id)
+                payable.status = PayableStatus.PAID
+                payable.paid_at = datetime.now(timezone.utc)
+                await db.flush()
             created += 1
         except Exception as e:
             logger.error(f"Backfill failed for invoice {inv.id}: {e}")

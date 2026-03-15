@@ -46,16 +46,6 @@ export default function PayablesPage() {
     }
   }
 
-  async function handleMarkPaid(id) {
-    try {
-      await payablesAPI.markPaid(id)
-      toast.success('Marked as paid')
-      loadData()
-    } catch {
-      toast.error('Failed to mark as paid')
-    }
-  }
-
   async function handleJunk(id) {
     try {
       await payablesAPI.junk(id)
@@ -161,7 +151,6 @@ export default function PayablesPage() {
               <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">Amount</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Due Date</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Status</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">
@@ -199,14 +188,6 @@ export default function PayablesPage() {
                     }`}>
                       {p.status}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleMarkPaid(p.id)}
-                      className="text-sm text-blue-400 hover:underline"
-                    >
-                      Mark Paid
-                    </button>
                   </td>
                 </tr>
               )

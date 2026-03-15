@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { invoicesAPI, payablesAPI, healthAPI, settingsAPI } from '../services/api'
+import { invoicesAPI, payablesAPI, healthAPI, settingsAPI, recurringBillsAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   InboxIcon,
@@ -36,6 +36,9 @@ export default function DashboardPage() {
     outstanding: 0,
     overdue: 0,
     realBalance: null,
+    billsDueSoon: 0,
+    billsOverdue: 0,
+    nextBill: null,
   })
   const [health, setHealth] = useState(null)
   const [recentInvoices, setRecentInvoices] = useState([])
@@ -52,11 +55,12 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
     try {
-      const [invoicesRes, payablesRes, balanceRes, healthRes] = await Promise.allSettled([
+      const [invoicesRes, payablesRes, balanceRes, healthRes, cashFlowRes] = await Promise.allSettled([
         invoicesAPI.list({ page: 1, page_size: 15 }),
         payablesAPI.list(),
         payablesAPI.getRealBalance(),
         healthAPI.check(),
+        recurringBillsAPI.getCashFlow(),
       ])
 
       if (invoicesRes.status === 'fulfilled') {
@@ -80,6 +84,16 @@ export default function DashboardPage() {
 
       if (healthRes.status === 'fulfilled') {
         setHealth(healthRes.value.data)
+      }
+
+      if (cashFlowRes.status === 'fulfilled') {
+        const cf = cashFlowRes.value.data
+        setStats((s) => ({
+          ...s,
+          billsDueSoon: (cf.bills_due_soon || []).length,
+          billsOverdue: (cf.overdue_bills || []).length,
+          nextBill: (cf.bills_due_soon || [])[0] || null,
+        }))
       }
 
       // Count needs_review
@@ -174,6 +188,36 @@ export default function DashboardPage() {
           icon={CheckCircleIcon}
           color="bg-green-500"
           link="/payables"
+        />
+      </div>
+
+      {/* Bills Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <StatCard
+          title="Bills Due This Week"
+          value={stats.billsDueSoon}
+          icon={ClockIcon}
+          color="bg-yellow-500"
+          link="/bills"
+        />
+        {stats.billsOverdue > 0 && (
+          <StatCard
+            title="Overdue Bills"
+            value={stats.billsOverdue}
+            icon={ExclamationTriangleIcon}
+            color="bg-red-600"
+            link="/bills"
+          />
+        )}
+        <StatCard
+          title="Next Bill Due"
+          value={stats.nextBill
+            ? `${stats.nextBill.bill_name} — ${new Date(stats.nextBill.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+            : 'None'
+          }
+          icon={ClockIcon}
+          color="bg-blue-500"
+          link="/bills"
         />
       </div>
 

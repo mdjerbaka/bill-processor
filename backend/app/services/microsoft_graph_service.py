@@ -408,3 +408,61 @@ class MicrosoftGraphService:
         self.db.add(attachment)
         await self.db.flush()
         return attachment.id
+
+    # ── Send Mail ────────────────────────────────────────
+
+    async def send_mail(
+        self, subject: str, body_html: str, to_email: Optional[str] = None
+    ) -> bool:
+        """Send an email via Microsoft Graph API.
+
+        If to_email is not provided, sends to the connected user's own email
+        (useful for self-notifications).
+        """
+        access = await self._get_valid_token()
+        if not access:
+            logger.warning("MS Graph not connected, cannot send mail")
+            return False
+
+        # Resolve recipient
+        if not to_email:
+            result = await self.db.execute(select(MSGraphToken).limit(1))
+            token = result.scalar_one_or_none()
+            to_email = token.email_address if token else None
+            if not to_email:
+                logger.error("No recipient email and no connected email address")
+                return False
+
+        payload = {
+            "message": {
+                "subject": subject,
+                "body": {
+                    "contentType": "HTML",
+                    "content": body_html,
+                },
+                "toRecipients": [
+                    {"emailAddress": {"address": to_email}}
+                ],
+            },
+            "saveToSentItems": "true",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{MS_GRAPH_BASE}/me/sendMail",
+                    headers={
+                        "Authorization": f"Bearer {access}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+            if resp.status_code == 202:
+                logger.info(f"Email sent successfully to {to_email}: {subject}")
+                return True
+            else:
+                logger.error(f"Send mail failed: {resp.status_code} {resp.text[:300]}")
+                return False
+        except Exception as e:
+            logger.error(f"Send mail exception: {e}")
+            return False

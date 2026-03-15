@@ -128,28 +128,6 @@ class TestPayablesService:
         assert payable.amount == 1500.0
         assert payable.status == PayableStatus.OUTSTANDING
 
-    async def test_mark_paid(self, db_session: AsyncSession):
-        inv = Invoice(
-            vendor_name="V", total_amount=100,
-            status=InvoiceStatus.APPROVED,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-        )
-        db_session.add(inv)
-        await db_session.flush()
-
-        payable = Payable(
-            invoice_id=inv.id, vendor_name="V", amount=100,
-            status=PayableStatus.OUTSTANDING,
-        )
-        db_session.add(payable)
-        await db_session.flush()
-
-        svc = PayablesService(db_session)
-        result = await svc.mark_paid(payable.id)
-        assert result.status == PayableStatus.PAID
-        assert result.paid_at is not None
-
     async def test_summary_calculations(self, db_session: AsyncSession):
         for i, amount in enumerate([500, 300, 200]):
             inv = Invoice(

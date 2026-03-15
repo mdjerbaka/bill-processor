@@ -46,7 +46,6 @@ export const invoicesAPI = {
   get: (id) => api.get(`/invoices/${id}`),
   update: (id, data) => api.put(`/invoices/${id}`, data),
   approve: (id) => api.post(`/invoices/${id}/approve`),
-  markPaid: (id) => api.post(`/invoices/${id}/mark-paid`),
   junk: (id) => api.post(`/invoices/${id}/junk`),
   restore: (id) => api.post(`/invoices/${id}/restore`),
   getMatchSuggestions: (id) => api.get(`/invoices/${id}/match-suggestions`),
@@ -75,7 +74,6 @@ export const jobsAPI = {
 // ── Payables ────────────────────────────────────────────
 export const payablesAPI = {
   list: (includePaid = false) => api.get('/payables', { params: { include_paid: includePaid } }),
-  markPaid: (id) => api.post(`/payables/${id}/mark-paid`),
   junk: (id) => api.post(`/payables/${id}/junk`),
   restore: (id) => api.post(`/payables/${id}/restore`),
   setBankBalance: (balance) => api.post('/payables/bank-balance', { bank_balance: balance }),
@@ -131,6 +129,37 @@ export const healthAPI = {
 // ── Junk Bin ────────────────────────────────────────────
 export const junkAPI = {
   list: () => api.get('/junk'),
+}
+
+// ── Recurring Bills ─────────────────────────────────────
+export const recurringBillsAPI = {
+  list: (includeInactive = false) => api.get('/recurring-bills', { params: { include_inactive: includeInactive } }),
+  create: (data) => api.post('/recurring-bills', data),
+  update: (id, data) => api.put(`/recurring-bills/${id}`, data),
+  delete: (id) => api.delete(`/recurring-bills/${id}`),
+  listOccurrences: (params) => api.get('/recurring-bills/occurrences', { params }),
+  skip: (occurrenceId) => api.post(`/recurring-bills/occurrences/${occurrenceId}/skip`),
+  markPaid: (occurrenceId) => api.post(`/recurring-bills/occurrences/${occurrenceId}/mark-paid`),
+  getCashFlow: () => api.get('/recurring-bills/cash-flow'),
+  getCalendar: (startDate, endDate) => api.get('/recurring-bills/calendar', { params: { start_date: startDate, end_date: endDate } }),
+  bulkImport: (bills) => api.post('/recurring-bills/import', bills),
+  setOutstandingChecks: (amount) => api.post('/recurring-bills/outstanding-checks', { amount }),
+  importCSV: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/recurring-bills/import-csv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  downloadTemplate: () => api.get('/recurring-bills/template-csv', { responseType: 'blob' }),
+}
+
+// ── Notifications ───────────────────────────────────────
+export const notificationsAPI = {
+  list: (includeRead = false) => api.get('/notifications', { params: { include_read: includeRead } }),
+  count: () => api.get('/notifications/count'),
+  markRead: (id) => api.post(`/notifications/${id}/read`),
+  markAllRead: () => api.post('/notifications/read-all'),
 }
 
 export default api

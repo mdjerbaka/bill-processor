@@ -1,0 +1,64 @@
+name,vendor_name,amount,frequency,due_day_of_month,due_month,category,is_auto_pay,alert_days_before,notes
+Mortgage - Dan,Lender Name,2500.00,monthly,1,,mortgage,no,7,
+Mortgage - Dave,Lender Name,2200.00,monthly,1,,mortgage,no,7,
+Vehicle Payment 1,Finance Company,450.00,monthly,15,,vehicle,yes,7,
+Vehicle Payment 2,Finance Company,450.00,monthly,15,,vehicle,yes,7,
+Vehicle Payment 3,Finance Company,500.00,monthly,15,,vehicle,yes,7,
+Vehicle Payment 4,Finance Company,400.00,monthly,15,,vehicle,yes,7,
+Vehicle Payment 5,Finance Company,375.00,monthly,15,,vehicle,yes,7,
+Vehicle Payment 6,Finance Company,425.00,monthly,15,,vehicle,yes,7,
+Electric - Property 1,National Grid,180.00,monthly,15,,electric,no,7,
+Electric - Property 2,National Grid,150.00,monthly,15,,electric,no,7,
+Electric - Property 3,National Grid,120.00,monthly,15,,electric,no,7,
+Water - Property 1,City Water Dept,65.00,monthly,10,,water,no,7,
+Water - Property 2,City Water Dept,55.00,monthly,10,,water,no,7,
+Water - Property 3,City Water Dept,60.00,monthly,10,,water,no,7,
+Sewer,City Sewer Dept,85.00,monthly,10,,sewer,no,7,
+Internet - Location 1,ISP Provider,75.00,monthly,20,,internet,yes,7,
+Internet - Location 2,ISP Provider,65.00,monthly,20,,internet,yes,7,
+Vehicle Insurance - Policy 1,Insurance Co,200.00,monthly,1,,vehicle_insurance,yes,7,
+Vehicle Insurance - Policy 2,Insurance Co,175.00,monthly,1,,vehicle_insurance,yes,7,
+Health Insurance,Health Ins Provider,850.00,monthly,1,,health_insurance,yes,7,
+Liability Insurance,Liability Ins Provider,350.00,monthly,1,,liability_insurance,yes,7,
+Life Insurance - Policy 1,Life Ins Company,50.00,monthly,1,,life_insurance,yes,7,
+Life Insurance - Policy 2,Life Ins Company,45.00,monthly,1,,life_insurance,yes,7,
+Life Insurance - Policy 3,Life Ins Company,40.00,monthly,1,,life_insurance,yes,7,
+Credit Card 1,Card Issuer,500.00,monthly,25,,credit_card,no,7,
+Credit Card 2,Card Issuer,400.00,monthly,25,,credit_card,no,7,
+Credit Card 3,Card Issuer,350.00,monthly,20,,credit_card,no,7,
+Credit Card 4,Card Issuer,300.00,monthly,15,,credit_card,no,7,
+Credit Card 5,Card Issuer,250.00,monthly,10,,credit_card,no,7,
+Credit Card 6,Card Issuer,200.00,monthly,5,,credit_card,no,7,
+Credit Card 7,Card Issuer,150.00,monthly,28,,credit_card,no,7,
+Bookkeeper,Bookkeeper Name,500.00,monthly,1,,bookkeeper,no,7,
+SBA Loan,SBA,350.00,monthly,15,,loan,yes,7,
+Equity Loan 1,Lender Name,275.00,monthly,1,,loan,yes,7,
+Equity Loan 2,Lender Name,250.00,monthly,1,,loan,yes,7,
+Equity Loan 3,Lender Name,225.00,monthly,1,,loan,yes,7,
+Lull Payment,Lull Finance,300.00,monthly,15,,loan,yes,7,
+Student Loan,Student Loan Servicer,250.00,monthly,15,,loan,yes,7,
+DCU Loan,DCU,200.00,monthly,1,,loan,yes,7,
+BT Subscription,Buildertrend,100.00,monthly,1,,subscription,yes,7,
+AI Subscription,AI Provider,20.00,monthly,1,,subscription,yes,7,
+Microsoft 365,Microsoft,22.00,monthly,1,,subscription,yes,7,
+AAA Membership - Dan,AAA,15.00,monthly,1,,subscription,yes,7,
+AAA Membership - Dave,AAA,15.00,monthly,1,,subscription,yes,7,
+Peloton,Peloton,44.00,monthly,1,,subscription,yes,7,
+Trash Removal - Dumpster,Pits Dumpster,475.00,monthly,18,,trash,no,7,
+Phone Bill,Phone Provider,200.00,monthly,5,,phone,yes,7,
+Workers Comp Insurance,Workers Comp Provider,4200.00,annual,1,3,workers_comp,no,14,Annual premium
+Water - Quarterly 1,City Water Dept,180.00,quarterly,1,1,water,no,14,Quarterly bill
+Water - Quarterly 2,City Water Dept,160.00,quarterly,1,1,water,no,14,Quarterly bill
+Sewer - Quarterly,City Sewer Dept,220.00,quarterly,1,1,sewer,no,14,Quarterly bill
+CPA Services,CPA Firm,1500.00,quarterly,15,1,cpa,no,14,Quarterly accounting
+Company Taxes - Quarterly,IRS / DOR,5000.00,quarterly,15,1,taxes,no,14,Estimated quarterly tax payment
+Dan Taxes - Annual,IRS / DOR,3000.00,annual,15,4,taxes,no,30,Annual personal tax filing
+Dave Taxes - Annual,IRS / DOR,3000.00,annual,15,4,taxes,no,30,Annual personal tax filing
+Vehicle Excise Tax,City/Town Clerk,500.00,annual,1,2,registration,no,14,
+Vehicle Registrations,RMV,200.00,annual,1,6,registration,no,30,
+CSL License - Dave,MA DPL,150.00,biennial,1,6,license,no,60,Renews every 2 years
+HIC License - Dave,MA DPL,150.00,biennial,1,6,license,no,60,Renews every 2 years
+Hoisting License 1,MA DPS,100.00,biennial,1,9,license,no,60,Renews every 2 years
+Hoisting License 2,MA DPS,100.00,biennial,1,9,license,no,60,Renews every 2 years
+Payroll,Payroll Provider,8000.00,monthly,15,,payroll,yes,7,Biweekly but tracked monthly
+Subcontractor Payments,Various Subs,5000.00,monthly,30,,subcontractor,no,7,Varies by project

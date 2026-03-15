@@ -5,8 +5,6 @@ from __future__ import annotations
 import io
 import logging
 from datetime import datetime, timezone
-from typing import Optional
-
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -43,18 +41,6 @@ class PayablesService:
         )
         self.db.add(payable)
         await self.db.flush()
-        return payable
-
-    async def mark_paid(self, payable_id: int) -> Optional[Payable]:
-        """Mark a payable as paid."""
-        result = await self.db.execute(
-            select(Payable).where(Payable.id == payable_id)
-        )
-        payable = result.scalar_one_or_none()
-        if payable:
-            payable.status = PayableStatus.PAID
-            payable.paid_at = datetime.now(timezone.utc)
-            await self.db.flush()
         return payable
 
     async def get_outstanding_payables(self) -> list[Payable]:

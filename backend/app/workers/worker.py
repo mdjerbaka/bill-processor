@@ -30,6 +30,9 @@ from app.services.job_matching_service import JobMatchingService
 from app.services.ocr_service import get_ocr_provider_async
 from app.services.quickbooks_service import QuickBooksService
 from app.services.payables_service import PayablesService
+from app.services.recurring_bills_service import RecurringBillsService
+from app.services.notification_service import NotificationService
+from app.services.microsoft_graph_service import MicrosoftGraphService
 
 from sqlalchemy import select, func
 
@@ -38,6 +41,17 @@ settings = get_settings()
 
 # Simple lock to prevent overlapping polls
 _poll_lock = asyncio.Lock()
+
+
+async def _try_match_recurring_bill(db, invoice):
+    """Try to auto-match an invoice to a recurring bill occurrence."""
+    try:
+        bills_svc = RecurringBillsService(db)
+        matched = await bills_svc.auto_match_invoice(invoice)
+        if matched:
+            logger.info(f"Invoice {invoice.id} auto-matched to bill occurrence {matched.id}")
+    except Exception as e:
+        logger.error(f"Recurring bill auto-match failed for invoice {invoice.id}: {e}")
 
 
 async def poll_email_inbox(ctx: dict) -> dict:
@@ -192,6 +206,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                                     f"Extracted invoice {invoice.id} from email body: "
                                     f"vendor={extracted.vendor_name}, total={extracted.total_amount}"
                                 )
+                                await _try_match_recurring_bill(db, invoice)
                                 email_record.status = EmailStatus.EXTRACTED
                                 await db.commit()
                                 return {"invoices_created": 1, "source": "body_text"}
@@ -332,6 +347,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                     f"vendor={extracted.vendor_name}, total={extracted.total_amount}, "
                     f"confidence={extracted.confidence_score:.2f}"
                 )
+                await _try_match_recurring_bill(db, invoice)
 
             except Exception as e:
                 logger.error(f"OCR extraction failed for attachment {att.id}: {e}")
@@ -438,6 +454,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                                 f"Extracted invoice {invoice.id} from email body (fallback): "
                                 f"vendor={extracted.vendor_name}, total={extracted.total_amount}"
                             )
+                            await _try_match_recurring_bill(db, invoice)
             except Exception as e:
                 logger.error(f"Body text fallback extraction failed for email {email_id}: {e}")
 
@@ -447,16 +464,88 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
     return {"invoices_created": invoices_created}
 
 
+async def generate_bill_occurrences(ctx: dict) -> dict:
+    """Cron: Generate upcoming bill occurrences and update statuses."""
+    async with async_session_factory() as db:
+        svc = RecurringBillsService(db)
+
+        # Generate occurrences for the next 60 days
+        created = await svc.generate_occurrences(days_ahead=60)
+
+        # Update overdue and due-soon statuses
+        overdue_count = await svc.check_overdue()
+        due_soon_count = await svc.check_due_soon()
+
+        # Generate notifications for due-soon and overdue bills
+        notif_svc = NotificationService(db)
+        due_notifs = await notif_svc.generate_due_soon_notifications()
+        overdue_notifs = await notif_svc.generate_overdue_notifications()
+        credit_danger_notifs = await notif_svc.generate_credit_danger_notifications()
+
+        await db.commit()
+
+    logger.info(
+        f"Bill occurrences: {created} created, {overdue_count} overdue, "
+        f"{due_soon_count} due soon, {due_notifs + overdue_notifs + credit_danger_notifs} notifications"
+    )
+    return {
+        "occurrences_created": created,
+        "overdue": overdue_count,
+        "due_soon": due_soon_count,
+        "notifications": due_notifs + overdue_notifs + credit_danger_notifs,
+    }
+
+
+async def send_daily_digest(ctx: dict) -> dict:
+    """Cron: Send daily email digest of upcoming and overdue bills."""
+    async with async_session_factory() as db:
+        notif_svc = NotificationService(db)
+        graph_svc = MicrosoftGraphService(db)
+
+        # Check if MS Graph is connected
+        connected = await graph_svc.is_connected()
+        if not connected:
+            logger.info("MS Graph not connected, skipping daily digest email")
+            return {"skipped": True, "reason": "MS Graph not connected"}
+
+        # Build digest HTML
+        html = await notif_svc.build_daily_digest_html()
+        if not html:
+            logger.info("No bills to report in daily digest")
+            return {"skipped": True, "reason": "Nothing to report"}
+
+        # Send email
+        sent = await graph_svc.send_mail(
+            subject="Bill Processor — Daily Digest",
+            body_html=html,
+        )
+
+        await db.commit()
+
+    return {"sent": sent}
+
+
 class WorkerSettings:
     """ARQ worker configuration."""
 
-    functions = [poll_email_inbox, process_email_attachments]
+    functions = [poll_email_inbox, process_email_attachments, generate_bill_occurrences, send_daily_digest]
 
     cron_jobs = [
         cron(
             poll_email_inbox,
             second={0, 30},
             run_at_startup=True,
+        ),
+        cron(
+            generate_bill_occurrences,
+            hour={0},
+            minute={0},
+            run_at_startup=True,
+        ),
+        cron(
+            send_daily_digest,
+            hour={7},
+            minute={0},
         ),
     ]
 

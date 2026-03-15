@@ -59,6 +59,57 @@ class JobSource(str, enum.Enum):
     QUICKBOOKS = "quickbooks"
 
 
+class BillFrequency(str, enum.Enum):
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+    SEMI_ANNUAL = "semi_annual"
+    ANNUAL = "annual"
+    BIENNIAL = "biennial"
+
+
+class BillCategory(str, enum.Enum):
+    MORTGAGE = "mortgage"
+    VEHICLE = "vehicle"
+    ELECTRIC = "electric"
+    WATER = "water"
+    SEWER = "sewer"
+    INTERNET = "internet"
+    VEHICLE_INSURANCE = "vehicle_insurance"
+    HEALTH_INSURANCE = "health_insurance"
+    LIABILITY_INSURANCE = "liability_insurance"
+    LIFE_INSURANCE = "life_insurance"
+    CREDIT_CARD = "credit_card"
+    BOOKKEEPER = "bookkeeper"
+    LOAN = "loan"
+    SUBSCRIPTION = "subscription"
+    TRASH = "trash"
+    PHONE = "phone"
+    WORKERS_COMP = "workers_comp"
+    CPA = "cpa"
+    TAXES = "taxes"
+    REGISTRATION = "registration"
+    LICENSE = "license"
+    PAYROLL = "payroll"
+    SUBCONTRACTOR = "subcontractor"
+    OTHER = "other"
+
+
+class OccurrenceStatus(str, enum.Enum):
+    UPCOMING = "upcoming"
+    DUE_SOON = "due_soon"
+    OVERDUE = "overdue"
+    SKIPPED = "skipped"
+    PAID = "paid"
+
+
+class NotificationType(str, enum.Enum):
+    BILL_DUE_SOON = "bill_due_soon"
+    BILL_OVERDUE = "bill_overdue"
+    BILL_CREDIT_DANGER = "bill_credit_danger"
+    DAILY_DIGEST = "daily_digest"
+    BALANCE_LOW = "balance_low"
+
+
 # ── User ─────────────────────────────────────────────────
 class User(Base):
     __tablename__ = "users"
@@ -263,3 +314,64 @@ class MSGraphToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ── Recurring Bill ───────────────────────────────────────
+class RecurringBill(Base):
+    __tablename__ = "recurring_bills"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    vendor_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    frequency: Mapped[BillFrequency] = mapped_column(Enum(BillFrequency), nullable=False)
+    due_day_of_month: Mapped[int] = mapped_column(Integer, nullable=False)
+    due_month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    category: Mapped[BillCategory] = mapped_column(Enum(BillCategory), default=BillCategory.OTHER)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_auto_pay: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    next_due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    alert_days_before: Mapped[int] = mapped_column(Integer, default=7)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    # Relationships
+    occurrences: Mapped[List["BillOccurrence"]] = relationship(back_populates="recurring_bill", cascade="all, delete-orphan")
+    notifications: Mapped[List["Notification"]] = relationship(back_populates="recurring_bill")
+
+
+# ── Bill Occurrence ──────────────────────────────────────
+class BillOccurrence(Base):
+    __tablename__ = "bill_occurrences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    recurring_bill_id: Mapped[int] = mapped_column(ForeignKey("recurring_bills.id"), nullable=False)
+    due_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[OccurrenceStatus] = mapped_column(
+        Enum(OccurrenceStatus), default=OccurrenceStatus.UPCOMING
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    matched_invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    # Relationships
+    recurring_bill: Mapped["RecurringBill"] = relationship(back_populates="occurrences")
+
+
+# ── Notification ─────────────────────────────────────────
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    type: Mapped[NotificationType] = mapped_column(Enum(NotificationType), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    related_bill_id: Mapped[Optional[int]] = mapped_column(ForeignKey("recurring_bills.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    # Relationships
+    recurring_bill: Mapped[Optional["RecurringBill"]] = relationship(back_populates="notifications")

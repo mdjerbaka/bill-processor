@@ -90,27 +90,6 @@ class TestPayablesList:
         assert resp.json()["total"] == 2
 
 
-class TestMarkPaid:
-
-    async def test_mark_paid(
-        self, client: AsyncClient, auth_headers, db_session
-    ):
-        _, payable = await _create_payable(db_session)
-        await db_session.commit()
-        resp = await client.post(
-            f"/api/v1/payables/{payable.id}/mark-paid", headers=auth_headers
-        )
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "paid"
-        assert resp.json()["paid_at"] is not None
-
-    async def test_mark_paid_not_found(self, client: AsyncClient, auth_headers):
-        resp = await client.post(
-            "/api/v1/payables/9999/mark-paid", headers=auth_headers
-        )
-        assert resp.status_code == 404
-
-
 class TestBankBalance:
 
     async def test_set_and_get_balance(

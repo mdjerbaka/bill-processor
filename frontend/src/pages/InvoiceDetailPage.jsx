@@ -87,16 +87,6 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  async function handleMarkPaid() {
-    try {
-      const res = await invoicesAPI.markPaid(id)
-      setInvoice(res.data)
-      toast.success('Invoice marked as paid')
-    } catch (err) {
-      toast.error('Failed to mark as paid')
-    }
-  }
-
   async function handleJunk() {
     if (!confirm('Send this invoice to the junk bin?')) return
     try {
@@ -360,14 +350,6 @@ export default function InvoiceDetailPage() {
                 className="flex-1 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
               >
                 Approve & Add to Payables
-              </button>
-            )}
-            {['approved', 'sent_to_qb'].includes(invoice.status) && (
-              <button
-                onClick={handleMarkPaid}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
-              >
-                Mark as Paid
               </button>
             )}
             <button
