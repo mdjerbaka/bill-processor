@@ -31,8 +31,9 @@ fi
 
 # ── Update system ────────────────────────────────────────
 echo "[1/6] Updating system packages..."
+export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get upgrade -y -qq
+apt-get upgrade -y -qq -o Dpkg::Options::="--force-confold"
 
 # ── Install Docker ───────────────────────────────────────
 echo "[2/6] Installing Docker..."
