@@ -30,6 +30,7 @@ api.interceptors.response.use(
 export const authAPI = {
   setupStatus: () => api.get('/auth/setup-status'),
   setup: (data) => api.post('/auth/setup', data),
+  changePassword: (data) => api.post('/auth/change-password', data),
   login: (username, password) => {
     const formData = new URLSearchParams()
     formData.append('username', username)

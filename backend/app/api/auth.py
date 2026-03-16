@@ -16,6 +16,7 @@ from app.core.security import (
 )
 from app.models.models import AppSetting, Job, QBOToken, User
 from app.schemas.schemas import (
+    ChangePasswordRequest,
     LoginRequest,
     SetupRequest,
     SetupStatusResponse,
@@ -83,6 +84,20 @@ async def login(
 
     token = create_access_token({"sub": user.username})
     return TokenResponse(access_token=token)
+
+
+@router.post("/change-password")
+async def change_password(
+    req: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the current user's password."""
+    if not verify_password(req.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    current_user.hashed_password = hash_password(req.new_password)
+    await db.flush()
+    return {"message": "Password changed successfully"}
 
 
 @router.get("/setup-status", response_model=SetupStatusResponse)

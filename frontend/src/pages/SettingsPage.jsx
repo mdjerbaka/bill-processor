@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { settingsAPI, quickbooksAPI, healthAPI, microsoftAPI } from '../services/api'
+import { settingsAPI, quickbooksAPI, healthAPI, microsoftAPI, authAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function SettingsPage() {
@@ -30,6 +30,8 @@ export default function SettingsPage() {
   const [qbAccounts, setQbAccounts] = useState({ expense_accounts: [], bank_accounts: [] })
   const [qbDefaults, setQbDefaults] = useState({ expense_account: '', bank_account: '' })
   const [savingQBDefaults, setSavingQBDefaults] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ current: '', newPw: '', confirm: '' })
+  const [savingPassword, setSavingPassword] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -756,6 +758,65 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Change Password */}
+      <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4 text-gray-100">Change Password</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Current Password</label>
+            <input
+              type="password"
+              value={passwordForm.current}
+              onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">New Password</label>
+            <input
+              type="password"
+              value={passwordForm.newPw}
+              onChange={(e) => setPasswordForm({ ...passwordForm, newPw: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Confirm New Password</label>
+            <input
+              type="password"
+              value={passwordForm.confirm}
+              onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg text-sm"
+            />
+          </div>
+          <button
+            disabled={savingPassword || !passwordForm.current || !passwordForm.newPw || !passwordForm.confirm}
+            onClick={async () => {
+              if (passwordForm.newPw !== passwordForm.confirm) {
+                toast.error('New passwords do not match')
+                return
+              }
+              if (passwordForm.newPw.length < 8) {
+                toast.error('Password must be at least 8 characters')
+                return
+              }
+              setSavingPassword(true)
+              try {
+                await authAPI.changePassword({ current_password: passwordForm.current, new_password: passwordForm.newPw })
+                toast.success('Password changed successfully')
+                setPasswordForm({ current: '', newPw: '', confirm: '' })
+              } catch (err) {
+                toast.error(err.response?.data?.detail || 'Failed to change password')
+              }
+              setSavingPassword(false)
+            }}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {savingPassword ? 'Saving...' : 'Change Password'}
+          </button>
+        </div>
+      </div>
 
       {/* Danger Zone */}
       <div className="bg-gray-800 rounded-xl shadow-sm border border-red-900/50 p-6">

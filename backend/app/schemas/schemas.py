@@ -22,6 +22,11 @@ class SetupRequest(BaseModel):
     password: str = Field(min_length=8, max_length=200)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=200)
+
+
 # ── Email Config ─────────────────────────────────────────
 class EmailConfigRequest(BaseModel):
     imap_host: str
