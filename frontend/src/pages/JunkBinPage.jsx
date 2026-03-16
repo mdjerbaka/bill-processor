@@ -75,7 +75,7 @@ export default function JunkBinPage() {
       </div>
 
       {/* Content */}
-      <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 overflow-hidden">
+      <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 overflow-hidden overflow-x-auto">
         {tab === 'invoices' && (
           <table className="w-full">
             <thead className="bg-gray-900 border-b border-gray-700">

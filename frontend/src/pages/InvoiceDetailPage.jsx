@@ -317,9 +317,9 @@ export default function InvoiceDetailPage() {
 
           {/* Line Items */}
           {invoice.line_items?.length > 0 && (
-            <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6">
+            <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6 overflow-x-auto">
               <h2 className="text-lg font-semibold mb-4 text-gray-100">Line Items</h2>
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[400px]">
                 <thead>
                   <tr className="border-b border-gray-700">
                     <th className="text-left py-2 text-gray-400 font-medium">Description</th>

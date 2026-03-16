@@ -106,8 +106,8 @@ export default function InvoiceListPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 overflow-hidden overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead className="bg-gray-900 border-b border-gray-700">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Vendor</th>

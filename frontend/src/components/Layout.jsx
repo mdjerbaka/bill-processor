@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import NotificationBell from './NotificationBell'
 import {
@@ -11,6 +12,8 @@ import {
   ArrowRightOnRectangleIcon,
   QuestionMarkCircleIcon,
   CalendarDaysIcon,
+  Bars3Icon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 
 const navigation = [
@@ -25,13 +28,50 @@ const navigation = [
 
 export default function Layout() {
   const { logout } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const location = useLocation()
+
+  // Close sidebar on navigation
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="min-h-screen flex">
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-gray-800 rounded-lg text-gray-300 hover:text-white"
+      >
+        <Bars3Icon className="h-6 w-6" />
+      </button>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-white flex flex-col">
+      <aside className={`
+        fixed md:static inset-y-0 left-0 z-50
+        w-64 bg-gray-900 text-white flex flex-col
+        transform transition-transform duration-200 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0
+      `}>
         <div className="p-6">
-          <img src="/logo.avif" alt="Logo" className="h-12 w-auto mb-3" />
+          <div className="flex items-center justify-between mb-3">
+            <img src="/logo.avif" alt="Logo" className="h-12 w-auto" />
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden p-1 text-gray-400 hover:text-white"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold">Bill Processor</h1>
@@ -86,8 +126,8 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto bg-gray-950">
-        <div className="p-8">
+      <main className="flex-1 overflow-auto bg-gray-950 md:ml-0">
+        <div className="p-4 pt-16 md:pt-8 md:p-8">
           <Outlet />
         </div>
       </main>
