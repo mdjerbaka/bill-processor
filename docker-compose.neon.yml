@@ -1,0 +1,28 @@
+# docker-compose.neon.yml — Override to use external Neon Postgres (no local db)
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.neon.yml up -d --build
+#
+# Requires DATABASE_URL in .env pointing to your Neon database, e.g.:
+#   DATABASE_URL=postgresql+asyncpg://user:pass@ep-xyz.us-east-2.aws.neon.tech/billprocessor?ssl=require
+
+services:
+  db:
+    profiles:
+      - disabled          # never starts unless explicitly requested
+
+  api:
+    depends_on:
+      db:
+        condition: service_started
+        required: false
+      redis:
+        condition: service_healthy
+
+  worker:
+    depends_on:
+      db:
+        condition: service_started
+        required: false
+      redis:
+        condition: service_healthy

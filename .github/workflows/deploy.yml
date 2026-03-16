@@ -2,7 +2,7 @@ name: Deploy Bill Processor
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 env:
   DOCKER_REGISTRY: ghcr.io
@@ -55,6 +55,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /opt/bill-processor
-            docker compose pull
-            docker compose up -d --remove-orphans
+            git pull origin master
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.neon.yml up -d --build --remove-orphans
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.neon.yml exec -T api alembic upgrade head
             docker image prune -f

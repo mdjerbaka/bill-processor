@@ -1,7 +1,11 @@
 # docker-compose.prod.yml — Production overrides
 #
-# Usage:
+# Usage (local Docker with built-in Postgres):
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Usage (VPS/DigitalOcean with external Neon Postgres):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile vps up -d --build
+#   (This skips the local db service. Set DATABASE_URL in .env to your Neon connection string.)
 #
 # This removes volume mounts, disables --reload, and adds restart policies.
 
