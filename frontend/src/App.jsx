@@ -43,6 +43,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/setup" element={<SetupWizard />} />
       <Route path="/" element={
         <ProtectedRoute>
           <Layout />

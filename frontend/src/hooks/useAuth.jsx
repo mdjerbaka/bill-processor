@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
       setSetupStatus(res.data)
       setIsSetup(res.data.is_setup_complete)
     } catch {
+      setSetupStatus({ has_user: false })
       setIsSetup(false)
     }
   }
