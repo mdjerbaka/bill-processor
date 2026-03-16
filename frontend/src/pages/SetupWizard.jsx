@@ -71,24 +71,24 @@ export default function SetupWizard() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8">
-        <h1 className="text-2xl font-bold text-center mb-2">Welcome to Bill Processor</h1>
-        <p className="text-gray-500 text-center mb-6">Let's get you set up in a few steps</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-950">
+      <div className="max-w-lg w-full bg-gray-800 rounded-xl shadow-lg p-8">
+        <h1 className="text-2xl font-bold text-center mb-2 text-gray-100">Welcome to Bill Processor</h1>
+        <p className="text-gray-400 text-center mb-6">Let's get you set up in a few steps</p>
 
         {/* Step indicator */}
         <div className="flex items-center justify-center mb-8">
           {STEPS.map((label, i) => (
             <div key={i} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                i <= step ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
+                i <= step ? 'bg-blue-600 text-white' : 'bg-gray-600 text-gray-400'
               }`}>
                 {i < step ? '✓' : i + 1}
               </div>
-              <span className={`ml-2 text-sm ${i <= step ? 'text-gray-900' : 'text-gray-400'}`}>
+              <span className={`ml-2 text-sm ${i <= step ? 'text-gray-100' : 'text-gray-500'}`}>
                 {label}
               </span>
-              {i < STEPS.length - 1 && <div className="w-8 h-px bg-gray-300 mx-3" />}
+              {i < STEPS.length - 1 && <div className="w-8 h-px bg-gray-600 mx-3" />}
             </div>
           ))}
         </div>
@@ -97,34 +97,34 @@ export default function SetupWizard() {
         {step === 0 && (
           <form onSubmit={handleCreateAccount} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 minLength={3}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 minLength={8}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Confirm Password</label>
               <input
                 type="password"
                 value={confirmPw}
                 onChange={(e) => setConfirmPw(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 minLength={8}
                 required
               />
@@ -142,50 +142,50 @@ export default function SetupWizard() {
         {/* Step 1: Email setup */}
         {step === 1 && (
           <form onSubmit={handleEmailSetup} className="space-y-4">
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-gray-400 mb-4">
               Connect your invoice email inbox so bills are automatically imported.
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 sm:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">IMAP Server</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">IMAP Server</label>
                 <input
                   type="text"
                   value={imapHost}
                   onChange={(e) => setImapHost(e.target.value)}
                   placeholder="imap.gmail.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
                   required
                 />
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Port</label>
                 <input
                   type="number"
                   value={imapPort}
                   onChange={(e) => setImapPort(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email / Username</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Email / Username</label>
               <input
                 type="text"
                 value={imapUsername}
                 onChange={(e) => setImapUsername(e.target.value)}
                 placeholder="invoices@santimawcontracting.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password / App Password</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Password / App Password</label>
               <input
                 type="password"
                 value={imapPassword}
                 onChange={(e) => setImapPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -194,15 +194,15 @@ export default function SetupWizard() {
                 type="checkbox"
                 checked={useSsl}
                 onChange={(e) => setUseSsl(e.target.checked)}
-                className="rounded border-gray-300"
+                className="rounded border-gray-600 bg-gray-700"
               />
-              <span className="text-sm text-gray-700">Use SSL</span>
+              <span className="text-sm text-gray-300">Use SSL</span>
             </label>
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                className="flex-1 py-2.5 border border-gray-600 text-gray-300 rounded-lg font-medium hover:bg-gray-700"
               >
                 Skip for Now
               </button>
@@ -221,8 +221,8 @@ export default function SetupWizard() {
         {step === 2 && (
           <div className="text-center space-y-4">
             <div className="text-5xl mb-4">🎉</div>
-            <h2 className="text-xl font-semibold">You're all set!</h2>
-            <p className="text-gray-600">
+            <h2 className="text-xl font-semibold text-gray-100">You're all set!</h2>
+            <p className="text-gray-400">
               Your bill processor is ready. You can configure QuickBooks
               and import jobs from the Settings page at any time.
             </p>
