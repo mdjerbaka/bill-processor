@@ -119,6 +119,7 @@ export default function BillsPage() {
   const [outstandingChecksInput, setOutstandingChecksInput] = useState('')
   const [bankBalanceInput, setBankBalanceInput] = useState('')
   const [editingBankBalance, setEditingBankBalance] = useState(false)
+  const [editingOutstandingChecks, setEditingOutstandingChecks] = useState(false)
   const [sortColumn, setSortColumn] = useState('due_date')
   const [sortDirection, setSortDirection] = useState('asc')
 
@@ -346,6 +347,7 @@ export default function BillsPage() {
     try {
       await recurringBillsAPI.setOutstandingChecks(amount)
       toast.success('Outstanding checks updated')
+      setEditingOutstandingChecks(false)
       loadData()
     } catch {
       toast.error('Failed to update outstanding checks')
@@ -445,20 +447,26 @@ export default function BillsPage() {
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm text-gray-400">Outstanding Checks</p>
-                <form onSubmit={handleOutstandingChecks} className="flex items-center gap-2 mt-1">
-                  <span className="text-lg font-bold text-amber-400">$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={outstandingChecksInput}
-                    onChange={(e) => setOutstandingChecksInput(e.target.value)}
-                    className="w-28 bg-gray-700 border border-gray-600 text-amber-400 font-bold text-lg rounded px-2 py-0.5"
-                  />
-                  <button type="submit" className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors">
-                    Save
-                  </button>
-                </form>
+                {editingOutstandingChecks ? (
+                  <form onSubmit={handleOutstandingChecks} className="flex items-center gap-2 mt-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={outstandingChecksInput}
+                      onChange={(e) => setOutstandingChecksInput(e.target.value)}
+                      className="w-32 px-2 py-1 border border-gray-600 bg-gray-700 text-gray-200 rounded text-sm"
+                      autoFocus
+                    />
+                    <button type="submit" className="px-2 py-1 bg-blue-600 text-white text-xs rounded">Save</button>
+                    <button type="button" onClick={() => setEditingOutstandingChecks(false)} className="px-2 py-1 text-xs text-gray-400">Cancel</button>
+                  </form>
+                ) : (
+                  <p className="text-2xl font-bold text-amber-400 cursor-pointer mt-1" onClick={() => setEditingOutstandingChecks(true)}>
+                    ${(cashFlow.outstanding_checks || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    <span className="text-xs text-amber-400/60 ml-2">edit</span>
+                  </p>
+                )}
               </div>
               <div className="p-2.5 rounded-lg bg-gray-700/50">
                 <BanknotesIcon className="h-5 w-5 text-amber-400" />
