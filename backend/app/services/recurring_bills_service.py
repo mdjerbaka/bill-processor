@@ -361,14 +361,33 @@ class RecurringBillsService:
         return occ
 
     async def bulk_delete_occurrences(self, ids: list[int]) -> int:
-        """Delete multiple bill occurrences by their IDs."""
+        """Delete selected occurrences AND their parent recurring bills."""
         if not ids:
             return 0
+        # Find the parent recurring bill IDs for the selected occurrences
         result = await self.db.execute(
-            delete(BillOccurrence).where(BillOccurrence.id.in_(ids))
+            select(BillOccurrence.recurring_bill_id)
+            .where(BillOccurrence.id.in_(ids))
+            .distinct()
         )
+        bill_ids = [row[0] for row in result.all()]
+
+        if bill_ids:
+            # Delete notifications for these recurring bills
+            await self.db.execute(
+                delete(Notification).where(Notification.related_bill_id.in_(bill_ids))
+            )
+            # Delete ALL occurrences for these recurring bills (not just selected)
+            await self.db.execute(
+                delete(BillOccurrence).where(BillOccurrence.recurring_bill_id.in_(bill_ids))
+            )
+            # Delete the recurring bills themselves
+            await self.db.execute(
+                delete(RecurringBill).where(RecurringBill.id.in_(bill_ids))
+            )
+
         await self.db.flush()
-        return result.rowcount
+        return len(bill_ids)
 
     async def auto_match_invoice(self, invoice: Invoice) -> Optional[BillOccurrence]:
         """Try to match an incoming invoice to an unpaid recurring bill occurrence.

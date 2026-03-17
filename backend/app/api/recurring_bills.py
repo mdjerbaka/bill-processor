@@ -186,7 +186,7 @@ async def bulk_delete_occurrences(
     svc = RecurringBillsService(db)
     deleted = await svc.bulk_delete_occurrences(ids)
     await db.commit()
-    return {"detail": f"Deleted {deleted} occurrences", "count": deleted}
+    return {"detail": f"Deleted {deleted} recurring bills and all their occurrences", "count": deleted}
 
 
 @router.post("/occurrences/{occurrence_id}/skip")
