@@ -210,6 +210,17 @@ export default function BillsPage() {
     }
   }
 
+  async function handleDeleteAll() {
+    if (!confirm('Delete ALL recurring bills and their occurrences? This cannot be undone.')) return
+    try {
+      const res = await recurringBillsAPI.deleteAll()
+      toast.success(res.data.detail)
+      loadData()
+    } catch {
+      toast.error('Failed to delete all bills')
+    }
+  }
+
   async function handleSkip(occurrenceId) {
     try {
       await recurringBillsAPI.skip(occurrenceId)
@@ -305,6 +316,15 @@ export default function BillsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Recurring Bills & Cash Flow</h1>
         <div className="flex gap-2">
+          {bills.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-red-900/50 hover:bg-red-800 text-red-300 rounded-lg transition-colors"
+            >
+              <TrashIcon className="h-4 w-4" />
+              Delete All
+            </button>
+          )}
           <button
             onClick={() => setShowImport(true)}
             className="flex items-center gap-1.5 px-3 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-colors"

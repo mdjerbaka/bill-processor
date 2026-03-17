@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone, date
 from typing import Optional
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -569,11 +569,35 @@ class RecurringBillsService:
             grouped.setdefault(key, []).append(occ)
         return grouped
 
+    async def delete_all_bills(self) -> int:
+        """Hard-delete ALL recurring bills and their occurrences."""
+        # Delete all occurrences first (FK constraint)
+        await self.db.execute(delete(BillOccurrence))
+        # Delete all recurring bills
+        result = await self.db.execute(delete(RecurringBill))
+        await self.db.flush()
+        return result.rowcount
+
     async def bulk_import(self, bills_data: list[dict]) -> list[RecurringBill]:
-        """Import multiple recurring bills from a list of dicts."""
+        """Import multiple recurring bills from a list of dicts, skipping duplicates."""
+        # Pre-load existing bill name+vendor pairs for dedup
+        existing_result = await self.db.execute(
+            select(RecurringBill.name, RecurringBill.vendor_name).where(
+                RecurringBill.is_active == True
+            )
+        )
+        existing_keys = {
+            (row.name.strip().lower(), row.vendor_name.strip().lower())
+            for row in existing_result.all()
+        }
+
         created = []
         for data in bills_data:
+            key = (data["name"].strip().lower(), data["vendor_name"].strip().lower())
+            if key in existing_keys:
+                continue
             bill = await self.create_bill(data)
             created.append(bill)
+            existing_keys.add(key)
         await self.db.flush()
         return created

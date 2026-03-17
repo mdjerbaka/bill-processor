@@ -138,6 +138,7 @@ export const recurringBillsAPI = {
   create: (data) => api.post('/recurring-bills', data),
   update: (id, data) => api.put(`/recurring-bills/${id}`, data),
   delete: (id) => api.delete(`/recurring-bills/${id}`),
+  deleteAll: () => api.delete('/recurring-bills/all'),
   listOccurrences: (params) => api.get('/recurring-bills/occurrences', { params }),
   skip: (occurrenceId) => api.post(`/recurring-bills/occurrences/${occurrenceId}/skip`),
   markPaid: (occurrenceId) => api.post(`/recurring-bills/occurrences/${occurrenceId}/mark-paid`),

@@ -74,6 +74,7 @@ async def create_recurring_bill(
     """Create a new recurring bill."""
     svc = RecurringBillsService(db)
     bill = await svc.create_bill(data.model_dump())
+    await svc.generate_occurrences()
     await db.commit()
     return RecurringBillSchema(
         id=bill.id,
@@ -124,6 +125,18 @@ async def update_recurring_bill(
         created_at=bill.created_at,
         updated_at=bill.updated_at,
     )
+
+
+@router.delete("/all")
+async def delete_all_recurring_bills(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Delete ALL recurring bills and their occurrences."""
+    svc = RecurringBillsService(db)
+    count = await svc.delete_all_bills()
+    await db.commit()
+    return {"detail": f"Deleted {count} bills and all their occurrences"}
 
 
 @router.delete("/{bill_id}")
@@ -239,6 +252,7 @@ async def bulk_import_bills(
     """Bulk import recurring bills."""
     svc = RecurringBillsService(db)
     created = await svc.bulk_import([b.model_dump() for b in bills])
+    await svc.generate_occurrences()
     await db.commit()
     return {"detail": f"Imported {len(created)} bills", "count": len(created)}
 
@@ -350,9 +364,14 @@ async def import_bills_csv(
 
     svc = RecurringBillsService(db)
     created = await svc.bulk_import(bills_data)
+    await svc.generate_occurrences()
     await db.commit()
 
+    skipped = len(bills_data) - len(created)
     result = {"detail": f"Imported {len(created)} bills", "count": len(created)}
+    if skipped:
+        result["skipped"] = skipped
+        result["detail"] += f" ({skipped} duplicates skipped)"
     if errors:
         result["warnings"] = errors[:20]
     return result
