@@ -17,6 +17,7 @@ from app.models.models import (
     BillFrequency,
     BillOccurrence,
     Invoice,
+    Notification,
     OccurrenceStatus,
     RecurringBill,
 )
@@ -571,7 +572,9 @@ class RecurringBillsService:
 
     async def delete_all_bills(self) -> int:
         """Hard-delete ALL recurring bills and their occurrences."""
-        # Delete all occurrences first (FK constraint)
+        # Delete notifications referencing bills
+        await self.db.execute(delete(Notification).where(Notification.related_bill_id.isnot(None)))
+        # Delete all occurrences (FK constraint)
         await self.db.execute(delete(BillOccurrence))
         # Delete all recurring bills
         result = await self.db.execute(delete(RecurringBill))
