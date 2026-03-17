@@ -15,6 +15,7 @@ import {
   ArrowUpTrayIcon,
   ForwardIcon,
   CheckCircleIcon,
+  ChevronUpDownIcon,
 } from '@heroicons/react/24/outline'
 
 const FREQUENCY_OPTIONS = [
@@ -118,6 +119,39 @@ export default function BillsPage() {
   const [outstandingChecksInput, setOutstandingChecksInput] = useState('')
   const [bankBalanceInput, setBankBalanceInput] = useState('')
   const [editingBankBalance, setEditingBankBalance] = useState(false)
+  const [sortColumn, setSortColumn] = useState('due_date')
+  const [sortDirection, setSortDirection] = useState('asc')
+
+  function handleSort(column) {
+    if (sortColumn === column) {
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  function SortIcon({ column }) {
+    if (sortColumn !== column) return <ChevronUpDownIcon className="h-3.5 w-3.5 text-gray-600 ml-1 inline" />
+    return sortDirection === 'asc'
+      ? <ChevronUpIcon className="h-3.5 w-3.5 text-blue-400 ml-1 inline" />
+      : <ChevronDownIcon className="h-3.5 w-3.5 text-blue-400 ml-1 inline" />
+  }
+
+  const sortedOccurrences = [...occurrences].sort((a, b) => {
+    const dir = sortDirection === 'asc' ? 1 : -1
+    switch (sortColumn) {
+      case 'bill_name': return dir * (a.bill_name || '').localeCompare(b.bill_name || '')
+      case 'category': return dir * (a.category || '').localeCompare(b.category || '')
+      case 'amount': return dir * ((a.amount || 0) - (b.amount || 0))
+      case 'due_date': return dir * (new Date(a.due_date) - new Date(b.due_date))
+      case 'status': {
+        const order = { overdue: 0, due_soon: 1, upcoming: 2, paid: 3, skipped: 4 }
+        return dir * ((order[a.status] ?? 5) - (order[b.status] ?? 5))
+      }
+      default: return 0
+    }
+  })
 
   const loadData = useCallback(async () => {
     try {
@@ -492,18 +526,18 @@ export default function BillsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-400 border-b border-gray-700">
-                  <th className="pb-3 font-medium">Bill</th>
-                  <th className="pb-3 font-medium">Category</th>
-                  <th className="pb-3 font-medium text-right">Amount</th>
-                  <th className="pb-3 font-medium">Due Date</th>
+                  <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('bill_name')}>Bill<SortIcon column="bill_name" /></th>
+                  <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('category')}>Category<SortIcon column="category" /></th>
+                  <th className="pb-3 font-medium text-right cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('amount')}>Amount<SortIcon column="amount" /></th>
+                  <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('due_date')}>Due Date<SortIcon column="due_date" /></th>
                   <th className="pb-3 font-medium">Days</th>
-                  <th className="pb-3 font-medium">Status</th>
+                  <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('status')}>Status<SortIcon column="status" /></th>
                   <th className="pb-3 font-medium">Auto-Pay</th>
                   <th className="pb-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {occurrences.map((occ) => (
+                {sortedOccurrences.map((occ) => (
                   <tr key={occ.id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
                     <td className="py-3">
                       <p className="font-medium text-gray-200">{occ.bill_name}</p>

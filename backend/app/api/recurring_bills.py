@@ -75,6 +75,8 @@ async def create_recurring_bill(
     svc = RecurringBillsService(db)
     bill = await svc.create_bill(data.model_dump())
     await svc.generate_occurrences()
+    await svc.check_overdue()
+    await svc.check_due_soon()
     await db.commit()
     return RecurringBillSchema(
         id=bill.id,
@@ -165,6 +167,9 @@ async def list_occurrences(
 ):
     """List bill occurrences with optional filters."""
     svc = RecurringBillsService(db)
+    await svc.check_overdue()
+    await svc.check_due_soon()
+    await db.flush()
     sd = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc) if start_date else None
     ed = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) if end_date else None
     items = await svc.list_occurrences(
@@ -253,6 +258,8 @@ async def bulk_import_bills(
     svc = RecurringBillsService(db)
     created = await svc.bulk_import([b.model_dump() for b in bills])
     await svc.generate_occurrences()
+    await svc.check_overdue()
+    await svc.check_due_soon()
     await db.commit()
     return {"detail": f"Imported {len(created)} bills", "count": len(created)}
 
@@ -373,6 +380,8 @@ async def import_bills_csv(
     svc = RecurringBillsService(db)
     created = await svc.bulk_import(bills_data)
     await svc.generate_occurrences()
+    await svc.check_overdue()
+    await svc.check_due_soon()
     await db.commit()
 
     skipped = len(bills_data) - len(created)
