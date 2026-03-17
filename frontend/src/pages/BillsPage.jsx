@@ -109,6 +109,7 @@ export default function BillsPage() {
   const [editingBill, setEditingBill] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [managementOpen, setManagementOpen] = useState(false)
+  const [upcomingOpen, setUpcomingOpen] = useState(true)
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [showImport, setShowImport] = useState(false)
@@ -389,10 +390,24 @@ export default function BillsPage() {
       )}
 
       {/* Upcoming Bills */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-gray-800 rounded-xl border border-gray-700 mb-6">
+        <button
+          onClick={() => setUpcomingOpen(!upcomingOpen)}
+          className="w-full flex items-center justify-between p-6 text-left"
+        >
           <h2 className="text-lg font-semibold text-gray-100">Upcoming Bills</h2>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {upcomingOpen ? (
+              <ChevronUpIcon className="h-5 w-5 text-gray-400" />
+            ) : (
+              <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+            )}
+          </div>
+        </button>
+
+        {upcomingOpen && (
+          <div className="px-6 pb-6">
+          <div className="flex gap-2 mb-4">
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -416,7 +431,6 @@ export default function BillsPage() {
               ))}
             </select>
           </div>
-        </div>
 
         {occurrences.length === 0 ? (
           <p className="text-gray-500 text-sm text-center py-8">
@@ -501,6 +515,8 @@ export default function BillsPage() {
               </tbody>
             </table>
           </div>
+        )}
+        </div>
         )}
       </div>
 
