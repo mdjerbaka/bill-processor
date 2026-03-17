@@ -236,8 +236,8 @@ class RecurringBillCreate(BaseModel):
     name: str = Field(min_length=1, max_length=500)
     vendor_name: str = Field(min_length=1, max_length=500)
     amount: float = Field(gt=0)
-    frequency: str  # monthly, quarterly, semi_annual, annual, biennial
-    due_day_of_month: int = Field(ge=1, le=31)
+    frequency: str  # weekly, monthly, quarterly, semi_annual, annual, biennial
+    due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
     due_month: Optional[int] = Field(default=None, ge=1, le=12)
     category: str = "other"
     notes: Optional[str] = None
@@ -264,7 +264,7 @@ class RecurringBillSchema(BaseModel):
     vendor_name: str
     amount: float
     frequency: str
-    due_day_of_month: int
+    due_day_of_month: Optional[int] = None
     due_month: Optional[int] = None
     category: str
     notes: Optional[str] = None
