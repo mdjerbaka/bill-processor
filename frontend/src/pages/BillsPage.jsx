@@ -117,6 +117,7 @@ export default function BillsPage() {
   const [importing, setImporting] = useState(false)
   const [outstandingChecksInput, setOutstandingChecksInput] = useState('')
   const [bankBalanceInput, setBankBalanceInput] = useState('')
+  const [editingBankBalance, setEditingBankBalance] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -294,6 +295,7 @@ export default function BillsPage() {
     try {
       await payablesAPI.setBankBalance(amount)
       toast.success('Bank balance updated')
+      setEditingBankBalance(false)
       loadData()
     } catch {
       toast.error('Failed to update bank balance')
@@ -371,20 +373,26 @@ export default function BillsPage() {
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm text-gray-400">Bank Balance</p>
-                <form onSubmit={handleBankBalance} className="flex items-center gap-2 mt-1">
-                  <span className="text-lg font-bold text-blue-400">$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={bankBalanceInput}
-                    onChange={(e) => setBankBalanceInput(e.target.value)}
-                    className="w-28 bg-gray-700 border border-gray-600 text-blue-400 font-bold text-lg rounded px-2 py-0.5"
-                  />
-                  <button type="submit" className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors">
-                    Save
-                  </button>
-                </form>
+                {editingBankBalance ? (
+                  <form onSubmit={handleBankBalance} className="flex items-center gap-2 mt-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={bankBalanceInput}
+                      onChange={(e) => setBankBalanceInput(e.target.value)}
+                      className="w-32 px-2 py-1 border border-gray-600 bg-gray-700 text-gray-200 rounded text-sm"
+                      autoFocus
+                    />
+                    <button type="submit" className="px-2 py-1 bg-blue-600 text-white text-xs rounded">Save</button>
+                    <button type="button" onClick={() => setEditingBankBalance(false)} className="px-2 py-1 text-xs text-gray-400">Cancel</button>
+                  </form>
+                ) : (
+                  <p className="text-2xl font-bold text-blue-400 cursor-pointer mt-1" onClick={() => setEditingBankBalance(true)}>
+                    ${(cashFlow.bank_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    <span className="text-xs text-blue-400/60 ml-2">edit</span>
+                  </p>
+                )}
               </div>
               <div className="p-2.5 rounded-lg bg-gray-700/50">
                 <BanknotesIcon className="h-5 w-5 text-blue-400" />
