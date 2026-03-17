@@ -167,9 +167,6 @@ async def list_occurrences(
 ):
     """List bill occurrences with optional filters."""
     svc = RecurringBillsService(db)
-    await svc.check_overdue()
-    await svc.check_due_soon()
-    await db.flush()
     sd = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc) if start_date else None
     ed = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) if end_date else None
     items = await svc.list_occurrences(

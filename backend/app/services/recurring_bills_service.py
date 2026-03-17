@@ -320,20 +320,17 @@ class RecurringBillsService:
         result = await self.db.execute(
             select(BillOccurrence)
             .join(RecurringBill)
+            .options(joinedload(BillOccurrence.recurring_bill))
             .where(
                 BillOccurrence.status == OccurrenceStatus.UPCOMING,
                 BillOccurrence.due_date > now,
                 BillOccurrence.due_date <= now + timedelta(days=30),
             )
         )
-        occurrences = result.scalars().all()
+        occurrences = result.unique().scalars().all()
         updated = 0
         for occ in occurrences:
-            # Load the bill's alert_days_before
-            bill_result = await self.db.execute(
-                select(RecurringBill).where(RecurringBill.id == occ.recurring_bill_id)
-            )
-            bill = bill_result.scalar_one_or_none()
+            bill = occ.recurring_bill
             if bill and occ.due_date <= now + timedelta(days=bill.alert_days_before):
                 occ.status = OccurrenceStatus.DUE_SOON
                 updated += 1
@@ -452,6 +449,7 @@ class RecurringBillsService:
         q = (
             select(BillOccurrence)
             .join(RecurringBill)
+            .options(joinedload(BillOccurrence.recurring_bill))
             .where(RecurringBill.is_active == True)  # noqa: E712
             .order_by(BillOccurrence.due_date.asc())
         )
@@ -465,17 +463,15 @@ class RecurringBillsService:
             q = q.where(RecurringBill.category == BillCategory(category))
 
         result = await self.db.execute(q)
-        occurrences = result.scalars().all()
+        occurrences = result.unique().scalars().all()
 
+        now_date = datetime.now(timezone.utc).date()
         enriched = []
         for occ in occurrences:
-            bill_result = await self.db.execute(
-                select(RecurringBill).where(RecurringBill.id == occ.recurring_bill_id)
-            )
-            bill = bill_result.scalar_one_or_none()
+            bill = occ.recurring_bill
             days_overdue = None
             if occ.status == OccurrenceStatus.OVERDUE:
-                days_overdue = (datetime.now(timezone.utc).date() - occ.due_date.date()).days
+                days_overdue = (now_date - occ.due_date.date()).days
             enriched.append({
                 "id": occ.id,
                 "recurring_bill_id": occ.recurring_bill_id,
@@ -553,12 +549,6 @@ class RecurringBillsService:
 
         real_available = bank_balance - outstanding_checks - total_30d - total_overdue
 
-        # Bills due soon (for the response)
-        due_soon_items = await self.list_occurrences(
-            start_date=now, end_date=seven_days
-        )
-        overdue_items = await self.list_occurrences(status="overdue")
-
         return {
             "bank_balance": bank_balance,
             "outstanding_checks": outstanding_checks,
@@ -566,8 +556,8 @@ class RecurringBillsService:
             "total_upcoming_30d": total_30d,
             "total_overdue": total_overdue,
             "real_available": real_available,
-            "bills_due_soon": due_soon_items,
-            "overdue_bills": overdue_items,
+            "bills_due_soon": [],
+            "overdue_bills": [],
         }
 
     async def get_calendar_view(
