@@ -582,23 +582,25 @@ export default function BillsPage() {
                       )}
                     </td>
                     <td className="py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-3">
                         {occ.status !== 'skipped' && occ.status !== 'paid' && (
                           <button
                             onClick={() => handleMarkPaid(occ.id)}
-                            className="text-gray-400 hover:text-emerald-400 transition-colors"
+                            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800 transition-colors"
                             title="Mark as paid"
                           >
-                            <CheckCircleIcon className="h-4 w-4" />
+                            <CheckCircleIcon className="h-5 w-5 inline -mt-0.5 mr-1" />
+                            Paid
                           </button>
                         )}
                         {occ.status !== 'skipped' && occ.status !== 'paid' && (
                           <button
                             onClick={() => handleSkip(occ.id)}
-                            className="text-gray-400 hover:text-yellow-400 transition-colors"
+                            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-yellow-900/50 text-yellow-400 hover:bg-yellow-800 transition-colors"
                             title="Skip this occurrence"
                           >
-                            <ForwardIcon className="h-4 w-4" />
+                            <ForwardIcon className="h-5 w-5 inline -mt-0.5 mr-1" />
+                            Skip
                           </button>
                         )}
                       </div>
