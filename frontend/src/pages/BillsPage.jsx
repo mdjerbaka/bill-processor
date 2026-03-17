@@ -116,6 +116,7 @@ export default function BillsPage() {
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
   const [outstandingChecksInput, setOutstandingChecksInput] = useState('')
+  const [bankBalanceInput, setBankBalanceInput] = useState('')
 
   const loadData = useCallback(async () => {
     try {
@@ -127,7 +128,10 @@ export default function BillsPage() {
         }),
         recurringBillsAPI.list(),
       ])
-      if (cfRes.status === 'fulfilled') setCashFlow(cfRes.value.data)
+      if (cfRes.status === 'fulfilled') {
+        setCashFlow(cfRes.value.data)
+        setBankBalanceInput(cfRes.value.data.bank_balance?.toString() || '0')
+      }
       if (occRes.status === 'fulfilled') setOccurrences(occRes.value.data.items || [])
       if (billsRes.status === 'fulfilled') setBills(billsRes.value.data.items || [])
     } catch {
@@ -280,6 +284,22 @@ export default function BillsPage() {
     }
   }
 
+  async function handleBankBalance(e) {
+    e.preventDefault()
+    const amount = parseFloat(bankBalanceInput)
+    if (isNaN(amount) || amount < 0) {
+      toast.error('Enter a valid amount')
+      return
+    }
+    try {
+      await payablesAPI.setBankBalance(amount)
+      toast.success('Bank balance updated')
+      loadData()
+    } catch {
+      toast.error('Failed to update bank balance')
+    }
+  }
+
   async function handleOutstandingChecks(e) {
     e.preventDefault()
     const amount = parseFloat(outstandingChecksInput)
@@ -347,7 +367,30 @@ export default function BillsPage() {
       {/* Cash Flow Summary */}
       {cashFlow && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          <SummaryCard title="Bank Balance" value={fmt(cashFlow.bank_balance)} icon={BanknotesIcon} color="text-blue-400" />
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-400">Bank Balance</p>
+                <form onSubmit={handleBankBalance} className="flex items-center gap-2 mt-1">
+                  <span className="text-lg font-bold text-blue-400">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={bankBalanceInput}
+                    onChange={(e) => setBankBalanceInput(e.target.value)}
+                    className="w-28 bg-gray-700 border border-gray-600 text-blue-400 font-bold text-lg rounded px-2 py-0.5"
+                  />
+                  <button type="submit" className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded transition-colors">
+                    Save
+                  </button>
+                </form>
+              </div>
+              <div className="p-2.5 rounded-lg bg-gray-700/50">
+                <BanknotesIcon className="h-5 w-5 text-blue-400" />
+              </div>
+            </div>
+          </div>
           <SummaryCard title="Due in 7 Days" value={fmt(cashFlow.total_upcoming_7d)} icon={CalendarDaysIcon} color="text-yellow-400" />
           <SummaryCard title="Due in 30 Days" value={fmt(cashFlow.total_upcoming_30d)} icon={CalendarDaysIcon} color="text-orange-400" />
           <SummaryCard
