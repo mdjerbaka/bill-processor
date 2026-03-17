@@ -538,13 +538,12 @@ class WorkerSettings:
         ),
         cron(
             generate_bill_occurrences,
-            hour={0},
             minute={0},
             run_at_startup=True,
         ),
         cron(
             send_daily_digest,
-            hour={7},
+            hour={12},
             minute={0},
         ),
     ]
