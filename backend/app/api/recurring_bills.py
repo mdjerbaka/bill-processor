@@ -257,7 +257,7 @@ async def bulk_import_bills(
     return {"detail": f"Imported {len(created)} bills", "count": len(created)}
 
 
-VALID_FREQUENCIES = {"monthly", "quarterly", "semi_annual", "annual", "biennial"}
+VALID_FREQUENCIES = {"weekly", "monthly", "quarterly", "semi_annual", "annual", "biennial"}
 VALID_CATEGORIES = {
     "mortgage", "vehicle", "electric", "water", "sewer", "internet",
     "vehicle_insurance", "health_insurance", "liability_insurance", "life_insurance",
@@ -319,12 +319,20 @@ async def import_bills_csv(
             if frequency not in VALID_FREQUENCIES:
                 errors.append(f"Row {i} ({name}): invalid frequency '{frequency}'")
                 continue
-            try:
-                due_day = int(due_day_str)
-                if not 1 <= due_day <= 31:
-                    raise ValueError
-            except (ValueError, TypeError):
-                errors.append(f"Row {i} ({name}): invalid due_day_of_month '{due_day_str}'")
+            due_day = None
+            if frequency == "weekly":
+                # Weekly bills don't need a due_day_of_month
+                pass
+            elif due_day_str:
+                try:
+                    due_day = int(due_day_str)
+                    if not 1 <= due_day <= 31:
+                        raise ValueError
+                except (ValueError, TypeError):
+                    errors.append(f"Row {i} ({name}): invalid due_day_of_month '{due_day_str}'")
+                    continue
+            else:
+                errors.append(f"Row {i} ({name}): missing due_day_of_month")
                 continue
             due_month = None
             if due_month_str:

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def _compute_next_due_date(
     frequency: BillFrequency,
-    due_day: int,
+    due_day: Optional[int],
     due_month: Optional[int] = None,
     after: Optional[datetime] = None,
 ) -> datetime:
@@ -39,6 +39,11 @@ def _compute_next_due_date(
         """Clamp day to the last day of the given month."""
         max_day = calendar.monthrange(year, month)[1]
         return date(year, month, min(day, max_day))
+
+    if frequency == BillFrequency.WEEKLY:
+        # Next occurrence is simply the next day from today (every 7 days)
+        candidate = today + timedelta(days=1)
+        return datetime(candidate.year, candidate.month, candidate.day, tzinfo=timezone.utc)
 
     if frequency == BillFrequency.MONTHLY:
         candidate = _safe_date(today.year, today.month, due_day)
@@ -95,7 +100,7 @@ def _compute_next_due_date(
 
 def _generate_dates_in_range(
     frequency: BillFrequency,
-    due_day: int,
+    due_day: Optional[int],
     due_month: Optional[int],
     start: date,
     end: date,
@@ -106,6 +111,14 @@ def _generate_dates_in_range(
     def _safe_date(year: int, month: int, day: int) -> date:
         max_day = calendar.monthrange(year, month)[1]
         return date(year, month, min(day, max_day))
+
+    if frequency == BillFrequency.WEEKLY:
+        # Generate one occurrence per week starting from start
+        current = start
+        while current <= end:
+            dates.append(current)
+            current += timedelta(days=7)
+        return dates
 
     if frequency == BillFrequency.MONTHLY:
         current = date(start.year, start.month, 1)

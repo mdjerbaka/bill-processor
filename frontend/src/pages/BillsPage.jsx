@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline'
 
 const FREQUENCY_OPTIONS = [
+  { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'quarterly', label: 'Quarterly' },
   { value: 'semi_annual', label: 'Semi-Annual' },

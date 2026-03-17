@@ -60,6 +60,7 @@ class JobSource(str, enum.Enum):
 
 
 class BillFrequency(str, enum.Enum):
+    WEEKLY = "weekly"
     MONTHLY = "monthly"
     QUARTERLY = "quarterly"
     SEMI_ANNUAL = "semi_annual"
@@ -325,7 +326,7 @@ class RecurringBill(Base):
     vendor_name: Mapped[str] = mapped_column(String(500), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     frequency: Mapped[BillFrequency] = mapped_column(Enum(BillFrequency), nullable=False)
-    due_day_of_month: Mapped[int] = mapped_column(Integer, nullable=False)
+    due_day_of_month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     due_month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     category: Mapped[BillCategory] = mapped_column(Enum(BillCategory), default=BillCategory.OTHER)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
