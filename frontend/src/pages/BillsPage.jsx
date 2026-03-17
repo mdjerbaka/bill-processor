@@ -122,6 +122,7 @@ export default function BillsPage() {
   const [editingOutstandingChecks, setEditingOutstandingChecks] = useState(false)
   const [sortColumn, setSortColumn] = useState('due_date')
   const [sortDirection, setSortDirection] = useState('asc')
+  const [selectedOccurrences, setSelectedOccurrences] = useState(new Set())
 
   function handleSort(column) {
     if (sortColumn === column) {
@@ -281,6 +282,36 @@ export default function BillsPage() {
     } catch {
       toast.error('Failed to mark as paid')
     }
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedOccurrences.size === 0) return
+    if (!confirm(`Delete ${selectedOccurrences.size} selected occurrence(s)? This cannot be undone.`)) return
+    try {
+      const res = await recurringBillsAPI.bulkDeleteOccurrences([...selectedOccurrences])
+      toast.success(res.data.detail)
+      setSelectedOccurrences(new Set())
+      loadData()
+    } catch {
+      toast.error('Failed to delete selected occurrences')
+    }
+  }
+
+  function toggleSelectAll() {
+    if (selectedOccurrences.size === sortedOccurrences.length) {
+      setSelectedOccurrences(new Set())
+    } else {
+      setSelectedOccurrences(new Set(sortedOccurrences.map(o => o.id)))
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectedOccurrences(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   async function handleImport() {
@@ -500,7 +531,7 @@ export default function BillsPage() {
 
         {upcomingOpen && (
           <div className="px-6 pb-6">
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-4 items-center">
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -523,6 +554,15 @@ export default function BillsPage() {
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
+            {selectedOccurrences.size > 0 && (
+              <button
+                onClick={handleDeleteSelected}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-900/50 hover:bg-red-800 text-red-300 rounded-lg transition-colors ml-auto"
+              >
+                <TrashIcon className="h-4 w-4" />
+                Delete Selected ({selectedOccurrences.size})
+              </button>
+            )}
           </div>
 
         {occurrences.length === 0 ? (
@@ -534,6 +574,14 @@ export default function BillsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-400 border-b border-gray-700">
+                  <th className="pb-3 pr-2">
+                    <input
+                      type="checkbox"
+                      checked={sortedOccurrences.length > 0 && selectedOccurrences.size === sortedOccurrences.length}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                    />
+                  </th>
                   <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('bill_name')}>Bill<SortIcon column="bill_name" /></th>
                   <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('category')}>Category<SortIcon column="category" /></th>
                   <th className="pb-3 font-medium text-right cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('amount')}>Amount<SortIcon column="amount" /></th>
@@ -546,7 +594,15 @@ export default function BillsPage() {
               </thead>
               <tbody>
                 {sortedOccurrences.map((occ) => (
-                  <tr key={occ.id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
+                  <tr key={occ.id} className={`border-b border-gray-700/50 hover:bg-gray-700/30 ${selectedOccurrences.has(occ.id) ? 'bg-blue-900/20' : ''}`}>
+                    <td className="py-3 pr-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedOccurrences.has(occ.id)}
+                        onChange={() => toggleSelect(occ.id)}
+                        className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="py-3">
                       <p className="font-medium text-gray-200">{occ.bill_name}</p>
                       <p className="text-gray-500 text-xs">{occ.vendor_name}</p>

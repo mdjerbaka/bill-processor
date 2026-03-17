@@ -360,6 +360,16 @@ class RecurringBillsService:
             await self.db.flush()
         return occ
 
+    async def bulk_delete_occurrences(self, ids: list[int]) -> int:
+        """Delete multiple bill occurrences by their IDs."""
+        if not ids:
+            return 0
+        result = await self.db.execute(
+            delete(BillOccurrence).where(BillOccurrence.id.in_(ids))
+        )
+        await self.db.flush()
+        return result.rowcount
+
     async def auto_match_invoice(self, invoice: Invoice) -> Optional[BillOccurrence]:
         """Try to match an incoming invoice to an unpaid recurring bill occurrence.
 

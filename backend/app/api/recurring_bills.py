@@ -7,9 +7,9 @@ import io
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -174,6 +174,19 @@ async def list_occurrences(
     )
     schemas = [BillOccurrenceSchema(**item) for item in items]
     return BillOccurrenceListResponse(items=schemas, total=len(schemas))
+
+
+@router.post("/occurrences/bulk-delete")
+async def bulk_delete_occurrences(
+    ids: List[int] = Body(..., embed=True),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Delete multiple bill occurrences by ID."""
+    svc = RecurringBillsService(db)
+    deleted = await svc.bulk_delete_occurrences(ids)
+    await db.commit()
+    return {"detail": f"Deleted {deleted} occurrences", "count": deleted}
 
 
 @router.post("/occurrences/{occurrence_id}/skip")
