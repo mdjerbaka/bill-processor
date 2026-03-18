@@ -48,8 +48,8 @@ def upgrade() -> None:
     # Now create per-user copies of shared settings for user 2 (santimaw)
     # Copy bank_balance and outstanding_checks for santimaw with default values
     op.execute("""
-        INSERT INTO app_settings (key, value, user_id, is_encrypted)
-        SELECT key, '0', 2, false
+        INSERT INTO app_settings (key, value, user_id, is_encrypted, updated_at)
+        SELECT key, '0', 2, false, NOW()
         FROM app_settings
         WHERE user_id = 1 AND key IN ('bank_balance', 'outstanding_checks')
         AND NOT EXISTS (
