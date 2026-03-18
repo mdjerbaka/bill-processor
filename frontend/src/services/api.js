@@ -85,6 +85,14 @@ export const payablesAPI = {
   setBuffer: (buffer) => api.post('/payables/buffer', { buffer }),
   getRealBalance: () => api.get('/payables/real-balance'),
   exportExcel: () => api.get('/payables/export', { responseType: 'blob' }),
+  importCSV: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/payables/import-csv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  downloadTemplate: () => api.get('/payables/template-csv', { responseType: 'blob' }),
 }
 
 // ── Settings ────────────────────────────────────────────

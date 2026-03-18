@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { payablesAPI } from '../services/api'
-import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon, LockClosedIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon, LockClosedIcon, LockOpenIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline'
 import ContextMenu from '../components/ContextMenu'
 import toast from 'react-hot-toast'
 
@@ -26,6 +26,9 @@ export default function PayablesPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingPayable, setEditingPayable] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [showImport, setShowImport] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -161,6 +164,53 @@ export default function PayablesPage() {
     }
   }
 
+  async function handleImport() {
+    if (!importFile) {
+      toast.error('Please select a CSV file')
+      return
+    }
+    setImporting(true)
+    try {
+      const res = await payablesAPI.importCSV(importFile)
+      toast.success(`Imported ${res.data.count} payables`)
+      if (res.data.warnings?.length) {
+        toast(res.data.warnings.join('\n'), { icon: '⚠️', duration: 8000 })
+      }
+      setShowImport(false)
+      setImportFile(null)
+      loadData()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Import failed')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function handleDownloadTemplate() {
+    try {
+      const res = await payablesAPI.downloadTemplate()
+      const blob = new Blob([res.data], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'payables_template.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download template')
+    }
+  }
+
+  async function handleTogglePermanent(payable) {
+    try {
+      await payablesAPI.update(payable.id, { is_permanent: !payable.is_permanent })
+      toast.success(payable.is_permanent ? 'Removed permanent flag' : 'Marked as permanent')
+      loadData()
+    } catch {
+      toast.error('Failed to update')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -180,6 +230,13 @@ export default function PayablesPage() {
           >
             <PlusIcon className="h-4 w-4" />
             Add Payable
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1"
+          >
+            <ArrowUpTrayIcon className="h-4 w-4" />
+            Import CSV
           </button>
           <button
             onClick={handleExport}
@@ -280,7 +337,13 @@ export default function PayablesPage() {
               return (
                 <tr key={p.id} className={`${isOverdue ? 'bg-red-900/20' : ''} cursor-context-menu`} onContextMenu={(e) => contextMenu.show(e, p)}>
                   <td className="px-4 py-3 text-sm font-medium text-gray-200">
-                    {p.is_permanent && <LockClosedIcon className="h-4 w-4 inline text-orange-400 mr-1 -mt-0.5" title="Permanent" />}
+                    <button
+                      onClick={() => handleTogglePermanent(p)}
+                      className={`inline-flex items-center mr-1 -mt-0.5 ${p.is_permanent ? 'text-orange-400 hover:text-orange-300' : 'text-gray-600 hover:text-orange-400'} transition-colors`}
+                      title={p.is_permanent ? 'Click to remove permanent flag' : 'Click to mark as permanent'}
+                    >
+                      {p.is_permanent ? <LockClosedIcon className="h-4 w-4" /> : <LockOpenIcon className="h-4 w-4" />}
+                    </button>
                     {p.vendor_name}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-400">{p.invoice_number || '—'}</td>
@@ -420,6 +483,52 @@ export default function PayablesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import CSV Modal */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-100">Import Payables from CSV</h3>
+              <button onClick={() => { setShowImport(false); setImportFile(null) }} className="text-gray-400 hover:text-white">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Upload CSV File</label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setImportFile(e.target.files[0])}
+                  className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                />
+                {importFile && (
+                  <p className="text-xs text-gray-500 mt-1">{importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)</p>
+                )}
+              </div>
+              <div className="bg-gray-700/50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">CSV columns: vendor_name, amount, due_date, status, is_permanent, notes</p>
+                <button onClick={handleDownloadTemplate} className="text-xs text-blue-400 hover:text-blue-300 underline">
+                  Download template CSV
+                </button>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => { setShowImport(false); setImportFile(null) }} className="px-4 py-2 text-sm text-gray-400 hover:text-white">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImport}
+                  disabled={!importFile || importing}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {importing ? 'Importing...' : 'Import'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

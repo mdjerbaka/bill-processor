@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -369,3 +371,98 @@ async def backfill_missing_payables(
     await db.flush()
     logger.info(f"Backfilled {created} payables for {len(orphan_invoices)} orphan invoices")
     return {"backfilled": created, "total_orphans": len(orphan_invoices)}
+
+
+@router.get("/template-csv")
+async def download_payables_template():
+    """Download a CSV template for payable imports."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["vendor_name", "amount", "due_date", "status", "is_permanent", "notes"])
+    writer.writerow(["Acme Supplies", "1500.00", "2026-04-15", "outstanding", "no", "Monthly materials"])
+    writer.writerow(["Payroll - Crew A", "5000.00", "", "outstanding", "yes", "Weekly payroll"])
+    writer.writerow(["Equipment Rental", "800.00", "2026-04-01", "outstanding", "no", ""])
+    content = output.getvalue().encode("utf-8-sig")
+    return StreamingResponse(
+        iter([content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=payables_template.csv"},
+    )
+
+
+@router.post("/import-csv", status_code=201)
+async def import_payables_csv(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Import payables from a CSV file."""
+    content = await file.read()
+    text = None
+    for encoding in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            text = content.decode(encoding)
+            break
+        except (UnicodeDecodeError, ValueError):
+            continue
+    if text is None:
+        text = content.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    errors = []
+    created_count = 0
+
+    for i, row in enumerate(reader, start=2):
+        try:
+            vendor = (row.get("vendor_name") or "").strip()
+            amount_str = (row.get("amount") or "").strip()
+            due_date_str = (row.get("due_date") or "").strip()
+            status_str = (row.get("status") or "outstanding").strip().lower()
+            permanent_str = (row.get("is_permanent") or "no").strip().lower()
+            notes = (row.get("notes") or "").strip() or None
+
+            if not vendor:
+                errors.append(f"Row {i}: missing vendor_name")
+                continue
+            try:
+                amount = float(amount_str)
+                if amount <= 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                errors.append(f"Row {i} ({vendor}): invalid amount '{amount_str}'")
+                continue
+
+            due_date = None
+            if due_date_str:
+                try:
+                    due_date = datetime.fromisoformat(due_date_str).replace(tzinfo=timezone.utc)
+                except ValueError:
+                    errors.append(f"Row {i} ({vendor}): invalid date '{due_date_str}', use YYYY-MM-DD")
+                    continue
+
+            if status_str not in ("outstanding", "overdue", "scheduled"):
+                status_str = "outstanding"
+
+            is_permanent = permanent_str in ("yes", "true", "1", "y")
+
+            payable = Payable(
+                vendor_name=vendor,
+                amount=amount,
+                due_date=due_date,
+                status=PayableStatus(status_str),
+                is_permanent=is_permanent,
+                user_id=user.id,
+            )
+            db.add(payable)
+            created_count += 1
+        except Exception as exc:
+            errors.append(f"Row {i}: {exc}")
+
+    if created_count == 0 and errors:
+        raise HTTPException(status_code=400, detail=f"No valid payables found. Errors: {'; '.join(errors[:10])}")
+
+    await db.flush()
+    result = {"detail": f"Imported {created_count} payables", "count": created_count}
+    if errors:
+        result["warnings"] = errors[:20]
+    return result
