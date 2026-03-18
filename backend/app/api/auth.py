@@ -109,7 +109,7 @@ async def setup_status(db: AsyncSession = Depends(get_db)):
 
     # Has email config?
     result = await db.execute(
-        select(AppSetting).where(AppSetting.key == "imap_host")
+        select(AppSetting).where(AppSetting.key == "imap_host").limit(1)
     )
     has_email = result.scalar_one_or_none() is not None
 
