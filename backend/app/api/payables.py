@@ -15,6 +15,7 @@ from app.core.database import get_db
 from app.models.models import AppSetting, Invoice, InvoiceStatus, Job, Payable, PayableStatus, User
 from app.schemas.schemas import (
     BankBalanceRequest,
+    BufferRequest,
     PayableCreateRequest,
     PayableListResponse,
     PayableSchema,
@@ -65,6 +66,7 @@ async def list_payables(
             created_at=p.created_at,
             invoice_number=inv.invoice_number,
             job_name=job.name if job else None,
+            is_permanent=p.is_permanent,
         )
         for p, inv, job in rows
     ]
@@ -89,10 +91,11 @@ async def create_payable(
         amount=req.amount,
         due_date=req.due_date,
         status=PayableStatus(req.status) if req.status else PayableStatus.OUTSTANDING,
+        is_permanent=req.is_permanent if req.is_permanent else False,
         user_id=user.id,
     )
     db.add(payable)
-    await db.flush()
+    await db.commit()
     return PayableSchema(
         id=payable.id,
         invoice_id=payable.invoice_id,
@@ -104,6 +107,7 @@ async def create_payable(
         created_at=payable.created_at,
         invoice_number=req.invoice_number,
         job_name=None,
+        is_permanent=payable.is_permanent,
     )
 
 
@@ -161,6 +165,7 @@ async def update_payable(
         created_at=payable.created_at,
         invoice_number=inv_number,
         job_name=job_name,
+        is_permanent=payable.is_permanent,
     )
 
 
@@ -177,6 +182,9 @@ async def mark_payable_paid(
     payable = result.scalar_one_or_none()
     if not payable:
         raise HTTPException(status_code=404, detail="Payable not found")
+
+    if payable.is_permanent:
+        raise HTTPException(status_code=400, detail="Permanent payables cannot be marked as paid")
 
     payable.status = PayableStatus.PAID
     payable.paid_at = datetime.now(timezone.utc)
@@ -254,6 +262,29 @@ async def set_bank_balance(
         setting.value = str(req.bank_balance)
     else:
         setting = AppSetting(key="bank_balance", value=str(req.bank_balance), user_id=user.id)
+        db.add(setting)
+    await db.flush()
+
+    svc = PayablesService(db, user.id)
+    balance = await svc.get_real_balance()
+    return RealBalanceResponse(**balance)
+
+
+@router.post("/buffer", response_model=RealBalanceResponse)
+async def set_buffer(
+    req: BufferRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Set the balance buffer and get updated real available funds."""
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key == "balance_buffer", AppSetting.user_id == user.id)
+    )
+    setting = result.scalar_one_or_none()
+    if setting:
+        setting.value = str(req.buffer)
+    else:
+        setting = AppSetting(key="balance_buffer", value=str(req.buffer), user_id=user.id)
         db.add(setting)
     await db.flush()
 

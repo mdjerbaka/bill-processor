@@ -277,6 +277,7 @@ class Payable(Base):
         Enum(PayableStatus), default=PayableStatus.OUTSTANDING
     )
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    is_permanent: Mapped[bool] = mapped_column(Boolean, default=False)
     is_junked: Mapped[bool] = mapped_column(Boolean, default=False)
     junked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

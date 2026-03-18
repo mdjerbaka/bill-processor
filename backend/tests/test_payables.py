@@ -106,6 +106,7 @@ class TestBankBalance:
         assert resp.status_code == 200
         data = resp.json()
         assert data["bank_balance"] == 10000.0
+        assert data["buffer"] == 0.0
         assert data["real_available"] == 10000.0  # no outstanding
 
     async def test_real_balance_subtracts_outstanding(
@@ -122,3 +123,87 @@ class TestBankBalance:
         assert data["bank_balance"] == 10000.0
         assert data["total_outstanding"] == 3000.0
         assert data["real_available"] == 7000.0
+
+
+class TestBuffer:
+
+    async def test_set_buffer(
+        self, client: AsyncClient, auth_headers, db_session
+    ):
+        # Set bank balance first
+        await client.post(
+            "/api/v1/payables/bank-balance",
+            json={"bank_balance": 50000.0},
+            headers=auth_headers,
+        )
+        resp = await client.post(
+            "/api/v1/payables/buffer",
+            json={"buffer": 20000.0},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["buffer"] == 20000.0
+        assert data["real_available"] == 30000.0
+
+    async def test_buffer_subtracts_from_real_available(
+        self, client: AsyncClient, auth_headers, db_session
+    ):
+        await _create_payable(db_session, amount=5000.0)
+        setting = AppSetting(key="bank_balance", value="50000.0", user_id=1)
+        buf_setting = AppSetting(key="balance_buffer", value="20000.0", user_id=1)
+        db_session.add(setting)
+        db_session.add(buf_setting)
+        await db_session.commit()
+
+        resp = await client.get("/api/v1/payables/real-balance", headers=auth_headers)
+        data = resp.json()
+        assert data["bank_balance"] == 50000.0
+        assert data["total_outstanding"] == 5000.0
+        assert data["buffer"] == 20000.0
+        assert data["real_available"] == 25000.0
+
+
+class TestPermanentPayable:
+
+    async def test_create_permanent_payable(
+        self, client: AsyncClient, auth_headers
+    ):
+        resp = await client.post(
+            "/api/v1/payables",
+            json={
+                "vendor_name": "Weekly Payroll",
+                "amount": 12206.0,
+                "is_permanent": True,
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["is_permanent"] is True
+        assert data["vendor_name"] == "Weekly Payroll"
+
+    async def test_cannot_mark_permanent_as_paid(
+        self, client: AsyncClient, auth_headers, db_session
+    ):
+        _, payable = await _create_payable(db_session, vendor="Payroll")
+        payable.is_permanent = True
+        await db_session.commit()
+
+        resp = await client.post(
+            f"/api/v1/payables/{payable.id}/mark-paid",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 400
+        assert "Permanent" in resp.json()["detail"]
+
+    async def test_list_includes_is_permanent(
+        self, client: AsyncClient, auth_headers, db_session
+    ):
+        _, payable = await _create_payable(db_session, vendor="Payroll")
+        payable.is_permanent = True
+        await db_session.commit()
+
+        resp = await client.get("/api/v1/payables", headers=auth_headers)
+        items = resp.json()["items"]
+        assert any(p["is_permanent"] for p in items)

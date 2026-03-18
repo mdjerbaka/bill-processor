@@ -182,6 +182,7 @@ class PayableSchema(BaseModel):
     created_at: datetime
     invoice_number: Optional[str] = None
     job_name: Optional[str] = None
+    is_permanent: bool = False
 
     class Config:
         from_attributes = True
@@ -204,6 +205,7 @@ class PayableCreateRequest(BaseModel):
     due_date: Optional[datetime] = None
     status: Optional[str] = "outstanding"
     invoice_number: Optional[str] = None
+    is_permanent: Optional[bool] = False
 
 
 class PayableUpdateRequest(BaseModel):
@@ -212,6 +214,7 @@ class PayableUpdateRequest(BaseModel):
     due_date: Optional[datetime] = None
     status: Optional[str] = None
     invoice_number: Optional[str] = None
+    is_permanent: Optional[bool] = None
 
 
 class InvoiceCreateRequest(BaseModel):
@@ -229,7 +232,12 @@ class InvoiceCreateRequest(BaseModel):
 class RealBalanceResponse(BaseModel):
     bank_balance: float
     total_outstanding: float
+    buffer: float = 0.0
     real_available: float
+
+
+class BufferRequest(BaseModel):
+    buffer: float
 
 
 # ── Job Match Suggestion ─────────────────────────────────

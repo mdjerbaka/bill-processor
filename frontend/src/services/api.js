@@ -82,6 +82,7 @@ export const payablesAPI = {
   junk: (id) => api.post(`/payables/${id}/junk`),
   restore: (id) => api.post(`/payables/${id}/restore`),
   setBankBalance: (balance) => api.post('/payables/bank-balance', { bank_balance: balance }),
+  setBuffer: (buffer) => api.post('/payables/buffer', { buffer }),
   getRealBalance: () => api.get('/payables/real-balance'),
   exportExcel: () => api.get('/payables/export', { responseType: 'blob' }),
 }

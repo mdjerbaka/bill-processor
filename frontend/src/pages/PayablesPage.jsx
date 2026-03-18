@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { payablesAPI } from '../services/api'
-import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon, LockClosedIcon } from '@heroicons/react/24/outline'
 import ContextMenu from '../components/ContextMenu'
 import toast from 'react-hot-toast'
 
@@ -9,6 +9,7 @@ const emptyForm = {
   amount: '',
   due_date: '',
   invoice_number: '',
+  is_permanent: false,
 }
 
 export default function PayablesPage() {
@@ -16,8 +17,11 @@ export default function PayablesPage() {
   const [summary, setSummary] = useState({ total_outstanding: 0, total_overdue: 0 })
   const [bankBalance, setBankBalance] = useState(0)
   const [realBalance, setRealBalance] = useState(0)
+  const [buffer, setBuffer] = useState(0)
   const [editingBalance, setEditingBalance] = useState(false)
   const [balanceInput, setBalanceInput] = useState('')
+  const [editingBuffer, setEditingBuffer] = useState(false)
+  const [bufferInput, setBufferInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingPayable, setEditingPayable] = useState(null)
@@ -36,6 +40,8 @@ export default function PayablesPage() {
       setSummary({ total_outstanding: payRes.data.total_outstanding, total_overdue: payRes.data.total_overdue })
       setBankBalance(realRes.data.bank_balance)
       setBalanceInput(realRes.data.bank_balance?.toString() || '0')
+      setBuffer(realRes.data.buffer || 0)
+      setBufferInput((realRes.data.buffer || 0).toString())
       setRealBalance(realRes.data.real_available)
     } catch {
       toast.error('Failed to load payables')
@@ -48,11 +54,24 @@ export default function PayablesPage() {
       await payablesAPI.setBankBalance(parseFloat(balanceInput))
       const res = await payablesAPI.getRealBalance()
       setBankBalance(parseFloat(balanceInput))
+      setBuffer(res.data.buffer || 0)
       setRealBalance(res.data.real_available)
       setEditingBalance(false)
       toast.success('Bank balance updated')
     } catch {
       toast.error('Failed to update')
+    }
+  }
+
+  async function handleSaveBuffer() {
+    try {
+      const res = await payablesAPI.setBuffer(parseFloat(bufferInput))
+      setBuffer(parseFloat(bufferInput))
+      setRealBalance(res.data.real_available)
+      setEditingBuffer(false)
+      toast.success('Buffer updated')
+    } catch {
+      toast.error('Failed to update buffer')
     }
   }
 
@@ -78,6 +97,7 @@ export default function PayablesPage() {
       amount: payable.amount?.toString() || '',
       due_date: payable.due_date ? new Date(payable.due_date).toISOString().slice(0, 10) : '',
       invoice_number: payable.invoice_number || '',
+      is_permanent: payable.is_permanent || false,
     })
     setEditingPayable(payable)
     setShowForm(true)
@@ -90,6 +110,7 @@ export default function PayablesPage() {
       amount: parseFloat(form.amount),
       due_date: form.due_date ? new Date(form.due_date).toISOString() : null,
       invoice_number: form.invoice_number || null,
+      is_permanent: form.is_permanent,
     }
     try {
       if (editingPayable) {
@@ -119,7 +140,7 @@ export default function PayablesPage() {
   const contextMenu = ContextMenu({
     items: [
       { label: 'Edit', icon: PencilIcon, onClick: (data) => openEditForm(data) },
-      { label: 'Mark Paid', icon: CheckCircleIcon, onClick: (data) => handleMarkPaid(data.id) },
+      { label: 'Mark Paid', icon: CheckCircleIcon, onClick: (data) => handleMarkPaid(data.id), hidden: (data) => data.is_permanent },
       { label: 'Send to Junk', icon: TrashIcon, danger: true, onClick: (data) => handleJunk(data.id) },
     ],
   })
@@ -170,7 +191,7 @@ export default function PayablesPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-5">
           <p className="text-sm text-gray-400">Outstanding</p>
           <p className="text-2xl font-bold text-gray-100">
@@ -200,6 +221,27 @@ export default function PayablesPage() {
           ) : (
             <p className="text-2xl font-bold text-gray-100 cursor-pointer" onClick={() => setEditingBalance(true)}>
               ${bankBalance?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              <span className="text-xs text-blue-400 ml-2">edit</span>
+            </p>
+          )}
+        </div>
+        <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-5">
+          <p className="text-sm text-gray-400">Buffer</p>
+          {editingBuffer ? (
+            <div className="flex gap-2 mt-1">
+              <input
+                type="number"
+                step="0.01"
+                value={bufferInput}
+                onChange={(e) => setBufferInput(e.target.value)}
+                className="w-32 px-2 py-1 border border-gray-600 bg-gray-700 text-gray-200 rounded text-sm"
+              />
+              <button onClick={handleSaveBuffer} className="px-2 py-1 bg-blue-600 text-white text-xs rounded">Save</button>
+              <button onClick={() => setEditingBuffer(false)} className="px-2 py-1 text-xs text-gray-400">Cancel</button>
+            </div>
+          ) : (
+            <p className="text-2xl font-bold text-orange-400 cursor-pointer" onClick={() => setEditingBuffer(true)}>
+              ${buffer?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               <span className="text-xs text-blue-400 ml-2">edit</span>
             </p>
           )}
@@ -237,7 +279,10 @@ export default function PayablesPage() {
               const daysUntil = dueDate ? Math.ceil((dueDate - new Date()) / 86400000) : null
               return (
                 <tr key={p.id} className={`${isOverdue ? 'bg-red-900/20' : ''} cursor-context-menu`} onContextMenu={(e) => contextMenu.show(e, p)}>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-200">{p.vendor_name}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-200">
+                    {p.is_permanent && <LockClosedIcon className="h-4 w-4 inline text-orange-400 mr-1 -mt-0.5" title="Permanent" />}
+                    {p.vendor_name}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-400">{p.invoice_number || '—'}</td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-gray-200">
                     ${parseFloat(p.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -263,7 +308,7 @@ export default function PayablesPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {p.status !== 'paid' && (
+                      {p.status !== 'paid' && !p.is_permanent && (
                         <button
                           onClick={() => handleMarkPaid(p.id)}
                           className="px-2 py-1 text-xs font-medium rounded-lg bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800 transition-colors"
@@ -348,6 +393,16 @@ export default function PayablesPage() {
                   onChange={(e) => setForm({ ...form, invoice_number: e.target.value })}
                   className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_permanent"
+                  checked={form.is_permanent}
+                  onChange={(e) => setForm({ ...form, is_permanent: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-600"
+                />
+                <label htmlFor="is_permanent" className="text-sm text-gray-400">Permanent (always outstanding, e.g. payroll)</label>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button

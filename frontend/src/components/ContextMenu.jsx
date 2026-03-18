@@ -33,7 +33,7 @@ export default function ContextMenu({ items }) {
       style={{ top: position.y, left: position.x }}
       onClick={(e) => e.stopPropagation()}
     >
-      {items.map((item, i) => (
+      {items.filter(item => !item.hidden || !item.hidden(targetData)).map((item, i) => (
         <button
           key={i}
           onClick={() => { item.onClick(targetData); hide() }}

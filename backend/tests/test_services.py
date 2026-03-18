@@ -182,4 +182,37 @@ class TestPayablesService:
         balance = await svc.get_real_balance()
         assert balance["bank_balance"] == 5000.0
         assert balance["total_outstanding"] == 2000.0
+        assert balance["buffer"] == 0.0
         assert balance["real_available"] == 3000.0
+
+    async def test_real_balance_with_buffer(self, db_session: AsyncSession, test_user):
+        setting = AppSetting(key="bank_balance", value="10000.0", user_id=test_user.id)
+        buf_setting = AppSetting(key="balance_buffer", value="2000.0", user_id=test_user.id)
+        db_session.add(setting)
+        db_session.add(buf_setting)
+
+        inv = Invoice(
+            vendor_name="V", total_amount=3000,
+            status=InvoiceStatus.APPROVED,
+            user_id=test_user.id,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db_session.add(inv)
+        await db_session.flush()
+
+        payable = Payable(
+            invoice_id=inv.id, vendor_name="V", amount=3000,
+            due_date=datetime.now(timezone.utc) + timedelta(days=10),
+            status=PayableStatus.OUTSTANDING,
+            user_id=test_user.id,
+        )
+        db_session.add(payable)
+        await db_session.flush()
+
+        svc = PayablesService(db_session, test_user.id)
+        balance = await svc.get_real_balance()
+        assert balance["bank_balance"] == 10000.0
+        assert balance["total_outstanding"] == 3000.0
+        assert balance["buffer"] == 2000.0
+        assert balance["real_available"] == 5000.0

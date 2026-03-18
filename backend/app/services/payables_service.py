@@ -116,12 +116,20 @@ class PayablesService:
         setting = result.scalar_one_or_none()
         bank_balance = float(setting.value) if setting else 0.0
 
+        # Get buffer amount
+        result = await self.db.execute(
+            select(AppSetting).where(AppSetting.key == "balance_buffer", AppSetting.user_id == self.user_id)
+        )
+        buf_setting = result.scalar_one_or_none()
+        buffer = float(buf_setting.value) if buf_setting else 0.0
+
         summary = await self.get_payables_summary()
 
         return {
             "bank_balance": bank_balance,
             "total_outstanding": summary["total_outstanding"],
-            "real_available": bank_balance - summary["total_outstanding"],
+            "buffer": buffer,
+            "real_available": bank_balance - summary["total_outstanding"] - buffer,
         }
 
     async def export_to_excel(self) -> bytes:
