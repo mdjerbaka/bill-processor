@@ -40,7 +40,7 @@ async def list_recurring_bills(
     user: User = Depends(get_current_user),
 ):
     """List all recurring bills."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     bills = await svc.list_bills(include_inactive=include_inactive)
     items = [
         RecurringBillSchema(
@@ -72,7 +72,7 @@ async def create_recurring_bill(
     user: User = Depends(get_current_user),
 ):
     """Create a new recurring bill."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     bill = await svc.create_bill(data.model_dump())
     await svc.generate_occurrences()
     await svc.check_overdue()
@@ -105,7 +105,7 @@ async def update_recurring_bill(
     user: User = Depends(get_current_user),
 ):
     """Update a recurring bill."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     bill = await svc.update_bill(bill_id, data.model_dump(exclude_unset=True))
     if not bill:
         raise HTTPException(status_code=404, detail="Recurring bill not found")
@@ -135,7 +135,7 @@ async def delete_all_recurring_bills(
     user: User = Depends(get_current_user),
 ):
     """Delete ALL recurring bills and their occurrences."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     count = await svc.delete_all_bills()
     await db.commit()
     return {"detail": f"Deleted {count} bills and all their occurrences"}
@@ -148,7 +148,7 @@ async def delete_recurring_bill(
     user: User = Depends(get_current_user),
 ):
     """Soft-delete a recurring bill."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     deleted = await svc.delete_bill(bill_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Recurring bill not found")
@@ -166,7 +166,7 @@ async def list_occurrences(
     user: User = Depends(get_current_user),
 ):
     """List bill occurrences with optional filters."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     sd = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc) if start_date else None
     ed = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) if end_date else None
     items = await svc.list_occurrences(
@@ -183,7 +183,7 @@ async def bulk_delete_occurrences(
     user: User = Depends(get_current_user),
 ):
     """Delete multiple bill occurrences by ID."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     deleted = await svc.bulk_delete_occurrences(ids)
     await db.commit()
     return {"detail": f"Deleted {deleted} recurring bills and all their occurrences", "count": deleted}
@@ -196,7 +196,7 @@ async def skip_occurrence(
     user: User = Depends(get_current_user),
 ):
     """Skip a bill occurrence."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     occ = await svc.skip_occurrence(occurrence_id)
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence not found")
@@ -211,7 +211,7 @@ async def mark_occurrence_paid(
     user: User = Depends(get_current_user),
 ):
     """Mark a bill occurrence as paid (local tracking only, not synced to QuickBooks)."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     occ = await svc.mark_paid(occurrence_id)
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence not found")
@@ -235,7 +235,7 @@ async def toggle_occurrence_cashflow(
     user: User = Depends(get_current_user),
 ):
     """Toggle whether a bill occurrence is included in cash flow calculations."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     occ = await svc.toggle_cashflow(occurrence_id)
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence not found")
@@ -252,7 +252,7 @@ async def get_cash_flow(
     user: User = Depends(get_current_user),
 ):
     """Get cash flow summary."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     summary = await svc.get_cash_flow_summary()
     return CashFlowSummary(
         bank_balance=summary["bank_balance"],
@@ -275,7 +275,7 @@ async def get_calendar(
     user: User = Depends(get_current_user),
 ):
     """Get calendar view of bill occurrences grouped by date."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     sd = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
     ed = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
     grouped = await svc.get_calendar_view(sd, ed)
@@ -293,7 +293,7 @@ async def bulk_import_bills(
     user: User = Depends(get_current_user),
 ):
     """Bulk import recurring bills."""
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     created = await svc.bulk_import([b.model_dump() for b in bills])
     await svc.generate_occurrences()
     await svc.check_overdue()
@@ -415,7 +415,7 @@ async def import_bills_csv(
     if not bills_data and errors:
         raise HTTPException(status_code=400, detail=f"No valid bills found. Errors: {'; '.join(errors[:10])}")
 
-    svc = RecurringBillsService(db)
+    svc = RecurringBillsService(db, user.id)
     created = await svc.bulk_import(bills_data)
     await svc.generate_occurrences()
     await svc.check_overdue()
@@ -457,13 +457,13 @@ async def set_outstanding_checks(
     from sqlalchemy import select as sel
     amount = data.get("amount", 0.0)
     result = await db.execute(
-        sel(AppSetting).where(AppSetting.key == "outstanding_checks")
+        sel(AppSetting).where(AppSetting.key == "outstanding_checks", AppSetting.user_id == user.id)
     )
     setting = result.scalar_one_or_none()
     if setting:
         setting.value = str(amount)
     else:
-        setting = AppSetting(key="outstanding_checks", value=str(amount))
+        setting = AppSetting(key="outstanding_checks", value=str(amount), user_id=user.id)
         db.add(setting)
     await db.commit()
     return {"detail": "Outstanding checks updated", "amount": amount}
@@ -479,13 +479,13 @@ async def set_expected_receivables(
     from sqlalchemy import select as sel
     amount = data.get("amount", 0.0)
     result = await db.execute(
-        sel(AppSetting).where(AppSetting.key == "expected_receivables")
+        sel(AppSetting).where(AppSetting.key == "expected_receivables", AppSetting.user_id == user.id)
     )
     setting = result.scalar_one_or_none()
     if setting:
         setting.value = str(amount)
     else:
-        setting = AppSetting(key="expected_receivables", value=str(amount))
+        setting = AppSetting(key="expected_receivables", value=str(amount), user_id=user.id)
         db.add(setting)
     await db.commit()
     return {"detail": "Expected receivables updated", "amount": amount}

@@ -29,6 +29,7 @@ async def _create_invoice(
     status: InvoiceStatus = InvoiceStatus.EXTRACTED,
     with_line_items: bool = False,
     job_id: int | None = None,
+    user_id: int = 1,
 ) -> Invoice:
     inv = Invoice(
         vendor_name=vendor_name,
@@ -38,6 +39,7 @@ async def _create_invoice(
         status=status,
         job_id=job_id,
         confidence_score=0.95,
+        user_id=user_id,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
@@ -58,8 +60,8 @@ async def _create_invoice(
     return inv
 
 
-async def _create_job(db: AsyncSession, name: str = "Job Alpha") -> Job:
-    job = Job(name=name, code="J-001", source=JobSource.MANUAL, is_active=True)
+async def _create_job(db: AsyncSession, name: str = "Job Alpha", user_id: int = 1) -> Job:
+    job = Job(name=name, code="J-001", source=JobSource.MANUAL, is_active=True, user_id=user_id)
     db.add(job)
     await db.flush()
     return job

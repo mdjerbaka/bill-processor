@@ -23,12 +23,14 @@ async def _create_payable(
     amount: float = 500.0,
     status: PayableStatus = PayableStatus.OUTSTANDING,
     overdue: bool = False,
+    user_id: int = 1,
 ) -> tuple[Invoice, Payable]:
     inv = Invoice(
         vendor_name=vendor,
         invoice_number="INV-P01",
         total_amount=amount,
         status=InvoiceStatus.APPROVED,
+        user_id=user_id,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
@@ -42,6 +44,7 @@ async def _create_payable(
         amount=amount,
         due_date=due,
         status=status,
+        user_id=user_id,
     )
     db.add(payable)
     await db.flush()
@@ -109,7 +112,7 @@ class TestBankBalance:
         self, client: AsyncClient, auth_headers, db_session
     ):
         await _create_payable(db_session, amount=3000.0)
-        setting = AppSetting(key="bank_balance", value="10000.0")
+        setting = AppSetting(key="bank_balance", value="10000.0", user_id=1)
         db_session.add(setting)
         await db_session.commit()
 

@@ -24,7 +24,7 @@ async def list_junk(
     inv_result = await db.execute(
         select(Invoice)
         .options(joinedload(Invoice.job))
-        .where(Invoice.is_junked == True)
+        .where(Invoice.is_junked == True, Invoice.user_id == user.id)
         .order_by(Invoice.junked_at.desc())
     )
     invoices = inv_result.unique().scalars().all()
@@ -32,7 +32,7 @@ async def list_junk(
     # Junked payables (stand-alone, not already covered by invoice junk)
     pay_result = await db.execute(
         select(Payable)
-        .where(Payable.is_junked == True)
+        .where(Payable.is_junked == True, Payable.user_id == user.id)
         .order_by(Payable.junked_at.desc())
     )
     payables = pay_result.scalars().all()
@@ -40,7 +40,7 @@ async def list_junk(
     # Junked jobs
     job_result = await db.execute(
         select(Job)
-        .where(Job.is_junked == True)
+        .where(Job.is_junked == True, Job.user_id == user.id)
         .order_by(Job.junked_at.desc())
     )
     jobs = job_result.scalars().all()

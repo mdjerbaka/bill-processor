@@ -28,8 +28,9 @@ SUPPORTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"
 class EmailService:
     """Handles IMAP connection and email ingestion."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     async def get_email_config(self) -> Optional[dict]:
         """Load email configuration from app_settings."""
@@ -37,7 +38,7 @@ class EmailService:
         config = {}
         for key in keys:
             result = await self.db.execute(
-                select(AppSetting).where(AppSetting.key == key)
+                select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == self.user_id)
             )
             setting = result.scalar_one_or_none()
             if setting is None:
@@ -186,6 +187,7 @@ class EmailService:
                 subject=subject,
                 body_text=body_text,
                 status=EmailStatus.PENDING,
+                user_id=self.user_id,
             )
             self.db.add(email_record)
             await self.db.flush()

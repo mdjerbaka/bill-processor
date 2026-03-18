@@ -34,7 +34,7 @@ async def ms_connect(
             detail="Microsoft 365 not configured. Set MS_CLIENT_ID and MS_CLIENT_SECRET in .env",
         )
 
-    svc = MicrosoftGraphService(db)
+    svc = MicrosoftGraphService(db, user.id)
     auth_url = svc.get_auth_url()
     return {"auth_url": auth_url}
 
@@ -74,7 +74,7 @@ async def ms_status(
     user: User = Depends(get_current_user),
 ):
     """Check Microsoft 365 connection status."""
-    svc = MicrosoftGraphService(db)
+    svc = MicrosoftGraphService(db, user.id)
     info = await svc.get_connection_info()
     return info
 
@@ -85,7 +85,7 @@ async def ms_test(
     user: User = Depends(get_current_user),
 ):
     """Test the Microsoft 365 Graph API connection."""
-    svc = MicrosoftGraphService(db)
+    svc = MicrosoftGraphService(db, user.id)
     connected, message = await svc.test_connection()
     return {"connected": connected, "message": message}
 
@@ -96,7 +96,7 @@ async def ms_disconnect(
     user: User = Depends(get_current_user),
 ):
     """Remove Microsoft 365 connection tokens."""
-    svc = MicrosoftGraphService(db)
+    svc = MicrosoftGraphService(db, user.id)
     await svc.disconnect()
     return {"disconnected": True}
 
@@ -107,7 +107,7 @@ async def ms_list_folders(
     user: User = Depends(get_current_user),
 ):
     """List available mail folders from the connected Microsoft 365 account."""
-    svc = MicrosoftGraphService(db)
+    svc = MicrosoftGraphService(db, user.id)
     folders = await svc.list_mail_folders()
     return {"folders": folders}
 
@@ -160,7 +160,7 @@ async def ms_poll_now(
 ):
     """Manually trigger email polling from Microsoft 365 + OCR."""
     async with async_session_factory() as db:
-        svc = MicrosoftGraphService(db)
+        svc = MicrosoftGraphService(db, user.id)
         new_ids = await svc.poll_inbox()
 
         # Process each email through OCR (same as IMAP flow)

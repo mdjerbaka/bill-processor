@@ -92,6 +92,7 @@ async def create_invoice(
         job_id=req.job_id,
         status=InvoiceStatus.NEEDS_REVIEW,
         match_method="manual",
+        user_id=user.id,
     )
     db.add(invoice)
     await db.flush()
@@ -133,7 +134,7 @@ async def list_invoices(
     query = select(Invoice).options(
         joinedload(Invoice.job),
         joinedload(Invoice.line_items),
-    ).where(Invoice.is_junked == False)
+    ).where(Invoice.is_junked == False, Invoice.user_id == user.id)
 
     if status:
         try:
@@ -146,7 +147,7 @@ async def list_invoices(
         query = query.where(Invoice.vendor_name.ilike(f"%{vendor}%"))
 
     # Count
-    count_query = select(func.count(Invoice.id)).where(Invoice.is_junked == False)
+    count_query = select(func.count(Invoice.id)).where(Invoice.is_junked == False, Invoice.user_id == user.id)
     if status:
         try:
             count_query = count_query.where(Invoice.status == InvoiceStatus(status))
@@ -183,7 +184,7 @@ async def get_invoice(
     result = await db.execute(
         select(Invoice)
         .options(joinedload(Invoice.job), joinedload(Invoice.line_items))
-        .where(Invoice.id == invoice_id)
+        .where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.unique().scalar_one_or_none()
     if not invoice:
@@ -202,7 +203,7 @@ async def update_invoice(
     result = await db.execute(
         select(Invoice)
         .options(joinedload(Invoice.job), joinedload(Invoice.line_items))
-        .where(Invoice.id == invoice_id)
+        .where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.unique().scalar_one_or_none()
     if not invoice:
@@ -230,7 +231,7 @@ async def update_invoice(
             invoice.job_id = value
             invoice.match_method = "manual"
             # Learn from manual assignment
-            matcher = JobMatchingService(db)
+            matcher = JobMatchingService(db, user.id)
             await matcher.learn_from_assignment(invoice.vendor_name, value)
         else:
             setattr(invoice, field, value)
@@ -242,7 +243,7 @@ async def update_invoice(
     result = await db.execute(
         select(Invoice)
         .options(joinedload(Invoice.job), joinedload(Invoice.line_items))
-        .where(Invoice.id == invoice_id)
+        .where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.unique().scalar_one_or_none()
     return _invoice_to_schema(invoice)
@@ -258,7 +259,7 @@ async def approve_invoice(
     result = await db.execute(
         select(Invoice)
         .options(joinedload(Invoice.job), joinedload(Invoice.line_items))
-        .where(Invoice.id == invoice_id)
+        .where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.unique().scalar_one_or_none()
     if not invoice:
@@ -285,14 +286,14 @@ async def approve_invoice(
         existing_payable.amount = invoice.total_amount or 0.0
         existing_payable.due_date = invoice.due_date
     else:
-        payables_svc = PayablesService(db)
+        payables_svc = PayablesService(db, user.id)
         await payables_svc.create_payable(invoice)
 
     await db.flush()
 
     # Auto-send to QuickBooks if connected
     try:
-        qb_svc = QuickBooksService(db)
+        qb_svc = QuickBooksService(db, user.id)
         if await qb_svc.is_connected() and not invoice.qbo_bill_id:
             bill_id, vendor_id = await qb_svc.auto_send_bill(invoice)
             if bill_id:
@@ -309,7 +310,7 @@ async def approve_invoice(
     result = await db.execute(
         select(Invoice)
         .options(joinedload(Invoice.job), joinedload(Invoice.line_items))
-        .where(Invoice.id == invoice_id)
+        .where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.unique().scalar_one_or_none()
     return _invoice_to_schema(invoice)
@@ -323,13 +324,13 @@ async def get_match_suggestions(
 ):
     """Get job match suggestions for an invoice."""
     result = await db.execute(
-        select(Invoice).where(Invoice.id == invoice_id)
+        select(Invoice).where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    matcher = JobMatchingService(db)
+    matcher = JobMatchingService(db, user.id)
     suggestions = await matcher.match_invoice(invoice)
     return suggestions
 
@@ -342,7 +343,7 @@ async def junk_invoice(
 ):
     """Send an invoice (and its payable) to the junk bin."""
     result = await db.execute(
-        select(Invoice).where(Invoice.id == invoice_id)
+        select(Invoice).where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.scalar_one_or_none()
     if not invoice:
@@ -373,7 +374,7 @@ async def restore_invoice(
 ):
     """Restore an invoice (and its payable) from the junk bin."""
     result = await db.execute(
-        select(Invoice).where(Invoice.id == invoice_id)
+        select(Invoice).where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.scalar_one_or_none()
     if not invoice:

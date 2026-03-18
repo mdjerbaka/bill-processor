@@ -47,7 +47,7 @@ async def get_email_config(
     user: User = Depends(get_current_user),
 ):
     """Get current email configuration (password masked)."""
-    svc = EmailService(db)
+    svc = EmailService(db, user.id)
     try:
         config = await svc.get_email_config()
     except (ValueError, Exception):
@@ -98,7 +98,7 @@ async def save_email_config(
 
     for key, (value, should_encrypt) in settings_to_save.items():
         result = await db.execute(
-            select(AppSetting).where(AppSetting.key == key)
+            select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
         )
         setting = result.scalar_one_or_none()
 
@@ -112,13 +112,14 @@ async def save_email_config(
                 key=key,
                 value=stored_value,
                 is_encrypted=should_encrypt,
+                user_id=user.id,
             )
             db.add(setting)
 
     await db.flush()
 
     # Test connection
-    svc = EmailService(db)
+    svc = EmailService(db, user.id)
     connected, message = await svc.test_connection()
 
     return EmailConfigResponse(
@@ -136,7 +137,7 @@ async def test_email_connection(
     user: User = Depends(get_current_user),
 ):
     """Test the stored email connection."""
-    svc = EmailService(db)
+    svc = EmailService(db, user.id)
     connected, message = await svc.test_connection()
     return {"connected": connected, "message": message}
 
@@ -147,7 +148,7 @@ async def poll_email_now(
 ):
     """Manually trigger email polling + OCR processing (no worker needed)."""
     async with async_session_factory() as db:
-        svc = EmailService(db)
+        svc = EmailService(db, user.id)
         new_ids = await svc.poll_inbox()
 
         processed = 0
@@ -155,7 +156,7 @@ async def poll_email_now(
 
         for email_id in new_ids:
             try:
-                await _process_email(db, email_id)
+                await _process_email(db, email_id, user.id)
                 processed += 1
             except Exception as e:
                 logger.error(f"Processing email {email_id} failed: {e}")
@@ -175,7 +176,7 @@ async def process_pending_emails(
     """Process any emails that were polled but still in PENDING status."""
     async with async_session_factory() as db:
         result = await db.execute(
-            select(Email).where(Email.status == EmailStatus.PENDING)
+            select(Email).where(Email.status == EmailStatus.PENDING, Email.user_id == user.id)
         )
         pending_emails = result.scalars().all()
 
@@ -185,7 +186,7 @@ async def process_pending_emails(
 
         for email_record in pending_emails:
             try:
-                await _process_email(db, email_record.id)
+                await _process_email(db, email_record.id, user.id)
                 processed += 1
             except Exception as e:
                 logger.error(f"Processing email {email_record.id} failed: {e}")
@@ -198,7 +199,7 @@ async def process_pending_emails(
         }
 
 
-async def _process_email(db: AsyncSession, email_id: int):
+async def _process_email(db: AsyncSession, email_id: int, user_id: int):
     """Run OCR extraction on attachments of a single email (inline, no worker)."""
     result = await db.execute(select(Email).where(Email.id == email_id))
     email_record = result.scalar_one_or_none()
@@ -234,6 +235,7 @@ async def _process_email(db: AsyncSession, email_id: int):
                             extracted_data=extracted.to_dict(),
                             confidence_score=extracted.confidence_score,
                             status=InvoiceStatus.NEEDS_REVIEW,
+                            user_id=user_id,
                         )
                         if extracted.invoice_date:
                             try:
@@ -262,7 +264,7 @@ async def _process_email(db: AsyncSession, email_id: int):
                             )
                             db.add(li)
                         await db.flush()
-                        matcher = JobMatchingService(db)
+                        matcher = JobMatchingService(db, user_id)
                         await matcher.match_invoice(invoice)
                         logger.info(f"Extracted invoice {invoice.id} from email body text")
             except Exception as e:
@@ -288,6 +290,7 @@ async def _process_email(db: AsyncSession, email_id: int):
                 extracted_data=extracted.to_dict(),
                 confidence_score=extracted.confidence_score,
                 status=InvoiceStatus.EXTRACTED,
+                user_id=user_id,
             )
 
             if extracted.invoice_date:
@@ -322,7 +325,7 @@ async def _process_email(db: AsyncSession, email_id: int):
 
             await db.flush()
 
-            matcher = JobMatchingService(db)
+            matcher = JobMatchingService(db, user_id)
             await matcher.match_invoice(invoice)
 
             logger.info(
@@ -337,6 +340,7 @@ async def _process_email(db: AsyncSession, email_id: int):
                 attachment_id=att.id,
                 status=InvoiceStatus.NEEDS_REVIEW,
                 error_message=str(e),
+                user_id=user_id,
             )
             db.add(invoice)
 
@@ -366,7 +370,7 @@ async def get_ocr_config(
     values = {}
     for key in OCR_SETTING_KEYS:
         result = await db.execute(
-            select(AppSetting).where(AppSetting.key == key)
+            select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
         )
         setting = result.scalar_one_or_none()
         if setting:
@@ -420,7 +424,7 @@ async def save_ocr_config(
 
     for key, (value, should_encrypt) in fields.items():
         result = await db.execute(
-            select(AppSetting).where(AppSetting.key == key)
+            select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
         )
         setting = result.scalar_one_or_none()
         stored_value = encrypt_value(value) if should_encrypt else value
@@ -433,6 +437,7 @@ async def save_ocr_config(
                 key=key,
                 value=stored_value,
                 is_encrypted=should_encrypt,
+                user_id=user.id,
             )
             db.add(setting)
 
@@ -450,7 +455,7 @@ async def test_ocr_config(
     """Test whether the configured OCR API key is valid."""
     # Read provider from DB
     result = await db.execute(
-        select(AppSetting).where(AppSetting.key == "ocr_provider")
+        select(AppSetting).where(AppSetting.key == "ocr_provider", AppSetting.user_id == user.id)
     )
     setting = result.scalar_one_or_none()
     provider = setting.value if setting else "none"
@@ -460,7 +465,7 @@ async def test_ocr_config(
 
     if provider == "openai":
         result = await db.execute(
-            select(AppSetting).where(AppSetting.key == "openai_api_key")
+            select(AppSetting).where(AppSetting.key == "openai_api_key", AppSetting.user_id == user.id)
         )
         key_setting = result.scalar_one_or_none()
         if not key_setting:
@@ -496,7 +501,7 @@ async def get_qb_config(
     values = {}
     for key in QB_SETTING_KEYS:
         result = await db.execute(
-            select(AppSetting).where(AppSetting.key == key)
+            select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
         )
         setting = result.scalar_one_or_none()
         if setting:
@@ -549,7 +554,7 @@ async def save_qb_config(
 
     for key, (value, should_encrypt) in fields.items():
         result = await db.execute(
-            select(AppSetting).where(AppSetting.key == key)
+            select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
         )
         setting = result.scalar_one_or_none()
         stored_value = encrypt_value(value) if should_encrypt else value
@@ -562,6 +567,7 @@ async def save_qb_config(
                 key=key,
                 value=stored_value,
                 is_encrypted=should_encrypt,
+                user_id=user.id,
             )
             db.add(setting)
 
@@ -581,20 +587,26 @@ async def reset_invoice_data(
     """
     from sqlalchemy import delete as sa_delete
 
-    # Count before deleting
-    inv_count = (await db.execute(select(func.count(Invoice.id)))).scalar() or 0
-    email_count = (await db.execute(select(func.count(Email.id)))).scalar() or 0
+    # Count before deleting (only this user's data)
+    inv_count = (await db.execute(select(func.count(Invoice.id)).where(Invoice.user_id == user.id))).scalar() or 0
+    email_count = (await db.execute(select(func.count(Email.id)).where(Email.user_id == user.id))).scalar() or 0
+
+    # Get this user's email IDs and invoice IDs for FK-safe deletion
+    user_email_ids = (await db.execute(select(Email.id).where(Email.user_id == user.id))).scalars().all()
+    user_invoice_ids = (await db.execute(select(Invoice.id).where(Invoice.user_id == user.id))).scalars().all()
 
     # Delete in FK dependency order
-    await db.execute(sa_delete(Payable))
-    await db.execute(sa_delete(InvoiceLineItem))
-    await db.execute(sa_delete(Invoice))
-    await db.execute(sa_delete(Attachment))
-    await db.execute(sa_delete(Email))
+    if user_invoice_ids:
+        await db.execute(sa_delete(Payable).where(Payable.user_id == user.id))
+        await db.execute(sa_delete(InvoiceLineItem).where(InvoiceLineItem.invoice_id.in_(user_invoice_ids)))
+        await db.execute(sa_delete(Invoice).where(Invoice.user_id == user.id))
+    if user_email_ids:
+        await db.execute(sa_delete(Attachment).where(Attachment.email_id.in_(user_email_ids)))
+        await db.execute(sa_delete(Email).where(Email.user_id == user.id))
 
     # Clear last poll time so the poller re-fetches recent messages
     await db.execute(
-        sa_delete(AppSetting).where(AppSetting.key == "last_email_poll")
+        sa_delete(AppSetting).where(AppSetting.key == "last_email_poll", AppSetting.user_id == user.id)
     )
 
     await db.flush()
@@ -614,10 +626,12 @@ async def reset_job_data(
     """Delete ALL job data (jobs and vendor-job mappings)."""
     from sqlalchemy import delete as sa_delete
 
-    job_count = (await db.execute(select(func.count(Job.id)))).scalar() or 0
+    job_count = (await db.execute(select(func.count(Job.id)).where(Job.user_id == user.id))).scalar() or 0
 
-    await db.execute(sa_delete(VendorJobMapping))
-    await db.execute(sa_delete(Job))
+    await db.execute(sa_delete(VendorJobMapping).where(VendorJobMapping.job_id.in_(
+        select(Job.id).where(Job.user_id == user.id)
+    )))
+    await db.execute(sa_delete(Job).where(Job.user_id == user.id))
     await db.flush()
 
     logger.info(f"Reset job data: {job_count} jobs deleted")

@@ -24,6 +24,7 @@ from app.models.models import (
     Invoice,
     InvoiceLineItem,
     InvoiceStatus,
+    User,
 )
 from app.services.email_service import EmailService
 from app.services.job_matching_service import JobMatchingService
@@ -43,10 +44,10 @@ settings = get_settings()
 _poll_lock = asyncio.Lock()
 
 
-async def _try_match_recurring_bill(db, invoice):
+async def _try_match_recurring_bill(db, invoice, user_id):
     """Try to auto-match an invoice to a recurring bill occurrence."""
     try:
-        bills_svc = RecurringBillsService(db)
+        bills_svc = RecurringBillsService(db, user_id)
         matched = await bills_svc.auto_match_invoice(invoice)
         if matched:
             logger.info(f"Invoice {invoice.id} auto-matched to bill occurrence {matched.id}")
@@ -64,24 +65,29 @@ async def poll_email_inbox(ctx: dict) -> dict:
         async with async_session_factory() as db:
             all_new_ids = []
 
-            # 1) IMAP polling (Gmail / generic IMAP)
-            try:
-                svc = EmailService(db)
-                imap_ids = await svc.poll_inbox()
-                all_new_ids.extend(imap_ids)
-            except Exception as e:
-                logger.warning(f"IMAP poll failed (may not be configured): {e}")
+            # Get all users
+            users_result = await db.execute(select(User))
+            users = users_result.scalars().all()
 
-            # 2) Microsoft Graph polling (Outlook / Microsoft 365)
-            try:
-                graph_svc = MicrosoftGraphService(db)
-                if await graph_svc.is_connected():
-                    graph_ids = await graph_svc.poll_inbox()
-                    all_new_ids.extend(graph_ids)
-                    if graph_ids:
-                        logger.info(f"MS Graph poll fetched {len(graph_ids)} new emails")
-            except Exception as e:
-                logger.warning(f"MS Graph poll failed: {e}")
+            for u in users:
+                # 1) IMAP polling (Gmail / generic IMAP)
+                try:
+                    svc = EmailService(db, u.id)
+                    imap_ids = await svc.poll_inbox()
+                    all_new_ids.extend(imap_ids)
+                except Exception as e:
+                    logger.warning(f"IMAP poll failed for user {u.id} (may not be configured): {e}")
+
+                # 2) Microsoft Graph polling (Outlook / Microsoft 365)
+                try:
+                    graph_svc = MicrosoftGraphService(db, u.id)
+                    if await graph_svc.is_connected():
+                        graph_ids = await graph_svc.poll_inbox()
+                        all_new_ids.extend(graph_ids)
+                        if graph_ids:
+                            logger.info(f"MS Graph poll fetched {len(graph_ids)} new emails for user {u.id}")
+                except Exception as e:
+                    logger.warning(f"MS Graph poll failed for user {u.id}: {e}")
 
             # Trigger extraction for each new email
             for email_id in all_new_ids:
@@ -114,6 +120,8 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
         email_record = result.scalar_one_or_none()
         if not email_record:
             return {"error": "Email not found"}
+
+        email_user_id = email_record.user_id
 
         # Skip if already processed (dedup guard against overlapping polls)
         if email_record.status in (EmailStatus.PROCESSING, EmailStatus.EXTRACTED):
@@ -167,6 +175,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                                     extracted_data=extracted.to_dict(),
                                     confidence_score=extracted.confidence_score,
                                     status=InvoiceStatus.NEEDS_REVIEW,
+                                    user_id=email_user_id,
                                 )
                                 if extracted.invoice_date:
                                     try:
@@ -196,20 +205,20 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                                     db.add(li)
                                 await db.flush()
 
-                                matcher = JobMatchingService(db)
+                                matcher = JobMatchingService(db, email_user_id)
                                 await matcher.match_invoice(invoice)
 
                                 # Create payable + auto-send to QuickBooks if auto-matched
                                 if invoice.status == InvoiceStatus.AUTO_MATCHED:
                                     try:
-                                        payables_svc = PayablesService(db)
+                                        payables_svc = PayablesService(db, email_user_id)
                                         await payables_svc.create_payable(invoice)
                                         await db.flush()
                                         logger.info(f"Created payable for auto-matched invoice {invoice.id}")
                                     except Exception as pay_err:
                                         logger.error(f"Payable creation failed for invoice {invoice.id}: {pay_err}")
                                     try:
-                                        qb_svc = QuickBooksService(db)
+                                        qb_svc = QuickBooksService(db, email_user_id)
                                         bill_id, vendor_id = await qb_svc.auto_send_bill(invoice)
                                         if bill_id:
                                             invoice.qbo_bill_id = bill_id
@@ -224,7 +233,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                                     f"Extracted invoice {invoice.id} from email body: "
                                     f"vendor={extracted.vendor_name}, total={extracted.total_amount}"
                                 )
-                                await _try_match_recurring_bill(db, invoice)
+                                await _try_match_recurring_bill(db, invoice, email_user_id)
                                 email_record.status = EmailStatus.EXTRACTED
                                 await db.commit()
                                 return {"invoices_created": 1, "source": "body_text"}
@@ -297,6 +306,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                     extracted_data=extracted.to_dict(),
                     confidence_score=extracted.confidence_score,
                     status=InvoiceStatus.EXTRACTED,
+                    user_id=email_user_id,
                 )
 
                 # Parse dates
@@ -335,20 +345,20 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                 await db.flush()
 
                 # Run job matching
-                matcher = JobMatchingService(db)
+                matcher = JobMatchingService(db, email_user_id)
                 await matcher.match_invoice(invoice)
 
                 # Create payable + auto-send to QuickBooks if auto-matched
                 if invoice.status == InvoiceStatus.AUTO_MATCHED:
                     try:
-                        payables_svc = PayablesService(db)
+                        payables_svc = PayablesService(db, email_user_id)
                         await payables_svc.create_payable(invoice)
                         await db.flush()
                         logger.info(f"Created payable for auto-matched invoice {invoice.id}")
                     except Exception as pay_err:
                         logger.error(f"Payable creation failed for invoice {invoice.id}: {pay_err}")
                     try:
-                        qb_svc = QuickBooksService(db)
+                        qb_svc = QuickBooksService(db, email_user_id)
                         bill_id, vendor_id = await qb_svc.auto_send_bill(invoice)
                         if bill_id:
                             invoice.qbo_bill_id = bill_id
@@ -365,7 +375,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                     f"vendor={extracted.vendor_name}, total={extracted.total_amount}, "
                     f"confidence={extracted.confidence_score:.2f}"
                 )
-                await _try_match_recurring_bill(db, invoice)
+                await _try_match_recurring_bill(db, invoice, email_user_id)
 
             except Exception as e:
                 logger.error(f"OCR extraction failed for attachment {att.id}: {e}")
@@ -375,6 +385,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                     attachment_id=att.id,
                     status=InvoiceStatus.NEEDS_REVIEW,
                     error_message=str(e),
+                    user_id=email_user_id,
                 )
                 db.add(invoice)
 
@@ -414,6 +425,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                                 extracted_data=extracted.to_dict(),
                                 confidence_score=extracted.confidence_score,
                                 status=InvoiceStatus.NEEDS_REVIEW,
+                                user_id=email_user_id,
                             )
                             if extracted.invoice_date:
                                 try:
@@ -443,20 +455,20 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                                 db.add(li)
                             await db.flush()
 
-                            matcher = JobMatchingService(db)
+                            matcher = JobMatchingService(db, email_user_id)
                             await matcher.match_invoice(invoice)
 
                             # Create payable + auto-send to QuickBooks if auto-matched
                             if invoice.status == InvoiceStatus.AUTO_MATCHED:
                                 try:
-                                    payables_svc = PayablesService(db)
+                                    payables_svc = PayablesService(db, email_user_id)
                                     await payables_svc.create_payable(invoice)
                                     await db.flush()
                                     logger.info(f"Created payable for auto-matched invoice {invoice.id}")
                                 except Exception as pay_err:
                                     logger.error(f"Payable creation failed for invoice {invoice.id}: {pay_err}")
                                 try:
-                                    qb_svc = QuickBooksService(db)
+                                    qb_svc = QuickBooksService(db, email_user_id)
                                     bill_id, vendor_id = await qb_svc.auto_send_bill(invoice)
                                     if bill_id:
                                         invoice.qbo_bill_id = bill_id
@@ -472,7 +484,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                                 f"Extracted invoice {invoice.id} from email body (fallback): "
                                 f"vendor={extracted.vendor_name}, total={extracted.total_amount}"
                             )
-                            await _try_match_recurring_bill(db, invoice)
+                            await _try_match_recurring_bill(db, invoice, email_user_id)
             except Exception as e:
                 logger.error(f"Body text fallback extraction failed for email {email_id}: {e}")
 
@@ -485,62 +497,83 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
 async def generate_bill_occurrences(ctx: dict) -> dict:
     """Cron: Generate upcoming bill occurrences and update statuses."""
     async with async_session_factory() as db:
-        svc = RecurringBillsService(db)
+        users_result = await db.execute(select(User))
+        users = users_result.scalars().all()
 
-        # Generate occurrences for the next 60 days
-        created = await svc.generate_occurrences(days_ahead=60)
+        total_created = 0
+        total_overdue = 0
+        total_due_soon = 0
+        total_notifs = 0
 
-        # Update overdue and due-soon statuses
-        overdue_count = await svc.check_overdue()
-        due_soon_count = await svc.check_due_soon()
+        for u in users:
+            svc = RecurringBillsService(db, u.id)
 
-        # Generate notifications for due-soon and overdue bills
-        notif_svc = NotificationService(db)
-        due_notifs = await notif_svc.generate_due_soon_notifications()
-        overdue_notifs = await notif_svc.generate_overdue_notifications()
-        credit_danger_notifs = await notif_svc.generate_credit_danger_notifications()
+            # Generate occurrences for the next 60 days
+            created = await svc.generate_occurrences(days_ahead=60)
+
+            # Update overdue and due-soon statuses
+            overdue_count = await svc.check_overdue()
+            due_soon_count = await svc.check_due_soon()
+
+            # Generate notifications for due-soon and overdue bills
+            notif_svc = NotificationService(db, u.id)
+            due_notifs = await notif_svc.generate_due_soon_notifications()
+            overdue_notifs = await notif_svc.generate_overdue_notifications()
+            credit_danger_notifs = await notif_svc.generate_credit_danger_notifications()
+
+            total_created += created
+            total_overdue += overdue_count
+            total_due_soon += due_soon_count
+            total_notifs += due_notifs + overdue_notifs + credit_danger_notifs
 
         await db.commit()
 
     logger.info(
-        f"Bill occurrences: {created} created, {overdue_count} overdue, "
-        f"{due_soon_count} due soon, {due_notifs + overdue_notifs + credit_danger_notifs} notifications"
+        f"Bill occurrences: {total_created} created, {total_overdue} overdue, "
+        f"{total_due_soon} due soon, {total_notifs} notifications"
     )
     return {
-        "occurrences_created": created,
-        "overdue": overdue_count,
-        "due_soon": due_soon_count,
-        "notifications": due_notifs + overdue_notifs + credit_danger_notifs,
+        "occurrences_created": total_created,
+        "overdue": total_overdue,
+        "due_soon": total_due_soon,
+        "notifications": total_notifs,
     }
 
 
 async def send_daily_digest(ctx: dict) -> dict:
     """Cron: Send daily email digest of upcoming and overdue bills."""
     async with async_session_factory() as db:
-        notif_svc = NotificationService(db)
-        graph_svc = MicrosoftGraphService(db)
+        users_result = await db.execute(select(User))
+        users = users_result.scalars().all()
+        sent_count = 0
 
-        # Check if MS Graph is connected
-        connected = await graph_svc.is_connected()
-        if not connected:
-            logger.info("MS Graph not connected, skipping daily digest email")
-            return {"skipped": True, "reason": "MS Graph not connected"}
+        for u in users:
+            notif_svc = NotificationService(db, u.id)
+            graph_svc = MicrosoftGraphService(db, u.id)
 
-        # Build digest HTML
-        html = await notif_svc.build_daily_digest_html()
-        if not html:
-            logger.info("No bills to report in daily digest")
-            return {"skipped": True, "reason": "Nothing to report"}
+            # Check if MS Graph is connected for this user
+            connected = await graph_svc.is_connected()
+            if not connected:
+                continue
 
-        # Send email
-        sent = await graph_svc.send_mail(
-            subject="Bill Processor — Daily Digest",
-            body_html=html,
-        )
+            # Build digest HTML
+            html = await notif_svc.build_daily_digest_html()
+            if not html:
+                continue
+
+            # Send email
+            sent = await graph_svc.send_mail(
+                subject="Bill Processor — Daily Digest",
+                body_html=html,
+            )
+            if sent:
+                sent_count += 1
 
         await db.commit()
 
-    return {"sent": sent}
+    if sent_count == 0:
+        return {"skipped": True, "reason": "No digests to send"}
+    return {"sent": sent_count}
 
 
 class WorkerSettings:

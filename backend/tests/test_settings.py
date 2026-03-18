@@ -151,7 +151,7 @@ class TestOCRSettings:
         self, client: AsyncClient, auth_headers, db_session
     ):
         """Set provider to openai but don't save a key."""
-        setting = AppSetting(key="ocr_provider", value="openai")
+        setting = AppSetting(key="ocr_provider", value="openai", user_id=1)
         db_session.add(setting)
         await db_session.commit()
         resp = await client.post("/api/v1/settings/ocr/test", headers=auth_headers)

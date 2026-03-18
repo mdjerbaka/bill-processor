@@ -50,8 +50,9 @@ MS_SCOPES = ["Mail.Read", "User.Read", "offline_access"]
 class MicrosoftGraphService:
     """Handles Microsoft 365 OAuth and email retrieval via Graph API."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: int = None):
         self.db = db
+        self.user_id = user_id
 
     # ── OAuth2 Flow ──────────────────────────────────────
 
@@ -278,7 +279,7 @@ class MicrosoftGraphService:
     async def _get_poll_folder_id(self) -> str:
         """Get the configured mail folder ID to poll, or empty for all."""
         result = await self.db.execute(
-            select(AppSetting).where(AppSetting.key == "ms_mail_folder_id")
+            select(AppSetting).where(AppSetting.key == "ms_mail_folder_id", AppSetting.user_id == self.user_id)
         )
         setting = result.scalar_one_or_none()
         return setting.value if setting and setting.value else ""
@@ -420,6 +421,7 @@ class MicrosoftGraphService:
                 subject=subject,
                 body_text=body_text[:5000] if body_text else "",
                 status=EmailStatus.PENDING,
+                user_id=self.user_id,
             )
             self.db.add(email_record)
             await self.db.flush()

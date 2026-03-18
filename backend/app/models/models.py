@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     LargeBinary,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -127,6 +128,7 @@ class Email(Base):
     __tablename__ = "emails"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     message_id: Mapped[Optional[str]] = mapped_column(String(500), unique=True, nullable=True)
     from_address: Mapped[str] = mapped_column(String(500), nullable=False)
     subject: Mapped[Optional[str]] = mapped_column(String(1000))
@@ -163,6 +165,7 @@ class Invoice(Base):
     __tablename__ = "invoices"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     email_id: Mapped[Optional[int]] = mapped_column(ForeignKey("emails.id"), nullable=True)
     attachment_id: Mapped[Optional[int]] = mapped_column(ForeignKey("attachments.id"), nullable=True)
 
@@ -229,6 +232,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(500), nullable=False)
     code: Mapped[Optional[str]] = mapped_column(String(100))
     description: Mapped[Optional[str]] = mapped_column(Text)
@@ -264,6 +268,7 @@ class Payable(Base):
     __tablename__ = "payables"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id"), unique=True, nullable=True)
     vendor_name: Mapped[str] = mapped_column(String(500), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -282,9 +287,13 @@ class Payable(Base):
 # ── App Settings (key-value store) ───────────────────────
 class AppSetting(Base):
     __tablename__ = "app_settings"
+    __table_args__ = (
+        UniqueConstraint("key", "user_id", name="uq_app_settings_key_user"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    key: Mapped[str] = mapped_column(String(200), unique=True, nullable=False)
+    key: Mapped[str] = mapped_column(String(200), nullable=False)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
     is_encrypted: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -322,6 +331,7 @@ class RecurringBill(Base):
     __tablename__ = "recurring_bills"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(500), nullable=False)
     vendor_name: Mapped[str] = mapped_column(String(500), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
@@ -368,6 +378,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     type: Mapped[NotificationType] = mapped_column(Enum(NotificationType), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
@@ -384,6 +395,7 @@ class ReceivableCheck(Base):
     __tablename__ = "receivable_checks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     job_name: Mapped[str] = mapped_column(String(500), nullable=False)
     invoiced_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     collect: Mapped[bool] = mapped_column(Boolean, default=False)

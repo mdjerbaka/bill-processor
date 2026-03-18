@@ -110,29 +110,31 @@ class TestJobMatchingService:
 
 class TestPayablesService:
 
-    async def test_create_payable(self, db_session: AsyncSession):
+    async def test_create_payable(self, db_session: AsyncSession, test_user):
         inv = Invoice(
             vendor_name="Test",
             total_amount=1500.0,
             due_date=datetime.now(timezone.utc) + timedelta(days=30),
             status=InvoiceStatus.APPROVED,
+            user_id=test_user.id,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
         db_session.add(inv)
         await db_session.flush()
 
-        svc = PayablesService(db_session)
+        svc = PayablesService(db_session, test_user.id)
         payable = await svc.create_payable(inv)
 
         assert payable.amount == 1500.0
         assert payable.status == PayableStatus.OUTSTANDING
 
-    async def test_summary_calculations(self, db_session: AsyncSession):
+    async def test_summary_calculations(self, db_session: AsyncSession, test_user):
         for i, amount in enumerate([500, 300, 200]):
             inv = Invoice(
                 vendor_name=f"V{i}", total_amount=amount,
                 status=InvoiceStatus.APPROVED,
+                user_id=test_user.id,
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc),
             )
@@ -142,23 +144,25 @@ class TestPayablesService:
                 invoice_id=inv.id, vendor_name=f"V{i}", amount=amount,
                 due_date=datetime.now(timezone.utc) + timedelta(days=30),
                 status=PayableStatus.OUTSTANDING,
+                user_id=test_user.id,
             )
             db_session.add(payable)
         await db_session.flush()
 
-        svc = PayablesService(db_session)
+        svc = PayablesService(db_session, test_user.id)
         summary = await svc.get_payables_summary()
         assert summary["total_outstanding"] == 1000.0
         assert summary["count"] == 3
 
-    async def test_real_balance(self, db_session: AsyncSession):
+    async def test_real_balance(self, db_session: AsyncSession, test_user):
         # Set bank balance
-        setting = AppSetting(key="bank_balance", value="5000.0")
+        setting = AppSetting(key="bank_balance", value="5000.0", user_id=test_user.id)
         db_session.add(setting)
 
         inv = Invoice(
             vendor_name="V", total_amount=2000,
             status=InvoiceStatus.APPROVED,
+            user_id=test_user.id,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
@@ -169,11 +173,12 @@ class TestPayablesService:
             invoice_id=inv.id, vendor_name="V", amount=2000,
             due_date=datetime.now(timezone.utc) + timedelta(days=10),
             status=PayableStatus.OUTSTANDING,
+            user_id=test_user.id,
         )
         db_session.add(payable)
         await db_session.flush()
 
-        svc = PayablesService(db_session)
+        svc = PayablesService(db_session, test_user.id)
         balance = await svc.get_real_balance()
         assert balance["bank_balance"] == 5000.0
         assert balance["total_outstanding"] == 2000.0

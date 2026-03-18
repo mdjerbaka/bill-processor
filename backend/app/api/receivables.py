@@ -32,7 +32,7 @@ async def list_receivable_checks(
     user: User = Depends(get_current_user),
 ):
     """List all receivable checks."""
-    svc = ReceivableChecksService(db)
+    svc = ReceivableChecksService(db, user.id)
     checks = await svc.list_checks()
     totals = await svc.get_totals()
     items = [ReceivableCheckSchema.model_validate(c) for c in checks]
@@ -51,7 +51,7 @@ async def create_receivable_check(
     user: User = Depends(get_current_user),
 ):
     """Create a new receivable check entry."""
-    svc = ReceivableChecksService(db)
+    svc = ReceivableChecksService(db, user.id)
     check = await svc.create_check(data.model_dump())
     await db.commit()
     await db.refresh(check)
@@ -66,7 +66,7 @@ async def update_receivable_check(
     user: User = Depends(get_current_user),
 ):
     """Update a receivable check entry."""
-    svc = ReceivableChecksService(db)
+    svc = ReceivableChecksService(db, user.id)
     check = await svc.update_check(check_id, data.model_dump(exclude_unset=True))
     if not check:
         raise HTTPException(status_code=404, detail="Receivable check not found")
@@ -82,7 +82,7 @@ async def delete_receivable_check(
     user: User = Depends(get_current_user),
 ):
     """Delete a receivable check entry."""
-    svc = ReceivableChecksService(db)
+    svc = ReceivableChecksService(db, user.id)
     deleted = await svc.delete_check(check_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Receivable check not found")
@@ -97,7 +97,7 @@ async def toggle_collect(
     user: User = Depends(get_current_user),
 ):
     """Toggle the collect status of a receivable check."""
-    svc = ReceivableChecksService(db)
+    svc = ReceivableChecksService(db, user.id)
     check = await svc.toggle_collect(check_id)
     if not check:
         raise HTTPException(status_code=404, detail="Receivable check not found")
@@ -114,7 +114,7 @@ async def get_totals(
     user: User = Depends(get_current_user),
 ):
     """Get total invoiced and total receivables."""
-    svc = ReceivableChecksService(db)
+    svc = ReceivableChecksService(db, user.id)
     return await svc.get_totals()
 
 
@@ -124,7 +124,7 @@ async def delete_all_receivable_checks(
     user: User = Depends(get_current_user),
 ):
     """Delete ALL receivable checks."""
-    svc = ReceivableChecksService(db)
+    svc = ReceivableChecksService(db, user.id)
     count = await svc.delete_all()
     await db.commit()
     return {"detail": f"Deleted {count} receivable checks"}
@@ -172,7 +172,7 @@ async def import_receivable_checks_csv(
             "notes": notes,
         })
 
-    svc = ReceivableChecksService(db)
+    svc = ReceivableChecksService(db, user.id)
     count = await svc.bulk_import(items)
     await db.commit()
 

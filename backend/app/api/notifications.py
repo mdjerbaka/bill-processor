@@ -25,7 +25,7 @@ async def list_notifications(
     user: User = Depends(get_current_user),
 ):
     """List notifications."""
-    svc = NotificationService(db)
+    svc = NotificationService(db, user.id)
     notifications = await svc.get_all(include_read=include_read)
     items = [
         NotificationSchema(
@@ -48,7 +48,7 @@ async def unread_count(
     user: User = Depends(get_current_user),
 ):
     """Get unread notification count."""
-    svc = NotificationService(db)
+    svc = NotificationService(db, user.id)
     count = await svc.unread_count()
     return {"count": count}
 
@@ -60,7 +60,7 @@ async def mark_notification_read(
     user: User = Depends(get_current_user),
 ):
     """Mark a single notification as read."""
-    svc = NotificationService(db)
+    svc = NotificationService(db, user.id)
     notif = await svc.mark_read(notification_id)
     if not notif:
         raise HTTPException(status_code=404, detail="Notification not found")
@@ -74,7 +74,7 @@ async def mark_all_read(
     user: User = Depends(get_current_user),
 ):
     """Mark all notifications as read."""
-    svc = NotificationService(db)
+    svc = NotificationService(db, user.id)
     count = await svc.mark_all_read()
     await db.commit()
     return {"detail": f"Marked {count} notifications as read", "count": count}

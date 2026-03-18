@@ -33,8 +33,9 @@ QBO_SCOPES = "com.intuit.quickbooks.accounting"
 class QuickBooksService:
     """Manages QuickBooks Online API interactions."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: int = None):
         self.db = db
+        self.user_id = user_id
         self._cached_creds: dict | None = None
 
     async def _get_qb_creds(self) -> dict:
@@ -61,7 +62,7 @@ class QuickBooksService:
         for db_key, (cred_key, is_encrypted) in db_keys.items():
             try:
                 result = await self.db.execute(
-                    select(AppSetting).where(AppSetting.key == db_key)
+                    select(AppSetting).where(AppSetting.key == db_key, AppSetting.user_id == self.user_id)
                 )
                 setting = result.scalar_one_or_none()
                 if setting and setting.value:
@@ -411,7 +412,7 @@ class QuickBooksService:
         # Check DB setting first
         from app.models.models import AppSetting
         result = await self.db.execute(
-            select(AppSetting).where(AppSetting.key == "qbo_default_expense_account")
+            select(AppSetting).where(AppSetting.key == "qbo_default_expense_account", AppSetting.user_id == self.user_id)
         )
         setting = result.scalar_one_or_none()
         if setting and setting.value:
@@ -427,7 +428,7 @@ class QuickBooksService:
         """Get the default bank account ID from settings, or find the first Bank account."""
         from app.models.models import AppSetting
         result = await self.db.execute(
-            select(AppSetting).where(AppSetting.key == "qbo_default_bank_account")
+            select(AppSetting).where(AppSetting.key == "qbo_default_bank_account", AppSetting.user_id == self.user_id)
         )
         setting = result.scalar_one_or_none()
         if setting and setting.value:

@@ -85,6 +85,7 @@ class TestQBOSendBill:
             vendor_name="Test",
             total_amount=100,
             status=InvoiceStatus.EXTRACTED,
+            user_id=1,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )

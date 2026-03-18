@@ -31,7 +31,7 @@ async def list_jobs(
     user: User = Depends(get_current_user),
 ):
     """List all jobs."""
-    query = select(Job).where(Job.is_junked == False)
+    query = select(Job).where(Job.is_junked == False, Job.user_id == user.id)
     if active_only:
         query = query.where(Job.is_active == True)
     query = query.order_by(Job.name.asc())
@@ -40,8 +40,8 @@ async def list_jobs(
     jobs = result.scalars().all()
 
     count_result = await db.execute(
-        select(func.count(Job.id)).where(Job.is_junked == False).where(Job.is_active == True) if active_only
-        else select(func.count(Job.id)).where(Job.is_junked == False)
+        select(func.count(Job.id)).where(Job.is_junked == False, Job.user_id == user.id).where(Job.is_active == True) if active_only
+        else select(func.count(Job.id)).where(Job.is_junked == False, Job.user_id == user.id)
     )
     total = count_result.scalar()
 
@@ -64,6 +64,7 @@ async def create_job(
         description=req.description,
         address=req.address,
         source=JobSource.MANUAL,
+        user_id=user.id,
     )
     db.add(job)
     await db.flush()
@@ -81,7 +82,7 @@ async def delete_imported_jobs(
     from sqlalchemy import delete as sa_delete
 
     result = await db.execute(
-        select(Job).where(Job.source == JobSource.BUILDERTREND_CSV)
+        select(Job).where(Job.source == JobSource.BUILDERTREND_CSV, Job.user_id == user.id)
     )
     jobs = result.scalars().all()
     job_ids = [j.id for j in jobs]
@@ -199,7 +200,7 @@ async def import_jobs_csv(
 
         # Check for duplicate by name
         existing = await db.execute(
-            select(Job).where(func.lower(Job.name) == name.lower())
+            select(Job).where(func.lower(Job.name) == name.lower(), Job.user_id == user.id)
         )
         if existing.scalar_one_or_none():
             skipped += 1
@@ -211,6 +212,7 @@ async def import_jobs_csv(
             address=address,
             description=description,
             source=JobSource.BUILDERTREND_CSV,
+            user_id=user.id,
         )
         db.add(job)
         imported += 1
@@ -227,7 +229,7 @@ async def update_job(
     user: User = Depends(get_current_user),
 ):
     """Update a job."""
-    result = await db.execute(select(Job).where(Job.id == job_id))
+    result = await db.execute(select(Job).where(Job.id == job_id, Job.user_id == user.id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -248,7 +250,7 @@ async def delete_job(
 ):
     """Send a job to the junk bin."""
     from datetime import datetime, timezone
-    result = await db.execute(select(Job).where(Job.id == job_id))
+    result = await db.execute(select(Job).where(Job.id == job_id, Job.user_id == user.id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -265,7 +267,7 @@ async def restore_job(
     user: User = Depends(get_current_user),
 ):
     """Restore a job from the junk bin."""
-    result = await db.execute(select(Job).where(Job.id == job_id))
+    result = await db.execute(select(Job).where(Job.id == job_id, Job.user_id == user.id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -286,6 +288,7 @@ async def list_vendor_mappings(
     result = await db.execute(
         select(VendorJobMapping, Job)
         .join(Job, VendorJobMapping.job_id == Job.id)
+        .where(Job.user_id == user.id)
         .order_by(VendorJobMapping.vendor_name_pattern.asc())
     )
     rows = result.all()
@@ -311,7 +314,7 @@ async def create_vendor_mapping(
 ):
     """Create a new vendor-to-job mapping rule."""
     # Verify job exists
-    result = await db.execute(select(Job).where(Job.id == req.job_id))
+    result = await db.execute(select(Job).where(Job.id == req.job_id, Job.user_id == user.id))
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -343,7 +346,9 @@ async def delete_vendor_mapping(
 ):
     """Delete a vendor-to-job mapping rule."""
     result = await db.execute(
-        select(VendorJobMapping).where(VendorJobMapping.id == mapping_id)
+        select(VendorJobMapping)
+        .join(Job, VendorJobMapping.job_id == Job.id)
+        .where(VendorJobMapping.id == mapping_id, Job.user_id == user.id)
     )
     mapping = result.scalar_one_or_none()
     if not mapping:

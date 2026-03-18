@@ -39,7 +39,7 @@ async def list_payables(
         select(Payable, Invoice, Job)
         .outerjoin(Invoice, Payable.invoice_id == Invoice.id)
         .outerjoin(Job, Invoice.job_id == Job.id)
-        .where(Payable.is_junked == False)
+        .where(Payable.is_junked == False, Payable.user_id == user.id)
     )
     if not include_paid:
         query = query.where(
@@ -50,7 +50,7 @@ async def list_payables(
     result = await db.execute(query)
     rows = result.all()
 
-    svc = PayablesService(db)
+    svc = PayablesService(db, user.id)
     summary = await svc.get_payables_summary()
 
     items = [
@@ -89,6 +89,7 @@ async def create_payable(
         amount=req.amount,
         due_date=req.due_date,
         status=PayableStatus(req.status) if req.status else PayableStatus.OUTSTANDING,
+        user_id=user.id,
     )
     db.add(payable)
     await db.flush()
@@ -115,7 +116,7 @@ async def update_payable(
 ):
     """Update a payable's fields."""
     result = await db.execute(
-        select(Payable).where(Payable.id == payable_id)
+        select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
     )
     payable = result.scalar_one_or_none()
     if not payable:
@@ -171,7 +172,7 @@ async def mark_payable_paid(
 ):
     """Mark a payable as paid."""
     result = await db.execute(
-        select(Payable).where(Payable.id == payable_id)
+        select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
     )
     payable = result.scalar_one_or_none()
     if not payable:
@@ -191,7 +192,7 @@ async def junk_payable(
 ):
     """Send a payable to the junk bin and revert invoice to review."""
     result = await db.execute(
-        select(Payable).where(Payable.id == payable_id)
+        select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
     )
     payable = result.scalar_one_or_none()
     if not payable:
@@ -225,7 +226,7 @@ async def restore_payable(
 ):
     """Restore a payable from the junk bin."""
     result = await db.execute(
-        select(Payable).where(Payable.id == payable_id)
+        select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
     )
     payable = result.scalar_one_or_none()
     if not payable:
@@ -246,17 +247,17 @@ async def set_bank_balance(
     """Set the current bank balance and get real available funds."""
     # Upsert bank balance setting
     result = await db.execute(
-        select(AppSetting).where(AppSetting.key == "bank_balance")
+        select(AppSetting).where(AppSetting.key == "bank_balance", AppSetting.user_id == user.id)
     )
     setting = result.scalar_one_or_none()
     if setting:
         setting.value = str(req.bank_balance)
     else:
-        setting = AppSetting(key="bank_balance", value=str(req.bank_balance))
+        setting = AppSetting(key="bank_balance", value=str(req.bank_balance), user_id=user.id)
         db.add(setting)
     await db.flush()
 
-    svc = PayablesService(db)
+    svc = PayablesService(db, user.id)
     balance = await svc.get_real_balance()
     return RealBalanceResponse(**balance)
 
@@ -267,7 +268,7 @@ async def get_real_balance(
     user: User = Depends(get_current_user),
 ):
     """Get current real available funds."""
-    svc = PayablesService(db)
+    svc = PayablesService(db, user.id)
     balance = await svc.get_real_balance()
     return RealBalanceResponse(**balance)
 
@@ -278,7 +279,7 @@ async def export_payables_excel(
     user: User = Depends(get_current_user),
 ):
     """Export payables to Excel (.xlsx)."""
-    svc = PayablesService(db)
+    svc = PayablesService(db, user.id)
     excel_bytes = await svc.export_to_excel()
 
     return StreamingResponse(
@@ -320,7 +321,7 @@ async def backfill_missing_payables(
     )
     orphan_invoices = list(result.scalars().all())
 
-    svc = PayablesService(db)
+    svc = PayablesService(db, user.id)
     created = 0
     for inv in orphan_invoices:
         try:

@@ -14,23 +14,29 @@ logger = logging.getLogger(__name__)
 
 
 class ReceivableChecksService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     async def list_checks(self) -> list[ReceivableCheck]:
         result = await self.db.execute(
-            select(ReceivableCheck).order_by(ReceivableCheck.job_name.asc())
+            select(ReceivableCheck)
+            .where(ReceivableCheck.user_id == self.user_id)
+            .order_by(ReceivableCheck.job_name.asc())
         )
         return list(result.scalars().all())
 
     async def get_check(self, check_id: int) -> Optional[ReceivableCheck]:
         result = await self.db.execute(
-            select(ReceivableCheck).where(ReceivableCheck.id == check_id)
+            select(ReceivableCheck).where(
+                ReceivableCheck.id == check_id,
+                ReceivableCheck.user_id == self.user_id,
+            )
         )
         return result.scalar_one_or_none()
 
     async def create_check(self, data: dict) -> ReceivableCheck:
-        check = ReceivableCheck(**data)
+        check = ReceivableCheck(**data, user_id=self.user_id)
         self.db.add(check)
         await self.db.flush()
         return check
@@ -64,12 +70,16 @@ class ReceivableChecksService:
         """Get total invoiced and total receivables (collect=True)."""
         total_invoiced_result = await self.db.execute(
             select(func.coalesce(func.sum(ReceivableCheck.invoiced_amount), 0.0))
+            .where(ReceivableCheck.user_id == self.user_id)
         )
         total_invoiced = float(total_invoiced_result.scalar() or 0.0)
 
         total_receivables_result = await self.db.execute(
             select(func.coalesce(func.sum(ReceivableCheck.invoiced_amount), 0.0))
-            .where(ReceivableCheck.collect == True)  # noqa: E712
+            .where(
+                ReceivableCheck.collect == True,  # noqa: E712
+                ReceivableCheck.user_id == self.user_id,
+            )
         )
         total_receivables = float(total_receivables_result.scalar() or 0.0)
 
@@ -86,6 +96,7 @@ class ReceivableChecksService:
                 invoiced_amount=item.get("invoiced_amount", 0.0),
                 collect=item.get("collect", False),
                 notes=item.get("notes"),
+                user_id=self.user_id,
             )
             self.db.add(check)
             created += 1
@@ -95,8 +106,11 @@ class ReceivableChecksService:
     async def delete_all(self) -> int:
         result = await self.db.execute(
             select(func.count(ReceivableCheck.id))
+            .where(ReceivableCheck.user_id == self.user_id)
         )
         count = result.scalar() or 0
-        await self.db.execute(delete(ReceivableCheck))
+        await self.db.execute(
+            delete(ReceivableCheck).where(ReceivableCheck.user_id == self.user_id)
+        )
         await self.db.flush()
         return count

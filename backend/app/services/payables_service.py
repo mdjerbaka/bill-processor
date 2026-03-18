@@ -27,8 +27,9 @@ logger = logging.getLogger(__name__)
 class PayablesService:
     """Manages payables tracking and exports."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     async def create_payable(self, invoice: Invoice) -> Payable:
         """Create a payable record from an approved invoice."""
@@ -38,6 +39,7 @@ class PayablesService:
             amount=invoice.total_amount or 0.0,
             due_date=invoice.due_date,
             status=PayableStatus.OUTSTANDING,
+            user_id=self.user_id,
         )
         self.db.add(payable)
         await self.db.flush()
@@ -47,7 +49,10 @@ class PayablesService:
         """Get all outstanding (unpaid) payables."""
         result = await self.db.execute(
             select(Payable)
-            .where(Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]))
+            .where(
+                Payable.user_id == self.user_id,
+                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
+            )
             .order_by(Payable.due_date.asc())
         )
         return list(result.scalars().all())
@@ -60,6 +65,7 @@ class PayablesService:
         await self.db.execute(
             Payable.__table__.update()
             .where(
+                Payable.user_id == self.user_id,
                 Payable.status == PayableStatus.OUTSTANDING,
                 Payable.due_date < now,
                 Payable.due_date.is_not(None),
@@ -71,6 +77,7 @@ class PayablesService:
         # Total outstanding
         result = await self.db.execute(
             select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
+                Payable.user_id == self.user_id,
                 Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE])
             )
         )
@@ -79,6 +86,7 @@ class PayablesService:
         # Total overdue
         result = await self.db.execute(
             select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
+                Payable.user_id == self.user_id,
                 Payable.status == PayableStatus.OVERDUE
             )
         )
@@ -87,6 +95,7 @@ class PayablesService:
         # Count
         result = await self.db.execute(
             select(func.count(Payable.id)).where(
+                Payable.user_id == self.user_id,
                 Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE])
             )
         )
@@ -102,7 +111,7 @@ class PayablesService:
         """Calculate real available funds."""
         # Get current bank balance from settings
         result = await self.db.execute(
-            select(AppSetting).where(AppSetting.key == "bank_balance")
+            select(AppSetting).where(AppSetting.key == "bank_balance", AppSetting.user_id == self.user_id)
         )
         setting = result.scalar_one_or_none()
         bank_balance = float(setting.value) if setting else 0.0

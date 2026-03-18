@@ -47,13 +47,13 @@ async def _create_qbo_token(db: AsyncSession) -> QBOToken:
     return token
 
 
-async def _set_qbo_defaults(db: AsyncSession):
+async def _set_qbo_defaults(db: AsyncSession, user_id: int = 1):
     """Set default expense + bank account IDs in app_settings."""
     for key, value in [
         ("qbo_default_expense_account", "76"),
         ("qbo_default_bank_account", "35"),
     ]:
-        db.add(AppSetting(key=key, value=value))
+        db.add(AppSetting(key=key, value=value, user_id=user_id))
     await db.flush()
 
 
@@ -66,6 +66,7 @@ async def _create_invoice(
     qbo_bill_id: str | None = None,
     qbo_vendor_id: str | None = None,
     with_line_items: bool = False,
+    user_id: int = 1,
 ) -> Invoice:
     inv = Invoice(
         vendor_name=vendor_name,
@@ -78,6 +79,7 @@ async def _create_invoice(
         qbo_bill_id=qbo_bill_id,
         qbo_vendor_id=qbo_vendor_id,
         confidence_score=0.95,
+        user_id=user_id,
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
@@ -99,7 +101,7 @@ async def _create_invoice(
 
 
 async def _create_job(db: AsyncSession, name: str = "Job Alpha") -> Job:
-    job = Job(name=name, code="J-001", source=JobSource.MANUAL, is_active=True)
+    job = Job(name=name, code="J-001", source=JobSource.MANUAL, is_active=True, user_id=1)
     db.add(job)
     await db.flush()
     return job
@@ -203,6 +205,7 @@ class TestPayablesVisibility:
             invoice_id=inv.id, vendor_name="Test Vendor",
             amount=1000.0, status=PayableStatus.OUTSTANDING,
             due_date=datetime.now(timezone.utc) + timedelta(days=30),
+            user_id=1,
         )
         db_session.add(payable)
         await db_session.commit()
@@ -235,6 +238,7 @@ class TestPayablesVisibility:
             invoice_id=inv.id, vendor_name="Test Vendor",
             amount=1000.0, status=PayableStatus.PAID,
             paid_at=datetime.now(timezone.utc),
+            user_id=1,
         )
         db_session.add(payable)
         await db_session.commit()
@@ -272,6 +276,7 @@ class TestBackfill:
         db_session.add(Payable(
             invoice_id=inv3.id, vendor_name="V3",
             amount=1000.0, status=PayableStatus.OUTSTANDING,
+            user_id=1,
         ))
         # This one is EXTRACTED — should NOT get a payable
         inv4 = await _create_invoice(

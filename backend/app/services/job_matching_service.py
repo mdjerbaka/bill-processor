@@ -29,8 +29,9 @@ logger = logging.getLogger(__name__)
 class JobMatchingService:
     """Matches invoices to jobs using rules and AI."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: int = None):
         self.db = db
+        self.user_id = user_id
 
     async def match_invoice(self, invoice: Invoice) -> list[JobMatchSuggestion]:
         """Try to match an invoice to a job. Returns ranked suggestions."""
@@ -110,7 +111,7 @@ class JobMatchingService:
         result = await self.db.execute(
             select(VendorJobMapping, Job)
             .join(Job, VendorJobMapping.job_id == Job.id)
-            .where(Job.is_active == True)
+            .where(Job.is_active == True, Job.user_id == self.user_id)
         )
         rows = result.all()
 
@@ -159,7 +160,7 @@ class JobMatchingService:
 
         # Load all active jobs that have an address
         result = await self.db.execute(
-            select(Job).where(Job.is_active == True, Job.address.is_not(None), Job.address != "")
+            select(Job).where(Job.is_active == True, Job.user_id == self.user_id, Job.address.is_not(None), Job.address != "")
         )
         jobs = result.scalars().all()
 
@@ -202,7 +203,7 @@ class JobMatchingService:
 
         # Load all active jobs
         result = await self.db.execute(
-            select(Job).where(Job.is_active == True)
+            select(Job).where(Job.is_active == True, Job.user_id == self.user_id)
         )
         jobs = result.scalars().all()
 

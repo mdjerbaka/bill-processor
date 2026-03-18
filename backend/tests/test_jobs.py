@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.models import Job, JobSource, VendorJobMapping
 
 
-async def _create_job(db: AsyncSession, name="Job A", code="J-001") -> Job:
-    job = Job(name=name, code=code, source=JobSource.MANUAL, is_active=True)
+async def _create_job(db: AsyncSession, name="Job A", code="J-001", user_id: int = 1) -> Job:
+    job = Job(name=name, code=code, source=JobSource.MANUAL, is_active=True, user_id=user_id)
     db.add(job)
     await db.flush()
     return job

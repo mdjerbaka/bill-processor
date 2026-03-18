@@ -171,8 +171,9 @@ def _generate_dates_in_range(
 class RecurringBillsService:
     """Manages recurring bills and their occurrences."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     # ── CRUD ─────────────────────────────────────────────
 
@@ -192,6 +193,7 @@ class RecurringBillsService:
             notes=data.get("notes"),
             is_auto_pay=data.get("is_auto_pay", False),
             alert_days_before=data.get("alert_days_before", 7),
+            user_id=self.user_id,
         )
         bill.next_due_date = _compute_next_due_date(
             freq, bill.due_day_of_month, bill.due_month
@@ -203,7 +205,7 @@ class RecurringBillsService:
     async def update_bill(self, bill_id: int, data: dict) -> Optional[RecurringBill]:
         """Update a recurring bill."""
         result = await self.db.execute(
-            select(RecurringBill).where(RecurringBill.id == bill_id)
+            select(RecurringBill).where(RecurringBill.id == bill_id, RecurringBill.user_id == self.user_id)
         )
         bill = result.scalar_one_or_none()
         if not bill:
@@ -228,7 +230,7 @@ class RecurringBillsService:
     async def delete_bill(self, bill_id: int) -> bool:
         """Soft-delete a recurring bill (set is_active=False)."""
         result = await self.db.execute(
-            select(RecurringBill).where(RecurringBill.id == bill_id)
+            select(RecurringBill).where(RecurringBill.id == bill_id, RecurringBill.user_id == self.user_id)
         )
         bill = result.scalar_one_or_none()
         if not bill:
@@ -240,13 +242,13 @@ class RecurringBillsService:
     async def get_bill(self, bill_id: int) -> Optional[RecurringBill]:
         """Get a single recurring bill by ID."""
         result = await self.db.execute(
-            select(RecurringBill).where(RecurringBill.id == bill_id)
+            select(RecurringBill).where(RecurringBill.id == bill_id, RecurringBill.user_id == self.user_id)
         )
         return result.scalar_one_or_none()
 
     async def list_bills(self, include_inactive: bool = False) -> list[RecurringBill]:
         """List all recurring bills."""
-        q = select(RecurringBill).order_by(RecurringBill.next_due_date.asc())
+        q = select(RecurringBill).where(RecurringBill.user_id == self.user_id).order_by(RecurringBill.next_due_date.asc())
         if not include_inactive:
             q = q.where(RecurringBill.is_active == True)  # noqa: E712
         result = await self.db.execute(q)
@@ -341,7 +343,9 @@ class RecurringBillsService:
     async def skip_occurrence(self, occurrence_id: int) -> Optional[BillOccurrence]:
         """Skip a bill occurrence."""
         result = await self.db.execute(
-            select(BillOccurrence).where(BillOccurrence.id == occurrence_id)
+            select(BillOccurrence)
+            .join(RecurringBill)
+            .where(BillOccurrence.id == occurrence_id, RecurringBill.user_id == self.user_id)
         )
         occ = result.scalar_one_or_none()
         if occ:
@@ -353,8 +357,9 @@ class RecurringBillsService:
         """Mark a bill occurrence as paid (local tracking only, not synced to QB)."""
         result = await self.db.execute(
             select(BillOccurrence)
+            .join(RecurringBill)
             .options(joinedload(BillOccurrence.recurring_bill))
-            .where(BillOccurrence.id == occurrence_id)
+            .where(BillOccurrence.id == occurrence_id, RecurringBill.user_id == self.user_id)
         )
         occ = result.unique().scalar_one_or_none()
         if occ:
@@ -367,7 +372,9 @@ class RecurringBillsService:
     async def toggle_cashflow(self, occurrence_id: int) -> Optional[BillOccurrence]:
         """Toggle whether an occurrence is included in cash flow calculations."""
         result = await self.db.execute(
-            select(BillOccurrence).where(BillOccurrence.id == occurrence_id)
+            select(BillOccurrence)
+            .join(RecurringBill)
+            .where(BillOccurrence.id == occurrence_id, RecurringBill.user_id == self.user_id)
         )
         occ = result.scalar_one_or_none()
         if occ:
@@ -379,10 +386,11 @@ class RecurringBillsService:
         """Delete selected occurrences AND their parent recurring bills."""
         if not ids:
             return 0
-        # Find the parent recurring bill IDs for the selected occurrences
+        # Find the parent recurring bill IDs for the selected occurrences (owned by this user)
         result = await self.db.execute(
             select(BillOccurrence.recurring_bill_id)
-            .where(BillOccurrence.id.in_(ids))
+            .join(RecurringBill)
+            .where(BillOccurrence.id.in_(ids), RecurringBill.user_id == self.user_id)
             .distinct()
         )
         bill_ids = [row[0] for row in result.all()]
@@ -430,6 +438,7 @@ class RecurringBillsService:
         result = await self.db.execute(
             select(RecurringBill).where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
             )
         )
         bills = result.scalars().all()
@@ -494,7 +503,10 @@ class RecurringBillsService:
             select(BillOccurrence)
             .join(RecurringBill)
             .options(joinedload(BillOccurrence.recurring_bill))
-            .where(RecurringBill.is_active == True)  # noqa: E712
+            .where(
+                RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
+            )
             .order_by(BillOccurrence.due_date.asc())
         )
         if start_date:
@@ -547,6 +559,7 @@ class RecurringBillsService:
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.included_in_cashflow == True,  # noqa: E712
                 BillOccurrence.due_date >= now,
                 BillOccurrence.due_date <= seven_days,
@@ -561,6 +574,7 @@ class RecurringBillsService:
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.included_in_cashflow == True,  # noqa: E712
                 BillOccurrence.due_date >= now,
                 BillOccurrence.due_date <= thirty_days,
@@ -575,6 +589,7 @@ class RecurringBillsService:
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.included_in_cashflow == True,  # noqa: E712
                 BillOccurrence.status == OccurrenceStatus.OVERDUE,
             )
@@ -583,14 +598,14 @@ class RecurringBillsService:
 
         # Bank balance from AppSetting
         balance_result = await self.db.execute(
-            select(AppSetting).where(AppSetting.key == "bank_balance")
+            select(AppSetting).where(AppSetting.key == "bank_balance", AppSetting.user_id == self.user_id)
         )
         balance_setting = balance_result.scalar_one_or_none()
         bank_balance = float(balance_setting.value) if balance_setting else 0.0
 
         # Outstanding checks from AppSetting
         checks_result = await self.db.execute(
-            select(AppSetting).where(AppSetting.key == "outstanding_checks")
+            select(AppSetting).where(AppSetting.key == "outstanding_checks", AppSetting.user_id == self.user_id)
         )
         checks_setting = checks_result.scalar_one_or_none()
         outstanding_checks = float(checks_setting.value) if checks_setting else 0.0
@@ -598,7 +613,10 @@ class RecurringBillsService:
         # Expected receivables from ReceivableCheck table (sum of collect=True)
         recv_result = await self.db.execute(
             select(func.coalesce(func.sum(ReceivableCheck.invoiced_amount), 0.0))
-            .where(ReceivableCheck.collect == True)  # noqa: E712
+            .where(
+                ReceivableCheck.collect == True,  # noqa: E712
+                ReceivableCheck.user_id == self.user_id,
+            )
         )
         expected_receivables = float(recv_result.scalar() or 0.0)
 
@@ -611,6 +629,7 @@ class RecurringBillsService:
             .options(joinedload(BillOccurrence.recurring_bill))
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.due_date >= now,
                 BillOccurrence.due_date <= seven_days,
                 BillOccurrence.status.notin_([OccurrenceStatus.SKIPPED, OccurrenceStatus.PAID]),
@@ -647,6 +666,7 @@ class RecurringBillsService:
             .options(joinedload(BillOccurrence.recurring_bill))
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.status == OccurrenceStatus.OVERDUE,
             )
             .order_by(BillOccurrence.due_date.asc())
@@ -700,22 +720,30 @@ class RecurringBillsService:
         return grouped
 
     async def delete_all_bills(self) -> int:
-        """Hard-delete ALL recurring bills and their occurrences."""
-        # Delete notifications referencing bills
-        await self.db.execute(delete(Notification).where(Notification.related_bill_id.isnot(None)))
-        # Delete all occurrences (FK constraint)
-        await self.db.execute(delete(BillOccurrence))
-        # Delete all recurring bills
-        result = await self.db.execute(delete(RecurringBill))
+        """Hard-delete ALL recurring bills and their occurrences for this user."""
+        # Get bill IDs for this user
+        result = await self.db.execute(
+            select(RecurringBill.id).where(RecurringBill.user_id == self.user_id)
+        )
+        bill_ids = [row[0] for row in result.all()]
+        if not bill_ids:
+            return 0
+        # Delete notifications referencing these bills
+        await self.db.execute(delete(Notification).where(Notification.related_bill_id.in_(bill_ids)))
+        # Delete all occurrences for these bills
+        await self.db.execute(delete(BillOccurrence).where(BillOccurrence.recurring_bill_id.in_(bill_ids)))
+        # Delete the recurring bills
+        await self.db.execute(delete(RecurringBill).where(RecurringBill.id.in_(bill_ids)))
         await self.db.flush()
-        return result.rowcount
+        return len(bill_ids)
 
     async def bulk_import(self, bills_data: list[dict]) -> list[RecurringBill]:
         """Import multiple recurring bills from a list of dicts, skipping duplicates."""
         # Pre-load existing bill name+vendor pairs for dedup
         existing_result = await self.db.execute(
             select(RecurringBill.name, RecurringBill.vendor_name).where(
-                RecurringBill.is_active == True
+                RecurringBill.is_active == True,
+                RecurringBill.user_id == self.user_id,
             )
         )
         existing_keys = {

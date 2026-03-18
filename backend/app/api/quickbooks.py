@@ -30,7 +30,7 @@ async def qbo_connect(
     # Check DB settings first, then fall back to .env
     client_id = settings.qbo_client_id
     result = await db.execute(
-        select(AppSetting).where(AppSetting.key == "qbo_client_id")
+        select(AppSetting).where(AppSetting.key == "qbo_client_id", AppSetting.user_id == user.id)
     )
     db_setting = result.scalar_one_or_none()
     if db_setting and db_setting.value:
@@ -39,7 +39,7 @@ async def qbo_connect(
     if not client_id:
         raise HTTPException(status_code=400, detail="QuickBooks client ID not configured. Go to Settings to add your QuickBooks credentials.")
 
-    svc = QuickBooksService(db)
+    svc = QuickBooksService(db, user.id)
     auth_url = await svc.get_auth_url()
     return {"auth_url": auth_url}
 
@@ -72,7 +72,7 @@ async def qbo_status(
     user: User = Depends(get_current_user),
 ):
     """Check QuickBooks connection status."""
-    svc = QuickBooksService(db)
+    svc = QuickBooksService(db, user.id)
     connected = await svc.is_connected()
 
     # Get default account settings
@@ -80,11 +80,11 @@ async def qbo_status(
     expense_acct = None
     bank_acct = None
     try:
-        r1 = await db.execute(select(AppSetting).where(AppSetting.key == "qbo_default_expense_account"))
+        r1 = await db.execute(select(AppSetting).where(AppSetting.key == "qbo_default_expense_account", AppSetting.user_id == user.id))
         s1 = r1.scalar_one_or_none()
         if s1:
             expense_acct = s1.value
-        r2 = await db.execute(select(AppSetting).where(AppSetting.key == "qbo_default_bank_account"))
+        r2 = await db.execute(select(AppSetting).where(AppSetting.key == "qbo_default_bank_account", AppSetting.user_id == user.id))
         s2 = r2.scalar_one_or_none()
         if s2:
             bank_acct = s2.value
@@ -104,7 +104,7 @@ async def qbo_all_accounts(
     user: User = Depends(get_current_user),
 ):
     """List expense and bank accounts from QuickBooks for settings dropdowns."""
-    svc = QuickBooksService(db)
+    svc = QuickBooksService(db, user.id)
     expense_accounts = await svc.get_accounts("Expense")
     bank_accounts = await svc.get_accounts("Bank")
     return {
@@ -126,12 +126,12 @@ async def save_qbo_defaults(
         short_key = key.replace("qbo_default_", "")
         value = req.get(short_key) or req.get(key)
         if value is not None:
-            result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+            result = await db.execute(select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id))
             setting = result.scalar_one_or_none()
             if setting:
                 setting.value = str(value)
             else:
-                db.add(AppSetting(key=key, value=str(value)))
+                db.add(AppSetting(key=key, value=str(value), user_id=user.id))
 
     await db.commit()
     return {"saved": True}
@@ -143,7 +143,7 @@ async def qbo_vendors(
     user: User = Depends(get_current_user),
 ):
     """List vendors from QuickBooks."""
-    svc = QuickBooksService(db)
+    svc = QuickBooksService(db, user.id)
     vendors = await svc.get_vendors()
     return {"vendors": vendors}
 
@@ -155,7 +155,7 @@ async def qbo_accounts(
     user: User = Depends(get_current_user),
 ):
     """List accounts from QuickBooks."""
-    svc = QuickBooksService(db)
+    svc = QuickBooksService(db, user.id)
     accounts = await svc.get_accounts(account_type)
     return {"accounts": accounts}
 
@@ -174,7 +174,7 @@ async def send_bill_to_qbo(
     result = await db.execute(
         select(Invoice)
         .options(joinedload(Invoice.line_items))
-        .where(Invoice.id == invoice_id)
+        .where(Invoice.id == invoice_id, Invoice.user_id == user.id)
     )
     invoice = result.unique().scalar_one_or_none()
     if not invoice:
@@ -183,7 +183,7 @@ async def send_bill_to_qbo(
     if invoice.status not in (InvoiceStatus.APPROVED, InvoiceStatus.AUTO_MATCHED):
         raise HTTPException(status_code=400, detail="Invoice must be approved first")
 
-    svc = QuickBooksService(db)
+    svc = QuickBooksService(db, user.id)
     bill_id = await svc.create_bill(invoice, qbo_vendor_id, qbo_account_id)
     if not bill_id:
         raise HTTPException(status_code=500, detail="Failed to create bill in QuickBooks")

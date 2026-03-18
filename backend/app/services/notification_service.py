@@ -23,8 +23,9 @@ logger = logging.getLogger(__name__)
 class NotificationService:
     """Manages in-app notifications and email digest generation."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, user_id: int):
         self.db = db
+        self.user_id = user_id
 
     async def create_notification(
         self,
@@ -39,6 +40,7 @@ class NotificationService:
             title=title,
             message=message,
             related_bill_id=related_bill_id,
+            user_id=self.user_id,
         )
         self.db.add(notif)
         await self.db.flush()
@@ -48,7 +50,7 @@ class NotificationService:
         """Get unread notifications, most recent first."""
         result = await self.db.execute(
             select(Notification)
-            .where(Notification.is_read == False)  # noqa: E712
+            .where(Notification.is_read == False, Notification.user_id == self.user_id)  # noqa: E712
             .order_by(Notification.created_at.desc())
             .limit(limit)
         )
@@ -56,7 +58,7 @@ class NotificationService:
 
     async def get_all(self, include_read: bool = False, limit: int = 100) -> list[Notification]:
         """Get notifications with optional read filter."""
-        q = select(Notification).order_by(Notification.created_at.desc()).limit(limit)
+        q = select(Notification).where(Notification.user_id == self.user_id).order_by(Notification.created_at.desc()).limit(limit)
         if not include_read:
             q = q.where(Notification.is_read == False)  # noqa: E712
         result = await self.db.execute(q)
@@ -66,7 +68,8 @@ class NotificationService:
         """Return count of unread notifications."""
         result = await self.db.execute(
             select(func.count(Notification.id)).where(
-                Notification.is_read == False  # noqa: E712
+                Notification.is_read == False,  # noqa: E712
+                Notification.user_id == self.user_id,
             )
         )
         return result.scalar() or 0
@@ -74,7 +77,7 @@ class NotificationService:
     async def mark_read(self, notification_id: int) -> Optional[Notification]:
         """Mark a single notification as read."""
         result = await self.db.execute(
-            select(Notification).where(Notification.id == notification_id)
+            select(Notification).where(Notification.id == notification_id, Notification.user_id == self.user_id)
         )
         notif = result.scalar_one_or_none()
         if notif:
@@ -85,7 +88,7 @@ class NotificationService:
     async def mark_all_read(self) -> int:
         """Mark all unread notifications as read. Returns count updated."""
         result = await self.db.execute(
-            select(Notification).where(Notification.is_read == False)  # noqa: E712
+            select(Notification).where(Notification.is_read == False, Notification.user_id == self.user_id)  # noqa: E712
         )
         notifications = result.scalars().all()
         for n in notifications:
@@ -105,6 +108,7 @@ class NotificationService:
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.status == OccurrenceStatus.DUE_SOON,
                 BillOccurrence.due_date >= now,
                 BillOccurrence.due_date <= seven_days,
@@ -120,6 +124,7 @@ class NotificationService:
                     Notification.type == NotificationType.BILL_DUE_SOON,
                     Notification.related_bill_id == occ.recurring_bill_id,
                     Notification.title.contains(occ.due_date.strftime("%Y-%m-%d")),
+                    Notification.user_id == self.user_id,
                 )
             )
             if existing.scalar_one_or_none():
@@ -150,6 +155,7 @@ class NotificationService:
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.status == OccurrenceStatus.OVERDUE,
             )
         )
@@ -162,6 +168,7 @@ class NotificationService:
                     Notification.type == NotificationType.BILL_OVERDUE,
                     Notification.related_bill_id == occ.recurring_bill_id,
                     Notification.title.contains(occ.due_date.strftime("%Y-%m-%d")),
+                    Notification.user_id == self.user_id,
                 )
             )
             if existing.scalar_one_or_none():
@@ -194,6 +201,7 @@ class NotificationService:
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.status == OccurrenceStatus.OVERDUE,
                 BillOccurrence.due_date <= danger_threshold,
             )
@@ -208,6 +216,7 @@ class NotificationService:
                     Notification.type == NotificationType.BILL_CREDIT_DANGER,
                     Notification.related_bill_id == occ.recurring_bill_id,
                     Notification.title.contains(occ.due_date.strftime("%Y-%m-%d")),
+                    Notification.user_id == self.user_id,
                 )
             )
             if existing.scalar_one_or_none():
@@ -245,6 +254,7 @@ class NotificationService:
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.due_date >= now,
                 BillOccurrence.due_date <= seven_days,
                 BillOccurrence.status != OccurrenceStatus.SKIPPED,
@@ -259,6 +269,7 @@ class NotificationService:
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                RecurringBill.user_id == self.user_id,
                 BillOccurrence.status == OccurrenceStatus.OVERDUE,
             )
             .order_by(BillOccurrence.due_date.asc())
