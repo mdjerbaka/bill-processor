@@ -55,18 +55,36 @@ async def _try_match_recurring_bill(db, invoice):
 
 
 async def poll_email_inbox(ctx: dict) -> dict:
-    """Task: Poll the IMAP inbox for new invoice emails."""
+    """Task: Poll email inboxes (IMAP + Microsoft Graph) for new invoice emails."""
     if _poll_lock.locked():
         logger.debug("Poll already in progress, skipping this cycle")
         return {"skipped": True}
 
     async with _poll_lock:
         async with async_session_factory() as db:
-            svc = EmailService(db)
-            new_ids = await svc.poll_inbox()
+            all_new_ids = []
+
+            # 1) IMAP polling (Gmail / generic IMAP)
+            try:
+                svc = EmailService(db)
+                imap_ids = await svc.poll_inbox()
+                all_new_ids.extend(imap_ids)
+            except Exception as e:
+                logger.warning(f"IMAP poll failed (may not be configured): {e}")
+
+            # 2) Microsoft Graph polling (Outlook / Microsoft 365)
+            try:
+                graph_svc = MicrosoftGraphService(db)
+                if await graph_svc.is_connected():
+                    graph_ids = await graph_svc.poll_inbox()
+                    all_new_ids.extend(graph_ids)
+                    if graph_ids:
+                        logger.info(f"MS Graph poll fetched {len(graph_ids)} new emails")
+            except Exception as e:
+                logger.warning(f"MS Graph poll failed: {e}")
 
             # Trigger extraction for each new email
-            for email_id in new_ids:
+            for email_id in all_new_ids:
                 await process_email_attachments(ctx, email_id)
 
             # Store last poll time
@@ -83,7 +101,7 @@ async def poll_email_inbox(ctx: dict) -> dict:
 
             await db.commit()
 
-    return {"new_emails": len(new_ids)}
+    return {"new_emails": len(all_new_ids)}
 
 
 async def process_email_attachments(ctx: dict, email_id: int) -> dict:
