@@ -16,6 +16,7 @@ import {
   ForwardIcon,
   CheckCircleIcon,
   ChevronUpDownIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline'
 
 const FREQUENCY_OPTIONS = [
@@ -70,12 +71,29 @@ function StatusBadge({ status }) {
   )
 }
 
-function SummaryCard({ title, value, color, icon: Icon }) {
+function SummaryCard({ title, value, color, icon: Icon, tooltip }) {
+  const [showTooltip, setShowTooltip] = useState(false)
   return (
     <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-400">{title}</p>
+          <div className="flex items-center gap-1">
+            <p className="text-sm text-gray-400">{title}</p>
+            {tooltip && (
+              <div className="relative">
+                <InformationCircleIcon
+                  className="h-4 w-4 text-gray-500 hover:text-gray-300 cursor-help"
+                  onMouseEnter={() => setShowTooltip(true)}
+                  onMouseLeave={() => setShowTooltip(false)}
+                />
+                {showTooltip && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-gray-900 border border-gray-600 rounded-lg text-xs text-gray-300 shadow-lg z-50 whitespace-pre-line">
+                    {tooltip}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <p className={`text-xl font-bold mt-1 ${color || 'text-gray-100'}`}>{value}</p>
         </div>
         {Icon && (
@@ -509,6 +527,7 @@ export default function BillsPage() {
             value={fmt(cashFlow.real_available)}
             icon={BanknotesIcon}
             color={cashFlow.real_available >= 0 ? 'text-green-400' : 'text-red-400'}
+            tooltip={`Bank Balance\n− Outstanding Checks\n− All bills due in 30 days\n− All overdue bills\n\n${fmt(cashFlow.bank_balance)} − ${fmt(cashFlow.outstanding_checks)} − ${fmt(cashFlow.total_upcoming_30d)} − ${fmt(cashFlow.total_overdue)} = ${fmt(cashFlow.real_available)}`}
           />
         </div>
       )}
@@ -659,6 +678,16 @@ export default function BillsPage() {
                             Skip
                           </button>
                         )}
+                        <button
+                          onClick={() => {
+                            const parentBill = bills.find(b => b.id === occ.recurring_bill_id)
+                            if (parentBill) openEditForm(parentBill)
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-blue-400 transition-colors"
+                          title="Edit recurring bill"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
