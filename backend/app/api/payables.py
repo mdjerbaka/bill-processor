@@ -64,7 +64,7 @@ async def list_payables(
             status=p.status.value,
             paid_at=p.paid_at,
             created_at=p.created_at,
-            invoice_number=inv.invoice_number,
+            invoice_number=inv.invoice_number if inv else None,
             job_name=job.name if job else None,
             is_permanent=p.is_permanent,
         )
