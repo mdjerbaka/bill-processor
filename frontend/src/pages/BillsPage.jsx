@@ -285,11 +285,24 @@ export default function BillsPage() {
     }
   }
 
+  // Refresh only the cash flow summary without re-fetching occurrences
+  const refreshCashFlow = useCallback(async () => {
+    try {
+      const res = await recurringBillsAPI.getCashFlow()
+      setCashFlow(res.data)
+      setBankBalanceInput(res.data.bank_balance?.toString() || '0')
+    } catch { /* ignore */ }
+  }, [])
+
   async function handleSkip(occurrenceId) {
     try {
       await recurringBillsAPI.skip(occurrenceId)
       toast.success('Occurrence skipped')
-      loadData()
+      // Update in-place so the bill doesn't jump
+      setOccurrences(prev => prev.map(o =>
+        o.id === occurrenceId ? { ...o, status: 'skipped' } : o
+      ))
+      refreshCashFlow()
     } catch {
       toast.error('Failed to skip occurrence')
     }
@@ -305,7 +318,11 @@ export default function BillsPage() {
       } else {
         toast.success('Marked as paid')
       }
-      loadData()
+      // Update in-place so the bill doesn't jump
+      setOccurrences(prev => prev.map(o =>
+        o.id === occurrenceId ? { ...o, status: 'paid', paid_at: new Date().toISOString(), included_in_cashflow: false } : o
+      ))
+      refreshCashFlow()
     } catch {
       toast.error('Failed to mark as paid')
     }
@@ -314,11 +331,11 @@ export default function BillsPage() {
   async function handleToggleCashflow(occurrenceId) {
     try {
       const res = await recurringBillsAPI.toggleCashflow(occurrenceId)
-      // Optimistic update for snappier feel
+      // Update in-place so the bill doesn't jump
       setOccurrences(prev => prev.map(o =>
         o.id === occurrenceId ? { ...o, included_in_cashflow: res.data.included_in_cashflow } : o
       ))
-      loadData()
+      refreshCashFlow()
     } catch {
       toast.error('Failed to toggle cash flow inclusion')
     }
