@@ -258,6 +258,7 @@ async def get_cash_flow(
         bank_balance=summary["bank_balance"],
         outstanding_checks=summary["outstanding_checks"],
         expected_receivables=summary["expected_receivables"],
+        total_payables=summary["total_payables"],
         total_upcoming_7d=summary["total_upcoming_7d"],
         total_upcoming_30d=summary["total_upcoming_30d"],
         total_overdue=summary["total_overdue"],

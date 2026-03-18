@@ -368,6 +368,7 @@ class CashFlowSummary(BaseModel):
     bank_balance: float
     outstanding_checks: float
     expected_receivables: float = 0.0
+    total_payables: float = 0.0
     total_upcoming_7d: float
     total_upcoming_30d: float
     total_overdue: float

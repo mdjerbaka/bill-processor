@@ -19,6 +19,8 @@ from app.models.models import (
     Invoice,
     Notification,
     OccurrenceStatus,
+    Payable,
+    PayableStatus,
     ReceivableCheck,
     RecurringBill,
 )
@@ -620,7 +622,17 @@ class RecurringBillsService:
         )
         expected_receivables = float(recv_result.scalar() or 0.0)
 
-        real_available = bank_balance + expected_receivables - outstanding_checks - total_30d - total_overdue
+        # Outstanding payables (invoices to pay)
+        payables_result = await self.db.execute(
+            select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
+                Payable.user_id == self.user_id,
+                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
+                Payable.is_junked == False,  # noqa: E712
+            )
+        )
+        total_payables = float(payables_result.scalar() or 0.0)
+
+        real_available = bank_balance + expected_receivables - outstanding_checks - total_30d - total_overdue - total_payables
 
         # Populate bills due soon (within 7 days, not paid/skipped)
         due_soon_result = await self.db.execute(
@@ -698,6 +710,7 @@ class RecurringBillsService:
             "bank_balance": bank_balance,
             "outstanding_checks": outstanding_checks,
             "expected_receivables": expected_receivables,
+            "total_payables": total_payables,
             "total_upcoming_7d": total_7d,
             "total_upcoming_30d": total_30d,
             "total_overdue": total_overdue,
