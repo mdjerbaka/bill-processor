@@ -71,6 +71,7 @@ export default function NotificationBell() {
   const typeColor = {
     bill_overdue: 'text-red-400',
     bill_due_soon: 'text-yellow-400',
+    bill_credit_danger: 'text-red-500',
     daily_digest: 'text-blue-400',
     balance_low: 'text-orange-400',
   }

@@ -19,6 +19,7 @@ from app.models.models import (
     Invoice,
     Notification,
     OccurrenceStatus,
+    ReceivableCheck,
     RecurringBill,
 )
 
@@ -351,12 +352,26 @@ class RecurringBillsService:
     async def mark_paid(self, occurrence_id: int) -> Optional[BillOccurrence]:
         """Mark a bill occurrence as paid (local tracking only, not synced to QB)."""
         result = await self.db.execute(
+            select(BillOccurrence)
+            .options(joinedload(BillOccurrence.recurring_bill))
+            .where(BillOccurrence.id == occurrence_id)
+        )
+        occ = result.unique().scalar_one_or_none()
+        if occ:
+            occ.status = OccurrenceStatus.PAID
+            occ.paid_at = datetime.now(timezone.utc)
+            occ.included_in_cashflow = False
+            await self.db.flush()
+        return occ
+
+    async def toggle_cashflow(self, occurrence_id: int) -> Optional[BillOccurrence]:
+        """Toggle whether an occurrence is included in cash flow calculations."""
+        result = await self.db.execute(
             select(BillOccurrence).where(BillOccurrence.id == occurrence_id)
         )
         occ = result.scalar_one_or_none()
         if occ:
-            occ.status = OccurrenceStatus.PAID
-            occ.paid_at = datetime.now(timezone.utc)
+            occ.included_in_cashflow = not occ.included_in_cashflow
             await self.db.flush()
         return occ
 
@@ -515,6 +530,7 @@ class RecurringBillsService:
                 "paid_at": occ.paid_at,
                 "matched_invoice_id": occ.matched_invoice_id,
                 "days_overdue": days_overdue,
+                "included_in_cashflow": occ.included_in_cashflow,
                 "created_at": occ.created_at,
             })
         return enriched
@@ -525,12 +541,13 @@ class RecurringBillsService:
         seven_days = now + timedelta(days=7)
         thirty_days = now + timedelta(days=30)
 
-        # Upcoming 7 days
+        # Upcoming 7 days (only bills toggled into cashflow)
         result_7d = await self.db.execute(
             select(func.coalesce(func.sum(BillOccurrence.amount), 0.0))
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                BillOccurrence.included_in_cashflow == True,  # noqa: E712
                 BillOccurrence.due_date >= now,
                 BillOccurrence.due_date <= seven_days,
                 BillOccurrence.status.notin_([OccurrenceStatus.SKIPPED, OccurrenceStatus.PAID]),
@@ -538,12 +555,13 @@ class RecurringBillsService:
         )
         total_7d = float(result_7d.scalar() or 0.0)
 
-        # Upcoming 30 days
+        # Upcoming 30 days (only bills toggled into cashflow)
         result_30d = await self.db.execute(
             select(func.coalesce(func.sum(BillOccurrence.amount), 0.0))
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                BillOccurrence.included_in_cashflow == True,  # noqa: E712
                 BillOccurrence.due_date >= now,
                 BillOccurrence.due_date <= thirty_days,
                 BillOccurrence.status.notin_([OccurrenceStatus.SKIPPED, OccurrenceStatus.PAID]),
@@ -551,12 +569,13 @@ class RecurringBillsService:
         )
         total_30d = float(result_30d.scalar() or 0.0)
 
-        # Overdue total
+        # Overdue total (only bills toggled into cashflow)
         result_overdue = await self.db.execute(
             select(func.coalesce(func.sum(BillOccurrence.amount), 0.0))
             .join(RecurringBill)
             .where(
                 RecurringBill.is_active == True,  # noqa: E712
+                BillOccurrence.included_in_cashflow == True,  # noqa: E712
                 BillOccurrence.status == OccurrenceStatus.OVERDUE,
             )
         )
@@ -576,17 +595,95 @@ class RecurringBillsService:
         checks_setting = checks_result.scalar_one_or_none()
         outstanding_checks = float(checks_setting.value) if checks_setting else 0.0
 
-        real_available = bank_balance - outstanding_checks - total_30d - total_overdue
+        # Expected receivables from ReceivableCheck table (sum of collect=True)
+        recv_result = await self.db.execute(
+            select(func.coalesce(func.sum(ReceivableCheck.invoiced_amount), 0.0))
+            .where(ReceivableCheck.collect == True)  # noqa: E712
+        )
+        expected_receivables = float(recv_result.scalar() or 0.0)
+
+        real_available = bank_balance + expected_receivables - outstanding_checks - total_30d - total_overdue
+
+        # Populate bills due soon (within 7 days, not paid/skipped)
+        due_soon_result = await self.db.execute(
+            select(BillOccurrence)
+            .join(RecurringBill)
+            .options(joinedload(BillOccurrence.recurring_bill))
+            .where(
+                RecurringBill.is_active == True,  # noqa: E712
+                BillOccurrence.due_date >= now,
+                BillOccurrence.due_date <= seven_days,
+                BillOccurrence.status.notin_([OccurrenceStatus.SKIPPED, OccurrenceStatus.PAID]),
+            )
+            .order_by(BillOccurrence.due_date.asc())
+        )
+        due_soon_occs = due_soon_result.unique().scalars().all()
+        bills_due_soon = []
+        for occ in due_soon_occs:
+            bill = occ.recurring_bill
+            bills_due_soon.append({
+                "id": occ.id,
+                "recurring_bill_id": occ.recurring_bill_id,
+                "due_date": occ.due_date,
+                "amount": occ.amount,
+                "status": occ.status.value,
+                "notes": occ.notes,
+                "bill_name": bill.name if bill else None,
+                "vendor_name": bill.vendor_name if bill else None,
+                "category": bill.category.value if bill else None,
+                "is_auto_pay": bill.is_auto_pay if bill else None,
+                "paid_at": occ.paid_at,
+                "matched_invoice_id": occ.matched_invoice_id,
+                "days_overdue": None,
+                "included_in_cashflow": occ.included_in_cashflow,
+                "created_at": occ.created_at,
+            })
+
+        # Populate overdue bills (all overdue, regardless of cashflow toggle)
+        now_date = datetime.now(timezone.utc).date()
+        overdue_result = await self.db.execute(
+            select(BillOccurrence)
+            .join(RecurringBill)
+            .options(joinedload(BillOccurrence.recurring_bill))
+            .where(
+                RecurringBill.is_active == True,  # noqa: E712
+                BillOccurrence.status == OccurrenceStatus.OVERDUE,
+            )
+            .order_by(BillOccurrence.due_date.asc())
+        )
+        overdue_occs = overdue_result.unique().scalars().all()
+        overdue_bills = []
+        for occ in overdue_occs:
+            bill = occ.recurring_bill
+            days_overdue = (now_date - occ.due_date.date()).days
+            overdue_bills.append({
+                "id": occ.id,
+                "recurring_bill_id": occ.recurring_bill_id,
+                "due_date": occ.due_date,
+                "amount": occ.amount,
+                "status": occ.status.value,
+                "notes": occ.notes,
+                "bill_name": bill.name if bill else None,
+                "vendor_name": bill.vendor_name if bill else None,
+                "category": bill.category.value if bill else None,
+                "is_auto_pay": bill.is_auto_pay if bill else None,
+                "paid_at": occ.paid_at,
+                "matched_invoice_id": occ.matched_invoice_id,
+                "days_overdue": days_overdue,
+                "included_in_cashflow": occ.included_in_cashflow,
+                "created_at": occ.created_at,
+            })
 
         return {
             "bank_balance": bank_balance,
             "outstanding_checks": outstanding_checks,
+            "expected_receivables": expected_receivables,
             "total_upcoming_7d": total_7d,
             "total_upcoming_30d": total_30d,
             "total_overdue": total_overdue,
             "real_available": real_available,
-            "bills_due_soon": [],
-            "overdue_bills": [],
+            "bills_due_soon": bills_due_soon,
+            "overdue_bills": overdue_bills,
         }
 
     async def get_calendar_view(

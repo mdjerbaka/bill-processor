@@ -14,6 +14,7 @@ import {
   CalendarDaysIcon,
   Bars3Icon,
   XMarkIcon,
+  DocumentCheckIcon,
 } from '@heroicons/react/24/outline'
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Invoices', href: '/invoices', icon: InboxIcon },
   { name: 'Payables', href: '/payables', icon: CurrencyDollarIcon },
   { name: 'Bills', href: '/bills', icon: CalendarDaysIcon },
+  { name: 'Receivables', href: '/receivables', icon: DocumentCheckIcon },
   { name: 'Jobs', href: '/jobs', icon: WrenchScrewdriverIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   { name: 'Help', href: '/help', icon: QuestionMarkCircleIcon },

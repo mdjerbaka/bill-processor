@@ -215,8 +215,35 @@ async def mark_occurrence_paid(
     occ = await svc.mark_paid(occurrence_id)
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence not found")
+    # Generate next cycle's occurrence if needed
+    await svc.generate_occurrences()
     await db.commit()
-    return {"detail": "Occurrence marked as paid"}
+    # Find next upcoming occurrence for the same bill
+    next_due = None
+    if occ.recurring_bill:
+        next_due = occ.recurring_bill.next_due_date
+    return {
+        "detail": "Occurrence marked as paid",
+        "next_due_date": next_due.isoformat() if next_due else None,
+    }
+
+
+@router.post("/occurrences/{occurrence_id}/toggle-cashflow")
+async def toggle_occurrence_cashflow(
+    occurrence_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Toggle whether a bill occurrence is included in cash flow calculations."""
+    svc = RecurringBillsService(db)
+    occ = await svc.toggle_cashflow(occurrence_id)
+    if not occ:
+        raise HTTPException(status_code=404, detail="Occurrence not found")
+    await db.commit()
+    return {
+        "detail": f"Occurrence {'included in' if occ.included_in_cashflow else 'excluded from'} cash flow",
+        "included_in_cashflow": occ.included_in_cashflow,
+    }
 
 
 @router.get("/cash-flow", response_model=CashFlowSummary)
@@ -230,6 +257,7 @@ async def get_cash_flow(
     return CashFlowSummary(
         bank_balance=summary["bank_balance"],
         outstanding_checks=summary["outstanding_checks"],
+        expected_receivables=summary["expected_receivables"],
         total_upcoming_7d=summary["total_upcoming_7d"],
         total_upcoming_30d=summary["total_upcoming_30d"],
         total_overdue=summary["total_overdue"],
@@ -439,3 +467,25 @@ async def set_outstanding_checks(
         db.add(setting)
     await db.commit()
     return {"detail": "Outstanding checks updated", "amount": amount}
+
+
+@router.post("/expected-receivables")
+async def set_expected_receivables(
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Set the expected receivables amount (money expected to come in within the week)."""
+    from sqlalchemy import select as sel
+    amount = data.get("amount", 0.0)
+    result = await db.execute(
+        sel(AppSetting).where(AppSetting.key == "expected_receivables")
+    )
+    setting = result.scalar_one_or_none()
+    if setting:
+        setting.value = str(amount)
+    else:
+        setting = AppSetting(key="expected_receivables", value=str(amount))
+        db.add(setting)
+    await db.commit()
+    return {"detail": "Expected receivables updated", "amount": amount}

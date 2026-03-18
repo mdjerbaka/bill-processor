@@ -326,6 +326,7 @@ class BillOccurrenceSchema(BaseModel):
     paid_at: Optional[datetime] = None
     matched_invoice_id: Optional[int] = None
     days_overdue: Optional[int] = None
+    included_in_cashflow: bool = True
     created_at: datetime
 
     class Config:
@@ -358,9 +359,45 @@ class NotificationListResponse(BaseModel):
 class CashFlowSummary(BaseModel):
     bank_balance: float
     outstanding_checks: float
+    expected_receivables: float = 0.0
     total_upcoming_7d: float
     total_upcoming_30d: float
     total_overdue: float
     real_available: float
     bills_due_soon: List[BillOccurrenceSchema] = []
     overdue_bills: List[BillOccurrenceSchema] = []
+
+
+# ── Receivable Checks ────────────────────────────────────
+class ReceivableCheckCreate(BaseModel):
+    job_name: str = Field(min_length=1, max_length=500)
+    invoiced_amount: float = Field(ge=0)
+    collect: bool = False
+    notes: Optional[str] = None
+
+
+class ReceivableCheckUpdate(BaseModel):
+    job_name: Optional[str] = Field(default=None, max_length=500)
+    invoiced_amount: Optional[float] = Field(default=None, ge=0)
+    collect: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+class ReceivableCheckSchema(BaseModel):
+    id: int
+    job_name: str
+    invoiced_amount: float
+    collect: bool
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReceivableCheckListResponse(BaseModel):
+    items: List[ReceivableCheckSchema]
+    total: int
+    total_invoiced: float
+    total_receivables: float

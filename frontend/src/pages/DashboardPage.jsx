@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { invoicesAPI, payablesAPI, healthAPI, settingsAPI, recurringBillsAPI } from '../services/api'
 import toast from 'react-hot-toast'
+import OverdueAlertBanner from '../components/OverdueAlertBanner'
 import {
   InboxIcon,
   CurrencyDollarIcon,
@@ -39,6 +40,7 @@ export default function DashboardPage() {
     billsDueSoon: 0,
     billsOverdue: 0,
     nextBill: null,
+    overdueBills: [],
   })
   const [health, setHealth] = useState(null)
   const [recentInvoices, setRecentInvoices] = useState([])
@@ -93,6 +95,7 @@ export default function DashboardPage() {
           billsDueSoon: (cf.bills_due_soon || []).length,
           billsOverdue: (cf.overdue_bills || []).length,
           nextBill: (cf.bills_due_soon || [])[0] || null,
+          overdueBills: cf.overdue_bills || [],
         }))
       }
 
@@ -155,6 +158,20 @@ export default function DashboardPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+
+      {/* Overdue Alert Banner */}
+      <OverdueAlertBanner
+        overdueBills={stats.overdueBills}
+        onMarkPaid={async (occId) => {
+          try {
+            await recurringBillsAPI.markPaid(occId)
+            toast.success('Marked as paid')
+            loadDashboard()
+          } catch {
+            toast.error('Failed to mark as paid')
+          }
+        }}
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

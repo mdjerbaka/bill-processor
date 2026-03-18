@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { recurringBillsAPI, payablesAPI } from '../services/api'
 import toast from 'react-hot-toast'
+import OverdueAlertBanner from '../components/OverdueAlertBanner'
 import {
   PlusIcon,
   PencilIcon,
@@ -120,6 +122,7 @@ const emptyForm = {
 }
 
 export default function BillsPage() {
+  const navigate = useNavigate()
   const [cashFlow, setCashFlow] = useState(null)
   const [occurrences, setOccurrences] = useState([])
   const [bills, setBills] = useState([])
@@ -294,11 +297,30 @@ export default function BillsPage() {
 
   async function handleMarkPaid(occurrenceId) {
     try {
-      await recurringBillsAPI.markPaid(occurrenceId)
-      toast.success('Marked as paid')
+      const res = await recurringBillsAPI.markPaid(occurrenceId)
+      const nextDate = res.data?.next_due_date
+      if (nextDate) {
+        const formatted = new Date(nextDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        toast.success(`Marked as paid! Next due: ${formatted}`)
+      } else {
+        toast.success('Marked as paid')
+      }
       loadData()
     } catch {
       toast.error('Failed to mark as paid')
+    }
+  }
+
+  async function handleToggleCashflow(occurrenceId) {
+    try {
+      const res = await recurringBillsAPI.toggleCashflow(occurrenceId)
+      // Optimistic update for snappier feel
+      setOccurrences(prev => prev.map(o =>
+        o.id === occurrenceId ? { ...o, included_in_cashflow: res.data.included_in_cashflow } : o
+      ))
+      loadData()
+    } catch {
+      toast.error('Failed to toggle cash flow inclusion')
     }
   }
 
@@ -451,9 +473,15 @@ export default function BillsPage() {
         </div>
       </div>
 
+      {/* Overdue Alert Banner */}
+      <OverdueAlertBanner
+        overdueBills={cashFlow?.overdue_bills || []}
+        onMarkPaid={handleMarkPaid}
+      />
+
       {/* Cash Flow Summary */}
       {cashFlow && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
             <div className="flex items-center justify-between">
               <div className="flex-1">
@@ -522,12 +550,31 @@ export default function BillsPage() {
               </div>
             </div>
           </div>
+          <div
+            className="bg-gray-800 rounded-xl border border-gray-700 p-5 cursor-pointer hover:border-green-700/50 transition-colors"
+            onClick={() => navigate('/receivables')}
+            title="Click to manage receivable checks"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Expected Receivables</p>
+                <p className="text-xs text-gray-500 mt-0.5">From receivable checks</p>
+                <p className="text-2xl font-bold text-green-400 mt-1">
+                  ${(cashFlow.expected_receivables || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  <span className="text-xs text-green-400/60 ml-2">view &rarr;</span>
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-gray-700/50">
+                <BanknotesIcon className="h-5 w-5 text-green-400" />
+              </div>
+            </div>
+          </div>
           <SummaryCard
             title="Real Available"
             value={fmt(cashFlow.real_available)}
             icon={BanknotesIcon}
             color={cashFlow.real_available >= 0 ? 'text-green-400' : 'text-red-400'}
-            tooltip={`Bank Balance\n− Outstanding Checks\n− All bills due in 30 days\n− All overdue bills\n\n${fmt(cashFlow.bank_balance)} − ${fmt(cashFlow.outstanding_checks)} − ${fmt(cashFlow.total_upcoming_30d)} − ${fmt(cashFlow.total_overdue)} = ${fmt(cashFlow.real_available)}`}
+            tooltip={`Bank Balance\n+ Expected Receivables\n− Outstanding Checks\n− Toggled bills (30 days)\n− All overdue bills\n\n${fmt(cashFlow.bank_balance)} + ${fmt(cashFlow.expected_receivables || 0)} − ${fmt(cashFlow.outstanding_checks)} − ${fmt(cashFlow.total_upcoming_30d)} − ${fmt(cashFlow.total_overdue)} = ${fmt(cashFlow.real_available)}`}
           />
         </div>
       )}
@@ -607,6 +654,7 @@ export default function BillsPage() {
                   <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('due_date')}>Due Date<SortIcon column="due_date" /></th>
                   <th className="pb-3 font-medium">Days</th>
                   <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('status')}>Status<SortIcon column="status" /></th>
+                  <th className="pb-3 font-medium text-center" title="Include in cash flow calculation">$</th>
                   <th className="pb-3 font-medium">Auto-Pay</th>
                   <th className="pb-3 font-medium text-right">Actions</th>
                 </tr>
@@ -648,6 +696,21 @@ export default function BillsPage() {
                       )}
                     </td>
                     <td className="py-3"><StatusBadge status={occ.status} /></td>
+                    <td className="py-3 text-center">
+                      {occ.status !== 'paid' && occ.status !== 'skipped' && (
+                        <button
+                          onClick={() => handleToggleCashflow(occ.id)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                            occ.included_in_cashflow ? 'bg-blue-600' : 'bg-gray-600'
+                          }`}
+                          title={occ.included_in_cashflow ? 'Included in cash flow — click to exclude' : 'Excluded from cash flow — click to include'}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                            occ.included_in_cashflow ? 'translate-x-[18px]' : 'translate-x-[2px]'
+                          }`} />
+                        </button>
+                      )}
+                    </td>
                     <td className="py-3 text-center">
                       {occ.is_auto_pay && (
                         <span className="text-xs bg-blue-900/50 text-blue-400 px-2 py-0.5 rounded-full">auto</span>

@@ -356,6 +356,7 @@ class BillOccurrence(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     matched_invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id"), nullable=True)
+    included_in_cashflow: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     # Relationships
@@ -376,3 +377,16 @@ class Notification(Base):
 
     # Relationships
     recurring_bill: Mapped[Optional["RecurringBill"]] = relationship(back_populates="notifications")
+
+
+# ── Receivable Check ─────────────────────────────────────
+class ReceivableCheck(Base):
+    __tablename__ = "receivable_checks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    invoiced_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    collect: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

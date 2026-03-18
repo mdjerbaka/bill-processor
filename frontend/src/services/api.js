@@ -149,6 +149,7 @@ export const recurringBillsAPI = {
   listOccurrences: (params) => api.get('/recurring-bills/occurrences', { params }),
   skip: (occurrenceId) => api.post(`/recurring-bills/occurrences/${occurrenceId}/skip`),
   markPaid: (occurrenceId) => api.post(`/recurring-bills/occurrences/${occurrenceId}/mark-paid`),
+  toggleCashflow: (occurrenceId) => api.post(`/recurring-bills/occurrences/${occurrenceId}/toggle-cashflow`),
   bulkDeleteOccurrences: (ids) => api.post('/recurring-bills/occurrences/bulk-delete', { ids }),
   getCashFlow: () => api.get('/recurring-bills/cash-flow'),
   getCalendar: (startDate, endDate) => api.get('/recurring-bills/calendar', { params: { start_date: startDate, end_date: endDate } }),
@@ -170,6 +171,24 @@ export const notificationsAPI = {
   count: () => api.get('/notifications/count'),
   markRead: (id) => api.post(`/notifications/${id}/read`),
   markAllRead: () => api.post('/notifications/read-all'),
+}
+
+// ── Receivable Checks ───────────────────────────────────
+export const receivablesAPI = {
+  list: () => api.get('/receivables'),
+  create: (data) => api.post('/receivables', data),
+  update: (id, data) => api.put(`/receivables/${id}`, data),
+  delete: (id) => api.delete(`/receivables/${id}`),
+  deleteAll: () => api.delete('/receivables/all'),
+  toggleCollect: (id) => api.post(`/receivables/${id}/toggle-collect`),
+  getTotals: () => api.get('/receivables/totals'),
+  importCSV: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/receivables/import-csv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 export default api
