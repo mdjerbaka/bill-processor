@@ -264,7 +264,7 @@ class Payable(Base):
     __tablename__ = "payables"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), unique=True, nullable=False)
+    invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id"), unique=True, nullable=True)
     vendor_name: Mapped[str] = mapped_column(String(500), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

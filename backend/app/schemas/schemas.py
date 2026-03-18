@@ -173,7 +173,7 @@ class VendorJobMappingSchema(BaseModel):
 # ── Payable ──────────────────────────────────────────────
 class PayableSchema(BaseModel):
     id: int
-    invoice_id: int
+    invoice_id: Optional[int] = None
     vendor_name: str
     amount: float
     due_date: Optional[datetime] = None
@@ -196,6 +196,34 @@ class PayableListResponse(BaseModel):
 
 class BankBalanceRequest(BaseModel):
     bank_balance: float
+
+
+class PayableCreateRequest(BaseModel):
+    vendor_name: str = Field(min_length=1, max_length=500)
+    amount: float
+    due_date: Optional[datetime] = None
+    status: Optional[str] = "outstanding"
+    invoice_number: Optional[str] = None
+
+
+class PayableUpdateRequest(BaseModel):
+    vendor_name: Optional[str] = None
+    amount: Optional[float] = None
+    due_date: Optional[datetime] = None
+    status: Optional[str] = None
+    invoice_number: Optional[str] = None
+
+
+class InvoiceCreateRequest(BaseModel):
+    vendor_name: str = Field(min_length=1, max_length=500)
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    total_amount: Optional[float] = None
+    subtotal: Optional[float] = None
+    tax_amount: Optional[float] = None
+    job_id: Optional[int] = None
+    line_items: Optional[List[InvoiceLineItemSchema]] = None
 
 
 class RealBalanceResponse(BaseModel):

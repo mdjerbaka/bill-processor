@@ -45,6 +45,7 @@ export const authAPI = {
 export const invoicesAPI = {
   list: (params) => api.get('/invoices', { params }),
   get: (id) => api.get(`/invoices/${id}`),
+  create: (data) => api.post('/invoices', data),
   update: (id, data) => api.put(`/invoices/${id}`, data),
   approve: (id) => api.post(`/invoices/${id}/approve`),
   junk: (id) => api.post(`/invoices/${id}/junk`),
@@ -75,6 +76,9 @@ export const jobsAPI = {
 // ── Payables ────────────────────────────────────────────
 export const payablesAPI = {
   list: (includePaid = false) => api.get('/payables', { params: { include_paid: includePaid } }),
+  create: (data) => api.post('/payables', data),
+  update: (id, data) => api.put(`/payables/${id}`, data),
+  markPaid: (id) => api.post(`/payables/${id}/mark-paid`),
   junk: (id) => api.post(`/payables/${id}/junk`),
   restore: (id) => api.post(`/payables/${id}/restore`),
   setBankBalance: (balance) => api.post('/payables/bank-balance', { bank_balance: balance }),

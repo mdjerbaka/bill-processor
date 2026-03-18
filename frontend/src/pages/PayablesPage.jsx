@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react'
 import { payablesAPI } from '../services/api'
-import { TrashIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import ContextMenu from '../components/ContextMenu'
 import toast from 'react-hot-toast'
+
+const emptyForm = {
+  vendor_name: '',
+  amount: '',
+  due_date: '',
+  invoice_number: '',
+}
 
 export default function PayablesPage() {
   const [payables, setPayables] = useState([])
@@ -12,6 +19,9 @@ export default function PayablesPage() {
   const [editingBalance, setEditingBalance] = useState(false)
   const [balanceInput, setBalanceInput] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editingPayable, setEditingPayable] = useState(null)
+  const [form, setForm] = useState(emptyForm)
 
   useEffect(() => { loadData() }, [])
 
@@ -56,8 +66,60 @@ export default function PayablesPage() {
     }
   }
 
+  function openAddForm() {
+    setForm(emptyForm)
+    setEditingPayable(null)
+    setShowForm(true)
+  }
+
+  function openEditForm(payable) {
+    setForm({
+      vendor_name: payable.vendor_name || '',
+      amount: payable.amount?.toString() || '',
+      due_date: payable.due_date ? new Date(payable.due_date).toISOString().slice(0, 10) : '',
+      invoice_number: payable.invoice_number || '',
+    })
+    setEditingPayable(payable)
+    setShowForm(true)
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    const payload = {
+      vendor_name: form.vendor_name,
+      amount: parseFloat(form.amount),
+      due_date: form.due_date ? new Date(form.due_date).toISOString() : null,
+      invoice_number: form.invoice_number || null,
+    }
+    try {
+      if (editingPayable) {
+        await payablesAPI.update(editingPayable.id, payload)
+        toast.success('Payable updated')
+      } else {
+        await payablesAPI.create(payload)
+        toast.success('Payable created')
+      }
+      setShowForm(false)
+      loadData()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to save payable')
+    }
+  }
+
+  async function handleMarkPaid(id) {
+    try {
+      await payablesAPI.markPaid(id)
+      toast.success('Marked as paid')
+      loadData()
+    } catch {
+      toast.error('Failed to mark paid')
+    }
+  }
+
   const contextMenu = ContextMenu({
     items: [
+      { label: 'Edit', icon: PencilIcon, onClick: (data) => openEditForm(data) },
+      { label: 'Mark Paid', icon: CheckCircleIcon, onClick: (data) => handleMarkPaid(data.id) },
       { label: 'Send to Junk', icon: TrashIcon, danger: true, onClick: (data) => handleJunk(data.id) },
     ],
   })
@@ -90,12 +152,21 @@ export default function PayablesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Payables Tracker</h1>
-        <button
-          onClick={handleExport}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
-        >
-          Export Excel
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={openAddForm}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add Payable
+          </button>
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+          >
+            Export Excel
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -151,6 +222,7 @@ export default function PayablesPage() {
               <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">Amount</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Due Date</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-400">Status</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-gray-400">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">
@@ -164,7 +236,7 @@ export default function PayablesPage() {
               const dueDate = p.due_date ? new Date(p.due_date) : null
               const daysUntil = dueDate ? Math.ceil((dueDate - new Date()) / 86400000) : null
               return (
-                <tr key={p.id} className={`${isOverdue ? 'bg-red-900/20' : ''} cursor-context-menu`} onContextMenu={(e) => contextMenu.show(e, { id: p.id })}>
+                <tr key={p.id} className={`${isOverdue ? 'bg-red-900/20' : ''} cursor-context-menu`} onContextMenu={(e) => contextMenu.show(e, p)}>
                   <td className="px-4 py-3 text-sm font-medium text-gray-200">{p.vendor_name}</td>
                   <td className="px-4 py-3 text-sm text-gray-400">{p.invoice_number || '—'}</td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-gray-200">
@@ -189,6 +261,34 @@ export default function PayablesPage() {
                       {p.status}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {p.status !== 'paid' && (
+                        <button
+                          onClick={() => handleMarkPaid(p.id)}
+                          className="px-2 py-1 text-xs font-medium rounded-lg bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800 transition-colors"
+                          title="Mark as paid"
+                        >
+                          <CheckCircleIcon className="h-4 w-4 inline -mt-0.5 mr-0.5" />
+                          Paid
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openEditForm(p)}
+                        className="p-1.5 text-gray-400 hover:text-blue-400 transition-colors"
+                        title="Edit payable"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleJunk(p.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"
+                        title="Send to junk"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               )
             })}
@@ -196,6 +296,78 @@ export default function PayablesPage() {
         </table>
       </div>
       {contextMenu.menu}
+
+      {/* Add/Edit Payable Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-100">
+                {editingPayable ? 'Edit Payable' : 'Add Payable'}
+              </h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-white">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Vendor Name</label>
+                <input
+                  value={form.vendor_name}
+                  onChange={(e) => setForm({ ...form, vendor_name: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={form.due_date}
+                    onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Invoice # (optional)</label>
+                <input
+                  value={form.invoice_number}
+                  onChange={(e) => setForm({ ...form, invoice_number: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 text-sm text-gray-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                >
+                  {editingPayable ? 'Update Payable' : 'Add Payable'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

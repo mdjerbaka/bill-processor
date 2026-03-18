@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { invoicesAPI } from '../services/api'
-import { TrashIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import ContextMenu from '../components/ContextMenu'
 import toast from 'react-hot-toast'
 
@@ -34,6 +34,10 @@ export default function InvoiceListPage() {
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [vendorFilter, setVendorFilter] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [invoiceForm, setInvoiceForm] = useState({
+    vendor_name: '', invoice_number: '', total_amount: '', due_date: '',
+  })
 
   const loadInvoices = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -78,11 +82,39 @@ export default function InvoiceListPage() {
     ],
   })
 
+  async function handleCreateInvoice(e) {
+    e.preventDefault()
+    const payload = {
+      vendor_name: invoiceForm.vendor_name,
+      invoice_number: invoiceForm.invoice_number || null,
+      total_amount: invoiceForm.total_amount ? parseFloat(invoiceForm.total_amount) : null,
+      due_date: invoiceForm.due_date ? new Date(invoiceForm.due_date).toISOString() : null,
+    }
+    try {
+      await invoicesAPI.create(payload)
+      toast.success('Invoice created')
+      setShowForm(false)
+      setInvoiceForm({ vendor_name: '', invoice_number: '', total_amount: '', due_date: '' })
+      loadInvoices()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create invoice')
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Invoices</h1>
-        <span className="text-sm text-gray-400">{total} total</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add Invoice
+          </button>
+          <span className="text-sm text-gray-400">{total} total</span>
+        </div>
       </div>
 
       {/* Filters */}
@@ -197,6 +229,75 @@ export default function InvoiceListPage() {
         )}
       </div>
       {contextMenu.menu}
+
+      {/* Add Invoice Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-100">Add Invoice</h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-white">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateInvoice} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Vendor Name</label>
+                <input
+                  value={invoiceForm.vendor_name}
+                  onChange={(e) => setInvoiceForm({ ...invoiceForm, vendor_name: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Invoice # (optional)</label>
+                <input
+                  value={invoiceForm.invoice_number}
+                  onChange={(e) => setInvoiceForm({ ...invoiceForm, invoice_number: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={invoiceForm.total_amount}
+                    onChange={(e) => setInvoiceForm({ ...invoiceForm, total_amount: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={invoiceForm.due_date}
+                    onChange={(e) => setInvoiceForm({ ...invoiceForm, due_date: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 text-sm text-gray-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                >
+                  Add Invoice
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

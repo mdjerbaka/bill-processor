@@ -15,8 +15,10 @@ from app.core.database import get_db
 from app.models.models import AppSetting, Invoice, InvoiceStatus, Job, Payable, PayableStatus, User
 from app.schemas.schemas import (
     BankBalanceRequest,
+    PayableCreateRequest,
     PayableListResponse,
     PayableSchema,
+    PayableUpdateRequest,
     RealBalanceResponse,
 )
 from app.services.payables_service import PayablesService
@@ -35,7 +37,7 @@ async def list_payables(
     """List payables with summary."""
     query = (
         select(Payable, Invoice, Job)
-        .join(Invoice, Payable.invoice_id == Invoice.id)
+        .outerjoin(Invoice, Payable.invoice_id == Invoice.id)
         .outerjoin(Job, Invoice.job_id == Job.id)
         .where(Payable.is_junked == False)
     )
@@ -75,6 +77,112 @@ async def list_payables(
     )
 
 
+@router.post("", response_model=PayableSchema)
+async def create_payable(
+    req: PayableCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Manually create a payable (not linked to an invoice)."""
+    payable = Payable(
+        vendor_name=req.vendor_name,
+        amount=req.amount,
+        due_date=req.due_date,
+        status=PayableStatus(req.status) if req.status else PayableStatus.OUTSTANDING,
+    )
+    db.add(payable)
+    await db.flush()
+    return PayableSchema(
+        id=payable.id,
+        invoice_id=payable.invoice_id,
+        vendor_name=payable.vendor_name,
+        amount=payable.amount,
+        due_date=payable.due_date,
+        status=payable.status.value,
+        paid_at=payable.paid_at,
+        created_at=payable.created_at,
+        invoice_number=req.invoice_number,
+        job_name=None,
+    )
+
+
+@router.put("/{payable_id}", response_model=PayableSchema)
+async def update_payable(
+    payable_id: int,
+    req: PayableUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Update a payable's fields."""
+    result = await db.execute(
+        select(Payable).where(Payable.id == payable_id)
+    )
+    payable = result.scalar_one_or_none()
+    if not payable:
+        raise HTTPException(status_code=404, detail="Payable not found")
+
+    update_data = req.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        if field == "status" and value is not None:
+            payable.status = PayableStatus(value)
+            if value == "paid":
+                payable.paid_at = datetime.now(timezone.utc)
+        elif field == "invoice_number":
+            # invoice_number is stored on the linked invoice, skip for standalone
+            continue
+        else:
+            setattr(payable, field, value)
+
+    await db.flush()
+
+    # Fetch invoice info if linked
+    inv_number = None
+    job_name = None
+    if payable.invoice_id:
+        inv_result = await db.execute(
+            select(Invoice, Job)
+            .outerjoin(Job, Invoice.job_id == Job.id)
+            .where(Invoice.id == payable.invoice_id)
+        )
+        row = inv_result.first()
+        if row:
+            inv_number = row[0].invoice_number
+            job_name = row[1].name if row[1] else None
+
+    return PayableSchema(
+        id=payable.id,
+        invoice_id=payable.invoice_id,
+        vendor_name=payable.vendor_name,
+        amount=payable.amount,
+        due_date=payable.due_date,
+        status=payable.status.value,
+        paid_at=payable.paid_at,
+        created_at=payable.created_at,
+        invoice_number=inv_number,
+        job_name=job_name,
+    )
+
+
+@router.post("/{payable_id}/mark-paid")
+async def mark_payable_paid(
+    payable_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Mark a payable as paid."""
+    result = await db.execute(
+        select(Payable).where(Payable.id == payable_id)
+    )
+    payable = result.scalar_one_or_none()
+    if not payable:
+        raise HTTPException(status_code=404, detail="Payable not found")
+
+    payable.status = PayableStatus.PAID
+    payable.paid_at = datetime.now(timezone.utc)
+    await db.flush()
+    return {"detail": "Payable marked as paid"}
+
+
 @router.post("/{payable_id}/junk")
 async def junk_payable(
     payable_id: int,
@@ -95,14 +203,15 @@ async def junk_payable(
     payable.junked_at = now
 
     # Revert the invoice status so the user can re-approve later
-    inv_result = await db.execute(
-        select(Invoice).where(Invoice.id == payable.invoice_id)
-    )
-    invoice = inv_result.scalar_one_or_none()
-    if invoice and invoice.status in (
-        InvoiceStatus.APPROVED, InvoiceStatus.SENT_TO_QB, InvoiceStatus.PAID
-    ):
-        invoice.status = InvoiceStatus.NEEDS_REVIEW
+    if payable.invoice_id:
+        inv_result = await db.execute(
+            select(Invoice).where(Invoice.id == payable.invoice_id)
+        )
+        invoice = inv_result.scalar_one_or_none()
+        if invoice and invoice.status in (
+            InvoiceStatus.APPROVED, InvoiceStatus.SENT_TO_QB, InvoiceStatus.PAID
+        ):
+            invoice.status = InvoiceStatus.NEEDS_REVIEW
 
     await db.flush()
     return {"detail": "Payable sent to junk"}

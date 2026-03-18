@@ -22,6 +22,7 @@ from app.models.models import (
     User,
 )
 from app.schemas.schemas import (
+    InvoiceCreateRequest,
     InvoiceListResponse,
     InvoiceSchema,
     InvoiceUpdateRequest,
@@ -71,6 +72,52 @@ def _invoice_to_schema(inv: Invoice) -> InvoiceSchema:
         created_at=inv.created_at,
         updated_at=inv.updated_at,
     )
+
+
+@router.post("", response_model=InvoiceSchema)
+async def create_invoice(
+    req: InvoiceCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Manually create an invoice (not from email/OCR)."""
+    invoice = Invoice(
+        vendor_name=req.vendor_name,
+        invoice_number=req.invoice_number,
+        invoice_date=req.invoice_date,
+        due_date=req.due_date,
+        total_amount=req.total_amount,
+        subtotal=req.subtotal,
+        tax_amount=req.tax_amount,
+        job_id=req.job_id,
+        status=InvoiceStatus.NEEDS_REVIEW,
+        match_method="manual",
+    )
+    db.add(invoice)
+    await db.flush()
+
+    # Add line items if provided
+    if req.line_items:
+        for item_data in req.line_items:
+            li = InvoiceLineItem(
+                invoice_id=invoice.id,
+                description=item_data.description,
+                quantity=item_data.quantity,
+                unit_price=item_data.unit_price,
+                amount=item_data.amount,
+                product_code=item_data.product_code,
+            )
+            db.add(li)
+        await db.flush()
+
+    # Re-fetch with relationships
+    result = await db.execute(
+        select(Invoice)
+        .options(joinedload(Invoice.job), joinedload(Invoice.line_items))
+        .where(Invoice.id == invoice.id)
+    )
+    invoice = result.unique().scalar_one_or_none()
+    return _invoice_to_schema(invoice)
 
 
 @router.get("", response_model=InvoiceListResponse)
