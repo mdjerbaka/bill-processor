@@ -8,10 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+
 from app.api.auth import get_current_user
 from app.core.config import get_settings
 from app.core.database import get_db, async_session_factory
-from app.models.models import User
+from app.models.models import AppSetting, User
 from app.services.microsoft_graph_service import MicrosoftGraphService
 
 logger = logging.getLogger(__name__)
@@ -97,6 +99,59 @@ async def ms_disconnect(
     svc = MicrosoftGraphService(db)
     await svc.disconnect()
     return {"disconnected": True}
+
+
+@router.get("/folders")
+async def ms_list_folders(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """List available mail folders from the connected Microsoft 365 account."""
+    svc = MicrosoftGraphService(db)
+    folders = await svc.list_mail_folders()
+    return {"folders": folders}
+
+
+@router.get("/folder-setting")
+async def ms_get_folder_setting(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get the currently configured mail folder for polling."""
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key == "ms_mail_folder_id")
+    )
+    folder_id_setting = result.scalar_one_or_none()
+    result2 = await db.execute(
+        select(AppSetting).where(AppSetting.key == "ms_mail_folder_name")
+    )
+    folder_name_setting = result2.scalar_one_or_none()
+    return {
+        "folder_id": folder_id_setting.value if folder_id_setting else "",
+        "folder_name": folder_name_setting.value if folder_name_setting else "All Folders",
+    }
+
+
+@router.post("/folder-setting")
+async def ms_save_folder_setting(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Save the mail folder to poll."""
+    folder_id = body.get("folder_id", "")
+    folder_name = body.get("folder_name", "All Folders")
+
+    for key, value in [("ms_mail_folder_id", folder_id), ("ms_mail_folder_name", folder_name)]:
+        result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+        setting = result.scalar_one_or_none()
+        if setting:
+            setting.value = value
+        else:
+            db.add(AppSetting(key=key, value=value))
+
+    await db.commit()
+    return {"saved": True, "folder_id": folder_id, "folder_name": folder_name}
 
 
 @router.post("/poll")

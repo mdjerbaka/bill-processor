@@ -234,12 +234,63 @@ class MicrosoftGraphService:
 
     # ── Email Polling ────────────────────────────────────
 
+    async def list_mail_folders(self) -> list[dict]:
+        """List all mail folders from the connected account."""
+        access = await self._get_valid_token()
+        if not access:
+            return []
+
+        folders = []
+        try:
+            headers = {"Authorization": f"Bearer {access}"}
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(
+                    f"{MS_GRAPH_BASE}/me/mailFolders",
+                    headers=headers,
+                    params={"$top": "100", "$select": "id,displayName,totalItemCount,childFolderCount"},
+                )
+                if resp.status_code == 200:
+                    for f in resp.json().get("value", []):
+                        folders.append({
+                            "id": f["id"],
+                            "name": f["displayName"],
+                            "count": f.get("totalItemCount", 0),
+                        })
+                        # Also fetch child folders
+                        if f.get("childFolderCount", 0) > 0:
+                            child_resp = await client.get(
+                                f"{MS_GRAPH_BASE}/me/mailFolders/{f['id']}/childFolders",
+                                headers=headers,
+                                params={"$top": "50", "$select": "id,displayName,totalItemCount"},
+                            )
+                            if child_resp.status_code == 200:
+                                for child in child_resp.json().get("value", []):
+                                    folders.append({
+                                        "id": child["id"],
+                                        "name": f"{f['displayName']}/{child['displayName']}",
+                                        "count": child.get("totalItemCount", 0),
+                                    })
+        except Exception as e:
+            logger.error(f"Failed to list mail folders: {e}")
+
+        return folders
+
+    async def _get_poll_folder_id(self) -> str:
+        """Get the configured mail folder ID to poll, or empty for all."""
+        result = await self.db.execute(
+            select(AppSetting).where(AppSetting.key == "ms_mail_folder_id")
+        )
+        setting = result.scalar_one_or_none()
+        return setting.value if setting and setting.value else ""
+
     async def poll_inbox(self) -> list[int]:
         """Poll Microsoft 365 inbox for unread messages with attachments."""
         access = await self._get_valid_token()
         if not access:
             logger.warning("MS Graph not connected, skipping poll")
             return []
+
+        folder_id = await self._get_poll_folder_id()
 
         created_ids = []
         try:
@@ -255,8 +306,15 @@ class MicrosoftGraphService:
                     "$top": "20",
                     "$orderby": "receivedDateTime desc",
                 }
+
+                # Use specific folder or all messages
+                if folder_id:
+                    url = f"{MS_GRAPH_BASE}/me/mailFolders/{folder_id}/messages"
+                else:
+                    url = f"{MS_GRAPH_BASE}/me/messages"
+
                 resp = await client.get(
-                    f"{MS_GRAPH_BASE}/me/messages",
+                    url,
                     headers=headers,
                     params=params,
                 )

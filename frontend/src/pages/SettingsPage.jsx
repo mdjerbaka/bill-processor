@@ -21,6 +21,9 @@ export default function SettingsPage() {
   const [testingOcr, setTestingOcr] = useState(false)
   const [msStatus, setMsStatus] = useState({ connected: false, email: '' })
   const [pollingMs, setPollingMs] = useState(false)
+  const [msFolders, setMsFolders] = useState([])
+  const [msFolder, setMsFolder] = useState({ folder_id: '', folder_name: 'All Folders' })
+  const [loadingFolders, setLoadingFolders] = useState(false)
   const [loading, setLoading] = useState(true)
   const [qbEnvConfigured, setQbEnvConfigured] = useState(false)
   const [qbConfig, setQbConfig] = useState({
@@ -81,6 +84,16 @@ export default function SettingsPage() {
       }
       if (msRes.data) {
         setMsStatus(msRes.data)
+        if (msRes.data.connected) {
+          try {
+            const [foldersRes, folderSettingRes] = await Promise.all([
+              microsoftAPI.listFolders(),
+              microsoftAPI.getFolderSetting(),
+            ])
+            setMsFolders(foldersRes.data.folders || [])
+            if (folderSettingRes.data) setMsFolder(folderSettingRes.data)
+          } catch {}
+        }
       }
       if (qbConfigRes.data) {
         setQbConfig(prev => ({
@@ -229,6 +242,11 @@ export default function SettingsPage() {
             clearInterval(poll)
             setMsStatus(statusRes.data)
             toast.success('Microsoft 365 connected!')
+            // Load folders after connecting
+            try {
+              const foldersRes = await microsoftAPI.listFolders()
+              setMsFolders(foldersRes.data.folders || [])
+            } catch {}
           }
         } catch {}
       }, 2000)
@@ -267,6 +285,21 @@ export default function SettingsPage() {
       toast.error(err.response?.data?.detail || 'Poll failed')
     }
     setPollingMs(false)
+  }
+
+  async function handleSaveMsFolder(folderId) {
+    const folder = msFolders.find(f => f.id === folderId)
+    const data = {
+      folder_id: folderId,
+      folder_name: folder ? folder.name : 'All Folders',
+    }
+    try {
+      await microsoftAPI.saveFolderSetting(data)
+      setMsFolder(data)
+      toast.success(`Mail folder set to: ${data.folder_name}`)
+    } catch (err) {
+      toast.error('Failed to save folder setting')
+    }
   }
 
   async function handleSaveOcr() {
@@ -448,6 +481,24 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
+        {msStatus.connected && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Mail Folder to Poll</label>
+            <select
+              value={msFolder.folder_id}
+              onChange={(e) => handleSaveMsFolder(e.target.value)}
+              className="w-full max-w-md px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg text-sm"
+            >
+              <option value="">All Folders (default)</option>
+              {msFolders.map(f => (
+                <option key={f.id} value={f.id}>{f.name} ({f.count})</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Choose a specific folder to only poll emails from that folder, or leave as "All Folders" to scan everything.
+            </p>
+          </div>
+        )}
         {!msStatus.connected && (
           <p className="text-xs text-gray-500 mt-3">
             Requires an Azure App Registration with <code className="text-gray-400">Mail.Read</code> permission.

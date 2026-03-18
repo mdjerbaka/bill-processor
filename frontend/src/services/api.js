@@ -124,6 +124,9 @@ export const microsoftAPI = {
   test: () => api.post('/microsoft/test'),
   disconnect: () => api.post('/microsoft/disconnect'),
   poll: () => api.post('/microsoft/poll'),
+  listFolders: () => api.get('/microsoft/folders'),
+  getFolderSetting: () => api.get('/microsoft/folder-setting'),
+  saveFolderSetting: (data) => api.post('/microsoft/folder-setting', data),
 }
 
 // ── Health ──────────────────────────────────────────────
