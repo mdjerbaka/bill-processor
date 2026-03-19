@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { settingsAPI, quickbooksAPI, healthAPI, microsoftAPI, authAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function SettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [emailConfig, setEmailConfig] = useState({
     imap_host: '', imap_port: 993, imap_username: '', imap_password: '', use_ssl: true
   })
@@ -40,6 +42,23 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings()
+  }, [])
+
+  // Handle OAuth redirect back from Microsoft
+  useEffect(() => {
+    const msOAuthStatus = searchParams.get('ms_status')
+    if (msOAuthStatus) {
+      if (msOAuthStatus === 'connected') {
+        toast.success('Microsoft 365 connected successfully!')
+      } else if (msOAuthStatus === 'error') {
+        const msg = searchParams.get('ms_message') || 'Connection failed'
+        toast.error(`Microsoft 365: ${msg}`)
+      }
+      // Clean the URL params
+      searchParams.delete('ms_status')
+      searchParams.delete('ms_message')
+      setSearchParams(searchParams, { replace: true })
+    }
   }, [])
 
   async function loadSettings() {
@@ -235,25 +254,8 @@ export default function SettingsPage() {
   async function handleConnectMS() {
     try {
       const res = await microsoftAPI.connect()
-      const popup = window.open(res.data.auth_url, '_blank')
-      // Poll for connection status while popup is open
-      const poll = setInterval(async () => {
-        try {
-          const statusRes = await microsoftAPI.status()
-          if (statusRes.data.connected) {
-            clearInterval(poll)
-            setMsStatus(statusRes.data)
-            toast.success('Microsoft 365 connected!')
-            // Load folders after connecting
-            try {
-              const foldersRes = await microsoftAPI.listFolders()
-              setMsFolders(foldersRes.data.folders || [])
-            } catch {}
-          }
-        } catch {}
-      }, 2000)
-      // Stop polling after 5 minutes
-      setTimeout(() => clearInterval(poll), 300000)
+      // Navigate in the same tab — more reliable than popup
+      window.location.href = res.data.auth_url
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to start Microsoft 365 connection')
     }

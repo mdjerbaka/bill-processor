@@ -47,25 +47,22 @@ async def ms_callback(
     error_description: str = Query(None),
 ):
     """Microsoft OAuth2 callback — exchanges code for tokens."""
+    # Determine frontend URL for redirect
+    frontend_url = settings.app_url.rstrip("/")
+
     if error:
         logger.error(f"MS OAuth error: {error} — {error_description}")
-        return HTMLResponse(
-            content=f"<html><body><h2>Microsoft 365 connection failed.</h2><p>{error_description or error}</p><p>You can close this tab and try again.</p><script>window.close()</script></body></html>"
-        )
+        return RedirectResponse(url=f"{frontend_url}/settings?ms_status=error&ms_message={error_description or error}")
 
     async with async_session_factory() as db:
         svc = MicrosoftGraphService(db)
         success = await svc.exchange_code(code)
 
         if not success:
-            return HTMLResponse(
-                content="<html><body><h2>Microsoft 365 connection failed.</h2><p>Token exchange failed. You can close this tab and try again.</p><script>window.close()</script></body></html>"
-            )
+            return RedirectResponse(url=f"{frontend_url}/settings?ms_status=error&ms_message=Token+exchange+failed")
 
         await db.commit()
-        return HTMLResponse(
-            content="<html><body><h2>Microsoft 365 connected successfully!</h2><p>You can close this tab.</p><script>window.close()</script></body></html>"
-        )
+        return RedirectResponse(url=f"{frontend_url}/settings?ms_status=connected")
 
 
 @router.get("/status")
