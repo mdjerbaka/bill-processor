@@ -17,10 +17,12 @@ def upgrade() -> None:
     payment_method_enum = sa.Enum(
         "check", "ach", "debit", "online", "wire", "other",
         name="paymentmethod",
+        create_type=False,
     )
     payment_out_status_enum = sa.Enum(
         "outstanding", "cleared",
         name="paymentoutstatus",
+        create_type=False,
     )
 
     # Create enum types if they don't already exist
