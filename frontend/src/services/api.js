@@ -136,6 +136,8 @@ export const microsoftAPI = {
   listFolders: () => api.get('/microsoft/folders'),
   getFolderSetting: () => api.get('/microsoft/folder-setting'),
   saveFolderSetting: (data) => api.post('/microsoft/folder-setting', data),
+  getTargetMailbox: () => api.get('/microsoft/target-mailbox'),
+  saveTargetMailbox: (data) => api.post('/microsoft/target-mailbox', data),
   adminStatus: (userId) => api.get('/microsoft/admin/status', { params: { user_id: userId } }),
 }
 

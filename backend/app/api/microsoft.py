@@ -161,6 +161,39 @@ async def ms_save_folder_setting(
     return {"saved": True, "folder_id": folder_id, "folder_name": folder_name}
 
 
+@router.get("/target-mailbox")
+async def ms_get_target_mailbox(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get the configured target mailbox (shared/secondary) for polling."""
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key == "ms_target_mailbox", AppSetting.user_id == user.id)
+    )
+    setting = result.scalar_one_or_none()
+    return {"target_mailbox": setting.value if setting else ""}
+
+
+@router.post("/target-mailbox")
+async def ms_save_target_mailbox(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Save the target mailbox email to poll (e.g. shared mailbox)."""
+    target = (body.get("target_mailbox") or "").strip()
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key == "ms_target_mailbox", AppSetting.user_id == user.id)
+    )
+    setting = result.scalar_one_or_none()
+    if setting:
+        setting.value = target
+    else:
+        db.add(AppSetting(key="ms_target_mailbox", value=target, user_id=user.id))
+    await db.commit()
+    return {"saved": True, "target_mailbox": target}
+
+
 @router.post("/poll")
 async def ms_poll_now(
     user: User = Depends(get_current_user),

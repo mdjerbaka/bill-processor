@@ -27,6 +27,8 @@ export default function SettingsPage() {
   const [msTestResult, setMsTestResult] = useState(null)
   const [msFolders, setMsFolders] = useState([])
   const [msFolder, setMsFolder] = useState({ folder_id: '', folder_name: 'All Folders' })
+  const [msTargetMailbox, setMsTargetMailbox] = useState('')
+  const [savingMailbox, setSavingMailbox] = useState(false)
   const [loadingFolders, setLoadingFolders] = useState(false)
   const [loading, setLoading] = useState(true)
   const [qbEnvConfigured, setQbEnvConfigured] = useState(false)
@@ -109,12 +111,14 @@ export default function SettingsPage() {
         setMsStatus(msRes.data)
         if (msRes.data.connected) {
           try {
-            const [foldersRes, folderSettingRes] = await Promise.all([
+            const [foldersRes, folderSettingRes, targetMailboxRes] = await Promise.all([
               microsoftAPI.listFolders(),
               microsoftAPI.getFolderSetting(),
+              microsoftAPI.getTargetMailbox(),
             ])
             setMsFolders(foldersRes.data.folders || [])
             if (folderSettingRes.data) setMsFolder(folderSettingRes.data)
+            if (targetMailboxRes.data) setMsTargetMailbox(targetMailboxRes.data.target_mailbox || '')
           } catch {}
         }
       }
@@ -306,6 +310,22 @@ export default function SettingsPage() {
     } catch (err) {
       toast.error('Failed to save folder setting')
     }
+  }
+
+  async function handleSaveTargetMailbox() {
+    setSavingMailbox(true)
+    try {
+      await microsoftAPI.saveTargetMailbox({ target_mailbox: msTargetMailbox })
+      toast.success(msTargetMailbox ? `Target mailbox set to: ${msTargetMailbox}` : 'Target mailbox cleared — using your own inbox')
+      // Reload folders for the new mailbox
+      try {
+        const foldersRes = await microsoftAPI.listFolders()
+        setMsFolders(foldersRes.data.folders || [])
+      } catch {}
+    } catch (err) {
+      toast.error('Failed to save target mailbox')
+    }
+    setSavingMailbox(false)
   }
 
   async function handleTestMS() {
@@ -514,7 +534,30 @@ export default function SettingsPage() {
           </div>
         )}
         {msStatus.connected && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Target Mailbox (Shared / Secondary)</label>
+              <div className="flex gap-2 max-w-md">
+                <input
+                  type="email"
+                  value={msTargetMailbox}
+                  onChange={(e) => setMsTargetMailbox(e.target.value)}
+                  placeholder="e.g. invoices@yourcompany.com"
+                  className="flex-1 px-3 py-2 border border-gray-600 bg-gray-700 text-gray-200 rounded-lg text-sm placeholder-gray-500"
+                />
+                <button
+                  onClick={handleSaveTargetMailbox}
+                  disabled={savingMailbox}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingMailbox ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Leave blank to poll your own inbox. Set a shared mailbox email to poll invoices from that mailbox instead.
+              </p>
+            </div>
+            <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Mail Folder to Poll</label>
             <select
               value={msFolder.folder_id}
@@ -529,11 +572,12 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-500 mt-1">
               Choose a specific folder to only poll emails from that folder, or leave as "All Folders" to scan everything.
             </p>
+            </div>
           </div>
         )}
         {!msStatus.connected && (
           <p className="text-xs text-gray-500 mt-3">
-            Requires an Azure App Registration with <code className="text-gray-400">Mail.Read</code> permission.
+            Requires an Azure App Registration with <code className="text-gray-400">Mail.ReadWrite.Shared</code> permission.
             Set <code className="text-gray-400">MS_CLIENT_ID</code>, <code className="text-gray-400">MS_CLIENT_SECRET</code>, and <code className="text-gray-400">MS_TENANT_ID</code> in your .env file.
           </p>
         )}

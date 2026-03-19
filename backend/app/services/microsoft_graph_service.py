@@ -44,7 +44,7 @@ SUPPORTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"
 # Microsoft identity platform endpoints
 MS_AUTHORITY = "https://login.microsoftonline.com"
 MS_GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-MS_SCOPES = ["Mail.Read", "User.Read", "offline_access"]
+MS_SCOPES = ["Mail.ReadWrite.Shared", "User.Read", "offline_access"]
 
 
 class MicrosoftGraphService:
@@ -214,20 +214,23 @@ class MicrosoftGraphService:
             await self.db.flush()
 
     async def test_connection(self) -> tuple[bool, str]:
-        """Test MS Graph connection by calling /me/mailFolders/inbox."""
+        """Test MS Graph connection by calling mailFolders/inbox."""
         access = await self._get_valid_token()
         if not access:
             return False, "Not connected to Microsoft 365"
         try:
+            target_mailbox = await self._get_target_mailbox()
+            base = self._mailbox_base(target_mailbox)
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    f"{MS_GRAPH_BASE}/me/mailFolders/inbox",
+                    f"{base}/mailFolders/inbox",
                     headers={"Authorization": f"Bearer {access}"},
                 )
             if resp.status_code == 200:
                 data = resp.json()
                 count = data.get("totalItemCount", "?")
-                return True, f"Connected — inbox has {count} messages"
+                mailbox_label = f" ({target_mailbox})" if target_mailbox else ""
+                return True, f"Connected{mailbox_label} — inbox has {count} messages"
             else:
                 return False, f"Graph API error: {resp.status_code} {resp.text[:200]}"
         except Exception as e:
@@ -242,11 +245,14 @@ class MicrosoftGraphService:
             return []
 
         folders = []
+        target_mailbox = await self._get_target_mailbox()
+        base = self._mailbox_base(target_mailbox)
+
         try:
             headers = {"Authorization": f"Bearer {access}"}
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.get(
-                    f"{MS_GRAPH_BASE}/me/mailFolders",
+                    f"{base}/mailFolders",
                     headers=headers,
                     params={"$top": "100", "$select": "id,displayName,totalItemCount,childFolderCount"},
                 )
@@ -260,7 +266,7 @@ class MicrosoftGraphService:
                         # Also fetch child folders
                         if f.get("childFolderCount", 0) > 0:
                             child_resp = await client.get(
-                                f"{MS_GRAPH_BASE}/me/mailFolders/{f['id']}/childFolders",
+                                f"{base}/mailFolders/{f['id']}/childFolders",
                                 headers=headers,
                                 params={"$top": "50", "$select": "id,displayName,totalItemCount"},
                             )
@@ -271,6 +277,8 @@ class MicrosoftGraphService:
                                         "name": f"{f['displayName']}/{child['displayName']}",
                                         "count": child.get("totalItemCount", 0),
                                     })
+                else:
+                    logger.error(f"Failed to list mail folders: {resp.status_code} {resp.text[:200]}")
         except Exception as e:
             logger.error(f"Failed to list mail folders: {e}")
 
@@ -284,6 +292,20 @@ class MicrosoftGraphService:
         setting = result.scalar_one_or_none()
         return setting.value if setting and setting.value else ""
 
+    async def _get_target_mailbox(self) -> str:
+        """Get the configured target mailbox email, or empty to use /me."""
+        result = await self.db.execute(
+            select(AppSetting).where(AppSetting.key == "ms_target_mailbox", AppSetting.user_id == self.user_id)
+        )
+        setting = result.scalar_one_or_none()
+        return setting.value.strip() if setting and setting.value else ""
+
+    def _mailbox_base(self, target_mailbox: str) -> str:
+        """Return the Graph API base path for the mailbox."""
+        if target_mailbox:
+            return f"{MS_GRAPH_BASE}/users/{target_mailbox}"
+        return f"{MS_GRAPH_BASE}/me"
+
     async def poll_inbox(self) -> list[int]:
         """Poll Microsoft 365 inbox for unread messages with attachments."""
         access = await self._get_valid_token()
@@ -292,6 +314,8 @@ class MicrosoftGraphService:
             return []
 
         folder_id = await self._get_poll_folder_id()
+        target_mailbox = await self._get_target_mailbox()
+        base = self._mailbox_base(target_mailbox)
 
         created_ids = []
         try:
@@ -310,9 +334,9 @@ class MicrosoftGraphService:
 
                 # Use specific folder or all messages
                 if folder_id:
-                    url = f"{MS_GRAPH_BASE}/me/mailFolders/{folder_id}/messages"
+                    url = f"{base}/mailFolders/{folder_id}/messages"
                 else:
-                    url = f"{MS_GRAPH_BASE}/me/messages"
+                    url = f"{base}/messages"
 
                 resp = await client.get(
                     url,
@@ -334,14 +358,14 @@ class MicrosoftGraphService:
                 for msg in messages:
                     try:
                         email_id = await self._ingest_graph_message(
-                            client, headers, msg
+                            client, headers, msg, base
                         )
                         if email_id:
                             created_ids.append(email_id)
 
                         # Mark as read
                         await client.patch(
-                            f"{MS_GRAPH_BASE}/me/messages/{msg['id']}",
+                            f"{base}/messages/{msg['id']}",
                             headers={**headers, "Content-Type": "application/json"},
                             json={"isRead": True},
                         )
@@ -353,7 +377,7 @@ class MicrosoftGraphService:
                         # Still mark as read to avoid reprocessing
                         try:
                             await client.patch(
-                                f"{MS_GRAPH_BASE}/me/messages/{msg['id']}",
+                                f"{base}/messages/{msg['id']}",
                                 headers={
                                     **headers,
                                     "Content-Type": "application/json",
@@ -373,6 +397,7 @@ class MicrosoftGraphService:
         client: httpx.AsyncClient,
         headers: dict,
         msg: dict,
+        base: str = f"{MS_GRAPH_BASE}/me",
     ) -> Optional[int]:
         """Ingest a single Graph API message and its attachments."""
         message_id = msg.get("internetMessageId", msg["id"])
@@ -391,7 +416,7 @@ class MicrosoftGraphService:
 
         # Fetch attachments
         att_resp = await client.get(
-            f"{MS_GRAPH_BASE}/me/messages/{msg['id']}/attachments",
+            f"{base}/messages/{msg['id']}/attachments",
             headers=headers,
         )
         if att_resp.status_code != 200:
