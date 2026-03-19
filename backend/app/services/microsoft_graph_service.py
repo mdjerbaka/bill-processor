@@ -340,8 +340,12 @@ class MicrosoftGraphService:
                     "$filter": f"isRead eq false and hasAttachments eq true and receivedDateTime ge {since}",
                     "$select": "id,subject,from,receivedDateTime,body,internetMessageId",
                     "$top": "20",
-                    "$orderby": "receivedDateTime desc",
                 }
+                # $orderby combined with $filter is rejected by Graph API
+                # on shared/delegated mailboxes (/users/{email}) with
+                # "InefficientFilter" error, so only use it for /me.
+                if not target_mailbox:
+                    params["$orderby"] = "receivedDateTime desc"
 
                 # Use specific folder or all messages
                 if folder_id:
