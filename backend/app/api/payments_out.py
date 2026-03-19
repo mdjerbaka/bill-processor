@@ -56,7 +56,8 @@ async def list_outstanding_payments(
     payments = await svc.list_outstanding()
     total = await svc.get_total_outstanding()
     items = [_to_schema(p) for p in payments]
-    return PaymentOutListResponse(items=items, total=len(items), total_outstanding=total)
+    total_paid = sum(p.amount for p in payments)
+    return PaymentOutListResponse(items=items, total=total_paid, total_outstanding=total)
 
 
 @router.get("/history", response_model=PaymentOutListResponse)
@@ -72,7 +73,8 @@ async def list_cleared_payments(
     ed = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) if end_date else None
     payments = await svc.list_cleared(start_date=sd, end_date=ed)
     items = [_to_schema(p) for p in payments]
-    return PaymentOutListResponse(items=items, total=len(items), total_outstanding=0)
+    total_cleared = sum(p.amount for p in payments)
+    return PaymentOutListResponse(items=items, total=total_cleared, total_outstanding=0)
 
 
 @router.get("/total-outstanding")

@@ -455,7 +455,7 @@ class PaymentOutSchema(BaseModel):
 
 class PaymentOutListResponse(BaseModel):
     items: List[PaymentOutSchema]
-    total: int
+    total: float
     total_outstanding: float
 
 
