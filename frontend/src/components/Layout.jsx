@@ -15,12 +15,14 @@ import {
   Bars3Icon,
   XMarkIcon,
   DocumentCheckIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Invoices', href: '/invoices', icon: InboxIcon },
   { name: 'Payables', href: '/payables', icon: CurrencyDollarIcon },
+  { name: 'Payments Out', href: '/payments-out', icon: BanknotesIcon },
   { name: 'Bills', href: '/bills', icon: CalendarDaysIcon },
   { name: 'Receivables', href: '/receivables', icon: DocumentCheckIcon },
   { name: 'Jobs', href: '/jobs', icon: WrenchScrewdriverIcon },

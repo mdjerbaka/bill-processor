@@ -140,7 +140,6 @@ export default function BillsPage() {
   const [outstandingChecksInput, setOutstandingChecksInput] = useState('')
   const [bankBalanceInput, setBankBalanceInput] = useState('')
   const [editingBankBalance, setEditingBankBalance] = useState(false)
-  const [editingOutstandingChecks, setEditingOutstandingChecks] = useState(false)
   const [sortColumn, setSortColumn] = useState('due_date')
   const [sortDirection, setSortDirection] = useState('asc')
   const [selectedOccurrences, setSelectedOccurrences] = useState(new Set())
@@ -209,7 +208,7 @@ export default function BillsPage() {
     return () => clearInterval(interval)
   }, [loadData])
 
-  // Sync outstanding checks input with loaded cash flow data
+  // Sync outstanding checks display with loaded cash flow data
   useEffect(() => {
     if (cashFlow?.outstanding_checks != null) {
       setOutstandingChecksInput(cashFlow.outstanding_checks.toString())
@@ -425,23 +424,6 @@ export default function BillsPage() {
     }
   }
 
-  async function handleOutstandingChecks(e) {
-    e.preventDefault()
-    const amount = parseFloat(outstandingChecksInput)
-    if (isNaN(amount) || amount < 0) {
-      toast.error('Enter a valid amount')
-      return
-    }
-    try {
-      await recurringBillsAPI.setOutstandingChecks(amount)
-      toast.success('Outstanding checks updated')
-      setEditingOutstandingChecks(false)
-      loadData()
-    } catch {
-      toast.error('Failed to update outstanding checks')
-    }
-  }
-
   function daysUntil(dateStr) {
     const diff = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24))
     if (diff < 0) return `${Math.abs(diff)}d overdue`
@@ -537,30 +519,18 @@ export default function BillsPage() {
             icon={ExclamationTriangleIcon}
             color={cashFlow.total_overdue > 0 ? 'text-red-400' : 'text-gray-400'}
           />
-          <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+          <div
+            className="bg-gray-800 rounded-xl border border-gray-700 p-5 cursor-pointer hover:border-amber-700/50 transition-colors"
+            onClick={() => navigate('/payments-out')}
+            title="Click to manage payments out"
+          >
             <div className="flex items-center justify-between">
-              <div className="flex-1">
+              <div>
                 <p className="text-sm text-gray-400">Outstanding Checks</p>
-                {editingOutstandingChecks ? (
-                  <form onSubmit={handleOutstandingChecks} className="flex items-center gap-2 mt-1">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={outstandingChecksInput}
-                      onChange={(e) => setOutstandingChecksInput(e.target.value)}
-                      className="w-32 px-2 py-1 border border-gray-600 bg-gray-700 text-gray-200 rounded text-sm"
-                      autoFocus
-                    />
-                    <button type="submit" className="px-2 py-1 bg-blue-600 text-white text-xs rounded">Save</button>
-                    <button type="button" onClick={() => setEditingOutstandingChecks(false)} className="px-2 py-1 text-xs text-gray-400">Cancel</button>
-                  </form>
-                ) : (
-                  <p className="text-2xl font-bold text-amber-400 cursor-pointer mt-1" onClick={() => setEditingOutstandingChecks(true)}>
-                    ${(cashFlow.outstanding_checks || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    <span className="text-xs text-amber-400/60 ml-2">edit</span>
-                  </p>
-                )}
+                <p className="text-xs text-gray-500 mt-0.5">Auto-calculated from Payments Out</p>
+                <p className="text-2xl font-bold text-amber-400 mt-1">
+                  ${(cashFlow.outstanding_checks || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
               </div>
               <div className="p-2.5 rounded-lg bg-gray-700/50">
                 <BanknotesIcon className="h-5 w-5 text-amber-400" />

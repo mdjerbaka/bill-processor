@@ -112,6 +112,20 @@ class NotificationType(str, enum.Enum):
     BALANCE_LOW = "balance_low"
 
 
+class PaymentMethod(str, enum.Enum):
+    CHECK = "check"
+    ACH = "ach"
+    DEBIT = "debit"
+    ONLINE = "online"
+    WIRE = "wire"
+    OTHER = "other"
+
+
+class PaymentOutStatus(str, enum.Enum):
+    OUTSTANDING = "outstanding"
+    CLEARED = "cleared"
+
+
 # ── User ─────────────────────────────────────────────────
 class User(Base):
     __tablename__ = "users"
@@ -401,5 +415,25 @@ class ReceivableCheck(Base):
     invoiced_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     collect: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ── Payment Out (Check Register) ─────────────────────────
+class PaymentOut(Base):
+    __tablename__ = "payments_out"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    payment_method: Mapped[PaymentMethod] = mapped_column(Enum(PaymentMethod), default=PaymentMethod.OTHER)
+    check_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    vendor_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    job_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[PaymentOutStatus] = mapped_column(Enum(PaymentOutStatus), default=PaymentOutStatus.OUTSTANDING)
+    cleared_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    payable_id: Mapped[Optional[int]] = mapped_column(ForeignKey("payables.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

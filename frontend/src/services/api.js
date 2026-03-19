@@ -78,7 +78,7 @@ export const payablesAPI = {
   list: (includePaid = false) => api.get('/payables', { params: { include_paid: includePaid } }),
   create: (data) => api.post('/payables', data),
   update: (id, data) => api.put(`/payables/${id}`, data),
-  markPaid: (id) => api.post(`/payables/${id}/mark-paid`),
+  markPaid: (id, body) => api.post(`/payables/${id}/mark-paid`, body || null),
   junk: (id) => api.post(`/payables/${id}/junk`),
   restore: (id) => api.post(`/payables/${id}/restore`),
   setBankBalance: (balance) => api.post('/payables/bank-balance', { bank_balance: balance }),
@@ -136,6 +136,7 @@ export const microsoftAPI = {
   listFolders: () => api.get('/microsoft/folders'),
   getFolderSetting: () => api.get('/microsoft/folder-setting'),
   saveFolderSetting: (data) => api.post('/microsoft/folder-setting', data),
+  adminStatus: (userId) => api.get('/microsoft/admin/status', { params: { user_id: userId } }),
 }
 
 // ── Health ──────────────────────────────────────────────
@@ -198,6 +199,25 @@ export const receivablesAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+}
+
+// ── Payments Out ────────────────────────────────────────
+export const paymentsOutAPI = {
+  list: () => api.get('/payments-out'),
+  history: (startDate, endDate) => api.get('/payments-out/history', { params: { start_date: startDate, end_date: endDate } }),
+  create: (data) => api.post('/payments-out', data),
+  update: (id, data) => api.put(`/payments-out/${id}`, data),
+  delete: (id) => api.delete(`/payments-out/${id}`),
+  markCleared: (id) => api.post(`/payments-out/${id}/mark-cleared`),
+  totalOutstanding: () => api.get('/payments-out/total-outstanding'),
+  importCSV: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/payments-out/import-csv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  downloadTemplate: () => api.get('/payments-out/template-csv', { responseType: 'blob' }),
 }
 
 export default api

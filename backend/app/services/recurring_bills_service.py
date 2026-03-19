@@ -605,12 +605,10 @@ class RecurringBillsService:
         balance_setting = balance_result.scalar_one_or_none()
         bank_balance = float(balance_setting.value) if balance_setting else 0.0
 
-        # Outstanding checks from AppSetting
-        checks_result = await self.db.execute(
-            select(AppSetting).where(AppSetting.key == "outstanding_checks", AppSetting.user_id == self.user_id)
-        )
-        checks_setting = checks_result.scalar_one_or_none()
-        outstanding_checks = float(checks_setting.value) if checks_setting else 0.0
+        # Outstanding checks — calculated from PaymentOut records
+        from app.services.payments_out_service import PaymentsOutService
+        po_svc = PaymentsOutService(self.db, self.user_id)
+        outstanding_checks = await po_svc.get_total_outstanding()
 
         # Expected receivables from ReceivableCheck table (sum of collect=True)
         recv_result = await self.db.execute(

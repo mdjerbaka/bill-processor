@@ -182,3 +182,39 @@ async def ms_poll_now(
             "invoices_created": processed,
             "errors": errors,
         }
+
+
+@router.get("/admin/status")
+async def ms_admin_status(
+    user_id: int = Query(..., description="User ID to check connection for"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Check Microsoft 365 connection status for a specific user (admin use)."""
+    from app.models.models import MSGraphToken
+    from app.core.security import decrypt_value
+
+    # Find the user
+    result = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check for stored tokens
+    svc = MicrosoftGraphService(db, user_id)
+    info = await svc.get_connection_info()
+
+    # If connected, also test the actual connection
+    test_result = None
+    if info.get("connected"):
+        connected, message = await svc.test_connection()
+        test_result = {"connected": connected, "message": message}
+
+    return {
+        "user_id": user_id,
+        "username": target_user.username,
+        "connection_status": info,
+        "test_result": test_result,
+    }

@@ -410,3 +410,57 @@ class ReceivableCheckListResponse(BaseModel):
     total: int
     total_invoiced: float
     total_receivables: float
+
+
+# ── Payments Out (Check Register) ────────────────────────
+class PaymentOutCreate(BaseModel):
+    vendor_name: str = Field(min_length=1, max_length=500)
+    amount: float = Field(gt=0)
+    payment_date: datetime
+    payment_method: str = "other"
+    check_number: Optional[str] = None
+    job_name: Optional[str] = None
+    notes: Optional[str] = None
+    payable_id: Optional[int] = None
+
+
+class PaymentOutUpdate(BaseModel):
+    vendor_name: Optional[str] = Field(default=None, max_length=500)
+    amount: Optional[float] = Field(default=None, gt=0)
+    payment_date: Optional[datetime] = None
+    payment_method: Optional[str] = None
+    check_number: Optional[str] = None
+    job_name: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PaymentOutSchema(BaseModel):
+    id: int
+    vendor_name: str
+    amount: float
+    payment_date: datetime
+    payment_method: str
+    check_number: Optional[str] = None
+    job_name: Optional[str] = None
+    notes: Optional[str] = None
+    status: str
+    cleared_at: Optional[datetime] = None
+    payable_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PaymentOutListResponse(BaseModel):
+    items: List[PaymentOutSchema]
+    total: int
+    total_outstanding: float
+
+
+class MarkPaidWithPaymentRequest(BaseModel):
+    payment_method: Optional[str] = None
+    check_number: Optional[str] = None
+    job_name: Optional[str] = None
+    notes: Optional[str] = None

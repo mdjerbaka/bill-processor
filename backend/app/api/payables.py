@@ -174,10 +174,11 @@ async def update_payable(
 @router.post("/{payable_id}/mark-paid")
 async def mark_payable_paid(
     payable_id: int,
+    body: dict = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Mark a payable as paid."""
+    """Mark a payable as paid, optionally creating a Payment Out record."""
     result = await db.execute(
         select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
     )
@@ -191,7 +192,26 @@ async def mark_payable_paid(
     payable.status = PayableStatus.PAID
     payable.paid_at = datetime.now(timezone.utc)
     await db.flush()
-    return {"detail": "Payable marked as paid"}
+
+    # Optionally create a Payment Out record if payment details provided
+    payment_out_id = None
+    if body and body.get("payment_method"):
+        from app.services.payments_out_service import PaymentsOutService
+        po_svc = PaymentsOutService(db, user.id)
+        po = await po_svc.create({
+            "vendor_name": payable.vendor_name,
+            "amount": payable.amount,
+            "payment_date": datetime.now(timezone.utc),
+            "payment_method": body.get("payment_method", "other"),
+            "check_number": body.get("check_number"),
+            "job_name": body.get("job_name"),
+            "notes": body.get("notes"),
+            "payable_id": payable.id,
+        })
+        payment_out_id = po.id
+        await db.flush()
+
+    return {"detail": "Payable marked as paid", "payment_out_id": payment_out_id}
 
 
 @router.post("/{payable_id}/junk")

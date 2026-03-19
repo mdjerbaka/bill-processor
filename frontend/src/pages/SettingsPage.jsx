@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [testingOcr, setTestingOcr] = useState(false)
   const [msStatus, setMsStatus] = useState({ connected: false, email: '' })
   const [pollingMs, setPollingMs] = useState(false)
+  const [testingMs, setTestingMs] = useState(false)
+  const [msTestResult, setMsTestResult] = useState(null)
   const [msFolders, setMsFolders] = useState([])
   const [msFolder, setMsFolder] = useState({ folder_id: '', folder_name: 'All Folders' })
   const [loadingFolders, setLoadingFolders] = useState(false)
@@ -302,6 +304,20 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleTestMS() {
+    setTestingMs(true)
+    setMsTestResult(null)
+    try {
+      const res = await microsoftAPI.test()
+      setMsTestResult({ ok: true, message: res.data.message || 'Connection working' })
+      toast.success('M365 connection test passed')
+    } catch (err) {
+      setMsTestResult({ ok: false, message: err.response?.data?.detail || 'Connection test failed' })
+      toast.error('M365 connection test failed')
+    }
+    setTestingMs(false)
+  }
+
   async function handleSaveOcr() {
     setSavingOcr(true)
     try {
@@ -448,10 +464,17 @@ export default function SettingsPage() {
           {msStatus.connected ? (
             <>
               <span className="flex items-center gap-2 text-sm text-green-400">
-                <span className="w-2 h-2 bg-green-500 rounded-full" />
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 Connected
                 {msStatus.email && <span className="text-gray-400">({msStatus.email})</span>}
               </span>
+              <button
+                onClick={handleTestMS}
+                disabled={testingMs}
+                className="px-4 py-2 border border-green-700 text-green-400 rounded-lg text-sm font-medium hover:bg-green-900/30 disabled:opacity-50"
+              >
+                {testingMs ? 'Testing...' : 'Test Connection'}
+              </button>
               <button
                 onClick={handlePollMS}
                 disabled={pollingMs}
@@ -481,6 +504,11 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
+        {msTestResult && (
+          <div className={`mt-3 p-3 rounded-lg text-sm ${msTestResult.ok ? 'bg-green-900/30 border border-green-700/50 text-green-300' : 'bg-red-900/30 border border-red-700/50 text-red-300'}`}>
+            {msTestResult.ok ? '✓' : '✗'} {msTestResult.message}
+          </div>
+        )}
         {msStatus.connected && (
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-300 mb-1">Mail Folder to Poll</label>
