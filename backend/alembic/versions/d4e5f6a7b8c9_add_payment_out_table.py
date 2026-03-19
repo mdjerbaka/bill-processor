@@ -23,6 +23,11 @@ def upgrade() -> None:
         name="paymentoutstatus",
     )
 
+    # Create enum types if they don't already exist
+    bind = op.get_bind()
+    payment_method_enum.create(bind, checkfirst=True)
+    payment_out_status_enum.create(bind, checkfirst=True)
+
     op.create_table(
         "payments_out",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
