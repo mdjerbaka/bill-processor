@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -410,6 +411,42 @@ async def download_payables_template():
     )
 
 
+_MONTH_ABBR = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _parse_flexible_date(s: str) -> datetime:
+    """Parse dates in various formats: YYYY-MM-DD, M/D/YYYY, D-Mon, Mon-D, etc."""
+    s = s.strip()
+    # ISO: 2026-03-16
+    try:
+        return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    # US slash: 3/16/2026 or 03/16/2026
+    m = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{4})$', s)
+    if m:
+        return datetime(int(m.group(3)), int(m.group(1)), int(m.group(2)), tzinfo=timezone.utc)
+    # Abbreviated month: 16-Mar, Mar-16, 16 Mar, Mar 16
+    m = re.match(r'^(\d{1,2})[\s\-]([A-Za-z]{3})$', s)
+    if m:
+        day, mon = int(m.group(1)), _MONTH_ABBR.get(m.group(2).lower())
+        if mon:
+            return datetime(datetime.now().year, mon, day, tzinfo=timezone.utc)
+    m = re.match(r'^([A-Za-z]{3})[\s\-](\d{1,2})$', s)
+    if m:
+        mon, day = _MONTH_ABBR.get(m.group(1).lower()), int(m.group(2))
+        if mon:
+            return datetime(datetime.now().year, mon, day, tzinfo=timezone.utc)
+    # D/M/YYYY variant (less common, try last)
+    m = re.match(r'^(\d{1,2})-(\d{1,2})-(\d{4})$', s)
+    if m:
+        return datetime(int(m.group(3)), int(m.group(1)), int(m.group(2)), tzinfo=timezone.utc)
+    raise ValueError(f"Unrecognized date format: {s}")
+
+
 @router.post("/import-csv", status_code=201)
 async def import_payables_csv(
     file: UploadFile = File(...),
@@ -455,9 +492,9 @@ async def import_payables_csv(
             due_date = None
             if due_date_str:
                 try:
-                    due_date = datetime.fromisoformat(due_date_str).replace(tzinfo=timezone.utc)
+                    due_date = _parse_flexible_date(due_date_str)
                 except ValueError:
-                    errors.append(f"Row {i} ({vendor}): invalid date '{due_date_str}', use YYYY-MM-DD")
+                    errors.append(f"Row {i} ({vendor}): invalid date '{due_date_str}'")
                     continue
 
             if status_str not in ("outstanding", "overdue", "scheduled"):
