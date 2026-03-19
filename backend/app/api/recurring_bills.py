@@ -207,16 +207,35 @@ async def skip_occurrence(
 @router.post("/occurrences/{occurrence_id}/mark-paid")
 async def mark_occurrence_paid(
     occurrence_id: int,
+    body: dict = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Mark a bill occurrence as paid (local tracking only, not synced to QuickBooks)."""
+    """Mark a bill occurrence as paid, optionally creating a Payment Out record."""
     svc = RecurringBillsService(db, user.id)
     occ = await svc.mark_paid(occurrence_id)
     if not occ:
         raise HTTPException(status_code=404, detail="Occurrence not found")
     # Generate next cycle's occurrence if needed
     await svc.generate_occurrences()
+
+    # Optionally create a Payment Out record if payment details provided
+    payment_out_id = None
+    if body and body.get("payment_method"):
+        from app.services.payments_out_service import PaymentsOutService
+        po_svc = PaymentsOutService(db, user.id)
+        po = await po_svc.create({
+            "vendor_name": occ.recurring_bill.vendor_name if occ.recurring_bill else "Unknown",
+            "amount": occ.amount,
+            "payment_date": datetime.now(timezone.utc),
+            "payment_method": body.get("payment_method", "other"),
+            "check_number": body.get("check_number"),
+            "job_name": body.get("job_name"),
+            "notes": body.get("notes"),
+        })
+        payment_out_id = po.id
+        await db.flush()
+
     await db.commit()
     # Find next upcoming occurrence for the same bill
     next_due = None
@@ -225,6 +244,7 @@ async def mark_occurrence_paid(
     return {
         "detail": "Occurrence marked as paid",
         "next_due_date": next_due.isoformat() if next_due else None,
+        "payment_out_id": payment_out_id,
     }
 
 

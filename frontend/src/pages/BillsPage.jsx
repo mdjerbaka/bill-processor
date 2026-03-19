@@ -307,16 +307,28 @@ export default function BillsPage() {
     }
   }
 
-  async function handleMarkPaid(occurrenceId) {
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentTarget, setPaymentTarget] = useState(null)
+  const [paymentForm, setPaymentForm] = useState({ payment_method: 'check', check_number: '', job_name: '', notes: '' })
+
+  function openPaymentModal(occurrence) {
+    setPaymentTarget(occurrence)
+    setPaymentForm({ payment_method: 'check', check_number: '', job_name: '', notes: '' })
+    setShowPaymentModal(true)
+  }
+
+  async function handleMarkPaid(occurrenceId, paymentBody) {
     try {
-      const res = await recurringBillsAPI.markPaid(occurrenceId)
+      const res = await recurringBillsAPI.markPaid(occurrenceId, paymentBody)
       const nextDate = res.data?.next_due_date
       if (nextDate) {
         const formatted = new Date(nextDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        toast.success(`Marked as paid! Next due: ${formatted}`)
+        toast.success(paymentBody ? `Marked as paid & recorded payment! Next due: ${formatted}` : `Marked as paid! Next due: ${formatted}`)
       } else {
-        toast.success('Marked as paid')
+        toast.success(paymentBody ? 'Marked as paid & recorded payment' : 'Marked as paid')
       }
+      setShowPaymentModal(false)
+      setPaymentTarget(null)
       // Update in-place so the bill doesn't jump
       setOccurrences(prev => prev.map(o =>
         o.id === occurrenceId ? { ...o, status: 'paid', paid_at: new Date().toISOString(), included_in_cashflow: false } : o
@@ -475,7 +487,11 @@ export default function BillsPage() {
       {/* Overdue Alert Banner */}
       <OverdueAlertBanner
         overdueBills={cashFlow?.overdue_bills || []}
-        onMarkPaid={handleMarkPaid}
+        onMarkPaid={(id) => {
+          const occ = occurrences.find(o => o.id === id)
+          if (occ) openPaymentModal(occ)
+          else handleMarkPaid(id)
+        }}
       />
 
       {/* Cash Flow Summary */}
@@ -729,7 +745,7 @@ export default function BillsPage() {
                       <div className="flex items-center justify-end gap-3">
                         {occ.status !== 'skipped' && occ.status !== 'paid' && (
                           <button
-                            onClick={() => handleMarkPaid(occ.id)}
+                            onClick={() => openPaymentModal(occ)}
                             className="px-2.5 py-1 text-xs font-medium rounded-lg bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800 transition-colors"
                             title="Mark as paid"
                           >
@@ -970,6 +986,100 @@ export default function BillsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Mark Paid Modal */}
+      {showPaymentModal && paymentTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-100">Mark as Paid</h3>
+              <button onClick={() => setShowPaymentModal(false)} className="text-gray-400 hover:text-white">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-400 mb-1">
+              <span className="text-gray-200 font-medium">{paymentTarget.bill_name}</span>
+            </p>
+            <p className="text-sm text-gray-400 mb-4">
+              <span className="text-gray-300">{paymentTarget.vendor_name}</span> &mdash; ${paymentTarget.amount?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-xs text-gray-500 mb-4">
+              Optionally record this as a payment to track in Payments Out (outstanding checks/ACH).
+            </p>
+            <div className="space-y-3 mb-6">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Payment Method</label>
+                  <select
+                    value={paymentForm.payment_method}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="check">Check</option>
+                    <option value="ach">ACH</option>
+                    <option value="debit">Debit</option>
+                    <option value="online">Online</option>
+                    <option value="wire">Wire</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Check/Ref #</label>
+                  <input
+                    value={paymentForm.check_number}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, check_number: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Job Name</label>
+                <input
+                  value={paymentForm.job_name}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, job_name: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Optional"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Notes</label>
+                <input
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleMarkPaid(paymentTarget.id)}
+                className="px-4 py-2 text-sm bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors"
+              >
+                Mark Paid Only
+              </button>
+              <button
+                onClick={() => handleMarkPaid(paymentTarget.id, {
+                  payment_method: paymentForm.payment_method,
+                  check_number: paymentForm.check_number || null,
+                  job_name: paymentForm.job_name || null,
+                  notes: paymentForm.notes || null,
+                })}
+                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                Mark Paid &amp; Record Payment
+              </button>
+            </div>
           </div>
         </div>
       )}
