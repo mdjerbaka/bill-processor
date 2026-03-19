@@ -384,7 +384,7 @@ export default function PayablesPage() {
                     <div className="flex items-center justify-end gap-2">
                       {p.status !== 'paid' && !p.is_permanent && (
                         <button
-                          onClick={() => handleMarkPaid(p.id)}
+                          onClick={() => openPaymentModal(p)}
                           className="px-2 py-1 text-xs font-medium rounded-lg bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800 transition-colors"
                           title="Mark as paid"
                         >
