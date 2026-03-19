@@ -6,6 +6,7 @@ Create Date: 2026-03-19
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision = "d4e5f6a7b8c9"
 down_revision = "c3d4e5f6a7b8"
@@ -14,21 +15,22 @@ depends_on = None
 
 
 def upgrade() -> None:
-    payment_method_enum = sa.Enum(
-        "check", "ach", "debit", "online", "wire", "other",
-        name="paymentmethod",
-        create_type=False,
-    )
-    payment_out_status_enum = sa.Enum(
-        "outstanding", "cleared",
-        name="paymentoutstatus",
-        create_type=False,
-    )
+    # Create enum types only if they don't already exist
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE paymentmethod AS ENUM ('check', 'ach', 'debit', 'online', 'wire', 'other');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE paymentoutstatus AS ENUM ('outstanding', 'cleared');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+    """)
 
-    # Create enum types if they don't already exist
-    bind = op.get_bind()
-    payment_method_enum.create(bind, checkfirst=True)
-    payment_out_status_enum.create(bind, checkfirst=True)
+    payment_method_enum = postgresql.ENUM('check', 'ach', 'debit', 'online', 'wire', 'other', name='paymentmethod', create_type=False)
+    payment_out_status_enum = postgresql.ENUM('outstanding', 'cleared', name='paymentoutstatus', create_type=False)
 
     op.create_table(
         "payments_out",
