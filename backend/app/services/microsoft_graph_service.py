@@ -69,8 +69,11 @@ class MicrosoftGraphService:
         }
         return f"{MS_AUTHORITY}/{tenant}/oauth2/v2.0/authorize?{urlencode(params)}"
 
-    async def exchange_code(self, code: str) -> bool:
-        """Exchange authorization code for access + refresh tokens."""
+    async def exchange_code(self, code: str) -> tuple[bool, str]:
+        """Exchange authorization code for access + refresh tokens.
+        
+        Returns (success, error_message).
+        """
         tenant = settings.ms_tenant_id or "common"
         token_url = f"{MS_AUTHORITY}/{tenant}/oauth2/v2.0/token"
 
@@ -90,11 +93,19 @@ class MicrosoftGraphService:
 
         if response.status_code != 200:
             logger.error(f"MS token exchange failed: {response.text}")
-            return False
+            try:
+                err_data = response.json()
+                err_desc = err_data.get("error_description", err_data.get("error", "Unknown error"))
+                # Extract just the human-readable part before Trace ID
+                if "Trace ID" in err_desc:
+                    err_desc = err_desc.split("Trace ID")[0].strip().rstrip(".")
+            except Exception:
+                err_desc = f"HTTP {response.status_code}"
+            return False, err_desc
 
         data = response.json()
         await self._save_tokens(data)
-        return True
+        return True, ""
 
     async def _refresh_tokens(self, token: MSGraphToken) -> bool:
         """Refresh the access token using the refresh token."""

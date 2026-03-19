@@ -66,10 +66,12 @@ async def ms_callback(
 
     async with async_session_factory() as db:
         svc = MicrosoftGraphService(db)
-        success = await svc.exchange_code(code)
+        success, err_msg = await svc.exchange_code(code)
 
         if not success:
-            return RedirectResponse(url=f"{frontend_url}/settings?ms_status=error&ms_message=Token+exchange+failed")
+            from urllib.parse import quote
+            safe_msg = quote(err_msg or "Token exchange failed", safe="")
+            return RedirectResponse(url=f"{frontend_url}/settings?ms_status=error&ms_message={safe_msg}")
 
         await db.commit()
         return RedirectResponse(url=f"{frontend_url}/settings?ms_status=connected")
