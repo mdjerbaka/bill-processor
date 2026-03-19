@@ -41,18 +41,28 @@ async def ms_connect(
 
 @router.get("/callback")
 async def ms_callback(
-    code: str = Query(...),
+    code: str = Query(None),
     state: str = Query("ms_connect"),
     error: str = Query(None),
     error_description: str = Query(None),
+    admin_consent: str = Query(None),
+    tenant: str = Query(None),
 ):
-    """Microsoft OAuth2 callback — exchanges code for tokens."""
+    """Microsoft OAuth2 callback — exchanges code for tokens or handles admin consent."""
     # Determine frontend URL for redirect
     frontend_url = settings.app_url.rstrip("/")
 
     if error:
         logger.error(f"MS OAuth error: {error} — {error_description}")
         return RedirectResponse(url=f"{frontend_url}/settings?ms_status=error&ms_message={error_description or error}")
+
+    # Handle admin consent response (no code, just admin_consent=True)
+    if admin_consent and admin_consent.lower() == "true":
+        logger.info(f"Admin consent granted for tenant {tenant}")
+        return RedirectResponse(url=f"{frontend_url}/settings?ms_status=admin_consent_granted")
+
+    if not code:
+        return RedirectResponse(url=f"{frontend_url}/settings?ms_status=error&ms_message=No+authorization+code+received")
 
     async with async_session_factory() as db:
         svc = MicrosoftGraphService(db)

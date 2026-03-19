@@ -50,6 +50,8 @@ export default function SettingsPage() {
     if (msOAuthStatus) {
       if (msOAuthStatus === 'connected') {
         toast.success('Microsoft 365 connected successfully!')
+      } else if (msOAuthStatus === 'admin_consent_granted') {
+        toast.success('Admin consent granted! You can now connect Microsoft 365.')
       } else if (msOAuthStatus === 'error') {
         const msg = searchParams.get('ms_message') || 'Connection failed'
         toast.error(`Microsoft 365: ${msg}`)
