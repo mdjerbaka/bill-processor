@@ -415,8 +415,10 @@ class ReceivableCheck(Base):
     user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     job_name: Mapped[str] = mapped_column(String(500), nullable=False)
     invoiced_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    collect: Mapped[bool] = mapped_column(Boolean, default=False)    sent_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    collect: Mapped[bool] = mapped_column(Boolean, default=False)
+    sent_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
