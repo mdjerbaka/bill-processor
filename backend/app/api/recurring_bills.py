@@ -77,6 +77,7 @@ async def create_recurring_bill(
     await svc.generate_occurrences()
     await svc.check_overdue()
     await svc.check_due_soon()
+    await svc.auto_pay_due_occurrences()
     await db.commit()
     return RecurringBillSchema(
         id=bill.id,
@@ -147,13 +148,13 @@ async def delete_recurring_bill(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Soft-delete a recurring bill."""
+    """Delete a recurring bill and all its occurrences."""
     svc = RecurringBillsService(db, user.id)
     deleted = await svc.delete_bill(bill_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Recurring bill not found")
     await db.commit()
-    return {"detail": "Bill deactivated"}
+    return {"detail": "Bill deleted"}
 
 
 @router.get("/occurrences", response_model=BillOccurrenceListResponse)
@@ -319,6 +320,7 @@ async def bulk_import_bills(
     await svc.generate_occurrences()
     await svc.check_overdue()
     await svc.check_due_soon()
+    await svc.auto_pay_due_occurrences()
     await db.commit()
     return {"detail": f"Imported {len(created)} bills", "count": len(created)}
 
@@ -441,6 +443,7 @@ async def import_bills_csv(
     await svc.generate_occurrences()
     await svc.check_overdue()
     await svc.check_due_soon()
+    await svc.auto_pay_due_occurrences()
     await db.commit()
 
     skipped = len(bills_data) - len(created)

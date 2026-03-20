@@ -230,14 +230,25 @@ class RecurringBillsService:
         return bill
 
     async def delete_bill(self, bill_id: int) -> bool:
-        """Soft-delete a recurring bill (set is_active=False)."""
+        """Hard-delete a recurring bill and all its occurrences and notifications."""
         result = await self.db.execute(
             select(RecurringBill).where(RecurringBill.id == bill_id, RecurringBill.user_id == self.user_id)
         )
         bill = result.scalar_one_or_none()
         if not bill:
             return False
-        bill.is_active = False
+        # Delete related notifications
+        await self.db.execute(
+            delete(Notification).where(Notification.related_bill_id == bill_id)
+        )
+        # Delete all occurrences
+        await self.db.execute(
+            delete(BillOccurrence).where(BillOccurrence.recurring_bill_id == bill_id)
+        )
+        # Delete the bill itself
+        await self.db.execute(
+            delete(RecurringBill).where(RecurringBill.id == bill_id)
+        )
         await self.db.flush()
         return True
 
@@ -341,6 +352,31 @@ class RecurringBillsService:
                 updated += 1
         await self.db.flush()
         return updated
+
+    async def auto_pay_due_occurrences(self) -> int:
+        """Auto-pay occurrences whose parent bill has is_auto_pay=True and are due or overdue."""
+        now = datetime.now(timezone.utc)
+        result = await self.db.execute(
+            select(BillOccurrence)
+            .join(RecurringBill)
+            .where(
+                RecurringBill.user_id == self.user_id,
+                RecurringBill.is_auto_pay == True,  # noqa: E712
+                BillOccurrence.due_date <= now,
+                BillOccurrence.status.in_([
+                    OccurrenceStatus.UPCOMING,
+                    OccurrenceStatus.DUE_SOON,
+                    OccurrenceStatus.OVERDUE,
+                ]),
+            )
+        )
+        occurrences = result.scalars().all()
+        for occ in occurrences:
+            occ.status = OccurrenceStatus.PAID
+            occ.paid_at = now
+            occ.included_in_cashflow = False
+        await self.db.flush()
+        return len(occurrences)
 
     async def skip_occurrence(self, occurrence_id: int) -> Optional[BillOccurrence]:
         """Skip a bill occurrence."""

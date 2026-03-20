@@ -90,6 +90,7 @@ async def create_invoice(
         subtotal=req.subtotal,
         tax_amount=req.tax_amount,
         job_id=req.job_id,
+        notes=req.notes,
         status=InvoiceStatus.NEEDS_REVIEW,
         match_method="manual",
         user_id=user.id,

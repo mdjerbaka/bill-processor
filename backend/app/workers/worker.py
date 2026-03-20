@@ -503,6 +503,7 @@ async def generate_bill_occurrences(ctx: dict) -> dict:
         total_created = 0
         total_overdue = 0
         total_due_soon = 0
+        total_auto_paid = 0
         total_notifs = 0
 
         for u in users:
@@ -515,6 +516,9 @@ async def generate_bill_occurrences(ctx: dict) -> dict:
             overdue_count = await svc.check_overdue()
             due_soon_count = await svc.check_due_soon()
 
+            # Auto-pay bills marked as auto-pay that are due
+            auto_paid_count = await svc.auto_pay_due_occurrences()
+
             # Generate notifications for due-soon and overdue bills
             notif_svc = NotificationService(db, u.id)
             due_notifs = await notif_svc.generate_due_soon_notifications()
@@ -524,6 +528,7 @@ async def generate_bill_occurrences(ctx: dict) -> dict:
             total_created += created
             total_overdue += overdue_count
             total_due_soon += due_soon_count
+            total_auto_paid += auto_paid_count
             total_notifs += due_notifs + overdue_notifs + credit_danger_notifs
 
         await db.commit()

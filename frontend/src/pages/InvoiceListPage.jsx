@@ -36,7 +36,7 @@ export default function InvoiceListPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [invoiceForm, setInvoiceForm] = useState({
-    vendor_name: '', invoice_number: '', total_amount: '', due_date: '',
+    vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '',
   })
 
   const loadInvoices = useCallback(async (silent = false) => {
@@ -89,12 +89,13 @@ export default function InvoiceListPage() {
       invoice_number: invoiceForm.invoice_number || null,
       total_amount: invoiceForm.total_amount ? parseFloat(invoiceForm.total_amount) : null,
       due_date: invoiceForm.due_date ? new Date(invoiceForm.due_date).toISOString() : null,
+      notes: invoiceForm.notes || null,
     }
     try {
       await invoicesAPI.create(payload)
       toast.success('Invoice created')
       setShowForm(false)
-      setInvoiceForm({ vendor_name: '', invoice_number: '', total_amount: '', due_date: '' })
+      setInvoiceForm({ vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '' })
       loadInvoices()
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to create invoice')
@@ -278,6 +279,16 @@ export default function InvoiceListPage() {
                     className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Notes (optional)</label>
+                <textarea
+                  value={invoiceForm.notes}
+                  onChange={(e) => setInvoiceForm({ ...invoiceForm, notes: e.target.value })}
+                  rows={2}
+                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Follow-up notes, payment instructions, etc."
+                />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button

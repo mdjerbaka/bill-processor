@@ -94,6 +94,7 @@ class InvoiceSchema(BaseModel):
     qbo_bill_id: Optional[str] = None
     qbo_payment_id: Optional[str] = None
     error_message: Optional[str] = None
+    notes: Optional[str] = None
     line_items: List[InvoiceLineItemSchema] = []
     created_at: datetime
     updated_at: datetime
@@ -112,6 +113,7 @@ class InvoiceUpdateRequest(BaseModel):
     subtotal: Optional[float] = None
     tax_amount: Optional[float] = None
     job_id: Optional[int] = None
+    notes: Optional[str] = None
     line_items: Optional[List[InvoiceLineItemSchema]] = None
 
 
@@ -226,6 +228,7 @@ class InvoiceCreateRequest(BaseModel):
     subtotal: Optional[float] = None
     tax_amount: Optional[float] = None
     job_id: Optional[int] = None
+    notes: Optional[str] = None
     line_items: Optional[List[InvoiceLineItemSchema]] = None
 
 
@@ -382,6 +385,8 @@ class ReceivableCheckCreate(BaseModel):
     job_name: str = Field(min_length=1, max_length=500)
     invoiced_amount: float = Field(ge=0)
     collect: bool = False
+    sent_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
     notes: Optional[str] = None
 
 
@@ -389,6 +394,8 @@ class ReceivableCheckUpdate(BaseModel):
     job_name: Optional[str] = Field(default=None, max_length=500)
     invoiced_amount: Optional[float] = Field(default=None, ge=0)
     collect: Optional[bool] = None
+    sent_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
     notes: Optional[str] = None
 
 
@@ -397,6 +404,8 @@ class ReceivableCheckSchema(BaseModel):
     job_name: str
     invoiced_amount: float
     collect: bool
+    sent_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime

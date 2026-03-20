@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
@@ -165,10 +166,27 @@ async def import_receivable_checks_csv(
 
         notes = (row.get("notes") or row.get("Notes") or "").strip() or None
 
+        sent_date_str = (row.get("sent_date") or row.get("Sent Date") or "").strip()
+        due_date_str = (row.get("due_date") or row.get("Due Date") or "").strip()
+        sent_date = None
+        due_date = None
+        if sent_date_str:
+            try:
+                sent_date = datetime.fromisoformat(sent_date_str).replace(tzinfo=timezone.utc)
+            except ValueError:
+                errors.append(f"Row {i}: invalid sent_date '{sent_date_str}'")
+        if due_date_str:
+            try:
+                due_date = datetime.fromisoformat(due_date_str).replace(tzinfo=timezone.utc)
+            except ValueError:
+                errors.append(f"Row {i}: invalid due_date '{due_date_str}'")
+
         items.append({
             "job_name": job_name,
             "invoiced_amount": invoiced_amount,
             "collect": collect,
+            "sent_date": sent_date,
+            "due_date": due_date,
             "notes": notes,
         })
 

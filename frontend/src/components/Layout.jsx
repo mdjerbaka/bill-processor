@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { payablesAPI } from '../services/api'
 import NotificationBell from './NotificationBell'
 import {
   InboxIcon,
@@ -33,12 +34,28 @@ const navigation = [
 export default function Layout() {
   const { logout } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [balance, setBalance] = useState(null)
   const location = useLocation()
 
-  // Close sidebar on navigation
+  const fetchBalance = useCallback(async () => {
+    try {
+      const res = await payablesAPI.getRealBalance()
+      setBalance(res.data)
+    } catch {}
+  }, [])
+
+  // Close sidebar on navigation, refetch balance
   useEffect(() => {
     setSidebarOpen(false)
-  }, [location.pathname])
+    fetchBalance()
+  }, [location.pathname, fetchBalance])
+
+  // Fetch balance on mount and every 30 seconds
+  useEffect(() => {
+    fetchBalance()
+    const interval = setInterval(fetchBalance, 30000)
+    return () => clearInterval(interval)
+  }, [fetchBalance])
 
   return (
     <div className="min-h-screen flex">
@@ -86,6 +103,18 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 px-4 space-y-1">
+          {balance && (
+            <div className="mb-3 px-3 py-2.5 bg-gray-800 rounded-lg">
+              <p className="text-xs text-gray-400 uppercase tracking-wide">Real Balance</p>
+              <p className={`text-lg font-bold ${balance.real_available >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                ${parseFloat(balance.real_available).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+              <div className="mt-1 text-xs text-gray-500 space-y-0.5">
+                <p>Bank: ${parseFloat(balance.bank_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                <p>Outstanding: ${parseFloat(balance.total_outstanding).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+          )}
           {navigation.map((item) => (
             <NavLink
               key={item.name}

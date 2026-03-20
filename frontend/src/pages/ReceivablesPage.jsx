@@ -23,7 +23,7 @@ export default function ReceivablesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingCheck, setEditingCheck] = useState(null)
-  const [form, setForm] = useState({ job_name: '', invoiced_amount: '', collect: false, notes: '' })
+  const [form, setForm] = useState({ job_name: '', invoiced_amount: '', collect: false, sent_date: '', due_date: '', notes: '' })
   const [showImport, setShowImport] = useState(false)
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
@@ -75,7 +75,7 @@ export default function ReceivablesPage() {
   }, [loadData])
 
   function openAddForm() {
-    setForm({ job_name: '', invoiced_amount: '', collect: false, notes: '' })
+    setForm({ job_name: '', invoiced_amount: '', collect: false, sent_date: '', due_date: '', notes: '' })
     setEditingCheck(null)
     setShowForm(true)
   }
@@ -85,6 +85,8 @@ export default function ReceivablesPage() {
       job_name: check.job_name,
       invoiced_amount: check.invoiced_amount.toString(),
       collect: check.collect,
+      sent_date: check.sent_date ? check.sent_date.split('T')[0] : '',
+      due_date: check.due_date ? check.due_date.split('T')[0] : '',
       notes: check.notes || '',
     })
     setEditingCheck(check)
@@ -96,6 +98,8 @@ export default function ReceivablesPage() {
     const payload = {
       ...form,
       invoiced_amount: parseFloat(form.invoiced_amount),
+      sent_date: form.sent_date ? new Date(form.sent_date).toISOString() : null,
+      due_date: form.due_date ? new Date(form.due_date).toISOString() : null,
     }
     try {
       if (editingCheck) {
@@ -319,6 +323,8 @@ export default function ReceivablesPage() {
                   <th className="px-4 pb-3 pt-4 font-medium text-center cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('collect')}>
                     Collect<SortIcon column="collect" />
                   </th>
+                  <th className="px-4 pb-3 pt-4 font-medium">Sent Date</th>
+                  <th className="px-4 pb-3 pt-4 font-medium">Due Date</th>
                   <th className="px-4 pb-3 pt-4 font-medium">Notes</th>
                   <th className="px-6 pb-3 pt-4 font-medium text-right">Actions</th>
                 </tr>
@@ -362,6 +368,12 @@ export default function ReceivablesPage() {
                         )}
                       </button>
                     </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">
+                      {check.sent_date ? new Date(check.sent_date).toLocaleDateString() : '—'}
+                    </td>
+                    <td className={`px-4 py-3 text-xs ${check.due_date && !check.collect === false && new Date(check.due_date) < new Date() ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
+                      {check.due_date ? new Date(check.due_date).toLocaleDateString() : '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-400 text-xs max-w-[200px] truncate">
                       {check.notes || '—'}
                     </td>
@@ -397,7 +409,7 @@ export default function ReceivablesPage() {
                   <td className="px-4 py-3 text-center">
                     <span className="font-bold text-green-400">{fmt(totalReceivables)}</span>
                   </td>
-                  <td colSpan={2}></td>
+                  <td colSpan={4}></td>
                 </tr>
               </tfoot>
             </table>
@@ -439,6 +451,26 @@ export default function ReceivablesPage() {
                   className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
                   required
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Sent Date</label>
+                  <input
+                    type="date"
+                    value={form.sent_date}
+                    onChange={(e) => setForm({ ...form, sent_date: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={form.due_date}
+                    onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Notes</label>

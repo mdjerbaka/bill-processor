@@ -68,6 +68,7 @@ export default function InvoiceDetailPage() {
         subtotal: form.subtotal ? parseFloat(form.subtotal) : null,
         tax_amount: form.tax_amount ? parseFloat(form.tax_amount) : null,
         job_id: form.job_id ? parseInt(form.job_id) : null,
+        notes: form.notes || null,
       })
       setInvoice(res.data)
       setEditing(false)
@@ -220,10 +221,20 @@ export default function InvoiceDetailPage() {
                 { label: 'Total Amount', key: 'total_amount', type: 'number', prefix: '$' },
                 { label: 'Subtotal', key: 'subtotal', type: 'number', prefix: '$' },
                 { label: 'Tax', key: 'tax_amount', type: 'number', prefix: '$' },
+                { label: 'Notes', key: 'notes', type: 'textarea' },
               ].map(({ label, key, type, prefix }) => (
                 <div key={key} className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0">
                   <span className="text-sm text-gray-400">{label}</span>
                   {editing ? (
+                    type === 'textarea' ? (
+                      <textarea
+                        value={form[key] ?? ''}
+                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                        rows={2}
+                        className="px-2 py-1 border border-gray-600 bg-gray-700 text-gray-200 rounded text-sm w-48"
+                        placeholder="Optional notes..."
+                      />
+                    ) : (
                     <input
                       type={type === 'date' ? 'date' : type === 'number' ? 'number' : 'text'}
                       value={
@@ -235,6 +246,7 @@ export default function InvoiceDetailPage() {
                       className="px-2 py-1 border border-gray-600 bg-gray-700 text-gray-200 rounded text-sm w-48 text-right"
                       step={type === 'number' ? '0.01' : undefined}
                     />
+                    )
                   ) : (
                     <span className="text-sm font-medium text-gray-200">
                       {type === 'number' && invoice[key] != null
