@@ -103,6 +103,7 @@ export default function SetupWizard() {
 
         {/* Step 0: Create account */}
         {step === 0 && (
+          <>
           <form onSubmit={handleCreateAccount} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
@@ -152,6 +153,7 @@ export default function SetupWizard() {
               Sign in here
             </Link>
           </p>
+          </>
         )}
 
         {/* Step 1: Email setup */}
