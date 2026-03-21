@@ -100,6 +100,18 @@ async def change_password(
     return {"message": "Password changed successfully"}
 
 
+@router.get("/me")
+async def get_me(
+    current_user: User = Depends(get_current_user),
+):
+    """Return the current authenticated user's info. Used for token validation."""
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "is_active": current_user.is_active,
+    }
+
+
 @router.get("/setup-status", response_model=SetupStatusResponse)
 async def setup_status(db: AsyncSession = Depends(get_db)):
     """Check what setup steps have been completed."""

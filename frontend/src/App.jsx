@@ -22,21 +22,23 @@ function ProtectedRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { isSetup, setupStatus, isAuthenticated } = useAuth()
+  const { isSetup, setupStatus, isAuthenticated, connectionError } = useAuth()
 
   // Still checking setup status
   if (isSetup === null) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-950">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <p className="ml-4 text-gray-400">Connecting to server...</p>
       </div>
     )
   }
 
-  // Needs first-time setup
+  // Needs first-time setup — but always allow /login as an escape hatch
   if (setupStatus && !setupStatus.has_user) {
     return (
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<SetupWizard />} />
       </Routes>
     )

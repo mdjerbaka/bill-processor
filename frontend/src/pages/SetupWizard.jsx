@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { authAPI, settingsAPI } from '../services/api'
 import toast from 'react-hot-toast'
@@ -7,6 +8,7 @@ const STEPS = ['Create Account', 'Email Setup', 'All Done']
 
 export default function SetupWizard() {
   const { login, checkSetup } = useAuth()
+  const navigate = useNavigate()
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
 
@@ -35,7 +37,13 @@ export default function SetupWizard() {
       toast.success('Account created!')
       setStep(1)
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Setup failed')
+      const detail = err.response?.data?.detail || 'Setup failed'
+      if (detail === 'Setup already completed') {
+        toast.success('Account already exists. Redirecting to login...')
+        navigate('/login')
+        return
+      }
+      toast.error(detail)
     } finally {
       setLoading(false)
     }
@@ -137,6 +145,13 @@ export default function SetupWizard() {
               {loading ? 'Creating...' : 'Create Account & Continue'}
             </button>
           </form>
+
+          <p className="mt-4 text-center text-sm text-gray-400">
+            Already have an account?{' '}
+            <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+              Sign in here
+            </Link>
+          </p>
         )}
 
         {/* Step 1: Email setup */}
