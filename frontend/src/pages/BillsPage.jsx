@@ -143,6 +143,7 @@ export default function BillsPage() {
   const [sortColumn, setSortColumn] = useState('due_date')
   const [sortDirection, setSortDirection] = useState('asc')
   const [selectedOccurrences, setSelectedOccurrences] = useState(new Set())
+  const [collapsedWeeks, setCollapsedWeeks] = useState(new Set())
 
   function handleSort(column) {
     if (sortColumn === column) {
@@ -174,6 +175,52 @@ export default function BillsPage() {
       default: return 0
     }
   })
+
+  // Group occurrences by month then by week (1-7, 8-14, 15-21, 22-31)
+  function getWeekBucket(day) {
+    if (day <= 7) return 1
+    if (day <= 14) return 2
+    if (day <= 21) return 3
+    return 4
+  }
+
+  const groupedByMonthWeek = (() => {
+    const groups = {}
+    for (const occ of sortedOccurrences) {
+      const d = new Date(occ.due_date)
+      const monthKey = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      const day = d.getDate()
+      const week = getWeekBucket(day)
+      if (!groups[monthKey]) groups[monthKey] = {}
+      if (!groups[monthKey][week]) groups[monthKey][week] = []
+      groups[monthKey][week].push(occ)
+    }
+    // Sort month keys chronologically
+    const sortedMonths = Object.keys(groups).sort((a, b) => new Date('1 ' + a) - new Date('1 ' + b))
+    const result = []
+    for (const monthKey of sortedMonths) {
+      const weeks = []
+      for (const wk of [1, 2, 3, 4]) {
+        if (groups[monthKey][wk]) {
+          const items = groups[monthKey][wk]
+          const subtotal = items.reduce((sum, o) => sum + (o.included_in_cashflow && o.status !== 'paid' && o.status !== 'skipped' ? (o.amount || 0) : 0), 0)
+          const hasOverdue = items.some(o => o.status === 'overdue')
+          weeks.push({ week: wk, items, subtotal, hasOverdue })
+        }
+      }
+      result.push({ monthKey, weeks })
+    }
+    return result
+  })()
+
+  function toggleWeekCollapse(key) {
+    setCollapsedWeeks(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const loadData = useCallback(async () => {
     try {
@@ -658,127 +705,190 @@ export default function BillsPage() {
             No upcoming bill occurrences. Add some recurring bills to get started.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-400 border-b border-gray-700">
-                  <th className="pb-3 pr-2">
-                    <input
-                      type="checkbox"
-                      checked={sortedOccurrences.length > 0 && selectedOccurrences.size === sortedOccurrences.length}
-                      onChange={toggleSelectAll}
-                      className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                    />
-                  </th>
-                  <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('bill_name')}>Bill<SortIcon column="bill_name" /></th>
-                  <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('category')}>Category<SortIcon column="category" /></th>
-                  <th className="pb-3 font-medium text-right cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('amount')}>Amount<SortIcon column="amount" /></th>
-                  <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('due_date')}>Due Date<SortIcon column="due_date" /></th>
-                  <th className="pb-3 font-medium">Days</th>
-                  <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-200" onClick={() => handleSort('status')}>Status<SortIcon column="status" /></th>
-                  <th className="pb-3 font-medium text-center" title="Include in cash flow calculation">$</th>
-                  <th className="pb-3 font-medium">Auto-Pay</th>
-                  <th className="pb-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedOccurrences.map((occ) => (
-                  <tr key={occ.id} className={`border-b border-gray-700/50 hover:bg-gray-700/30 ${selectedOccurrences.has(occ.id) ? 'bg-blue-900/20' : ''}`}>
-                    <td className="py-3 pr-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedOccurrences.has(occ.id)}
-                        onChange={() => toggleSelect(occ.id)}
-                        className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="py-3">
-                      <p className="font-medium text-gray-200">{occ.bill_name}</p>
-                      <p className="text-gray-500 text-xs">{occ.vendor_name}</p>
-                    </td>
-                    <td className="py-3">
-                      <span className="text-xs text-gray-400 capitalize">{(occ.category || '').replace(/_/g, ' ')}</span>
-                    </td>
-                    <td className="py-3 text-right font-medium">{fmt(occ.amount)}</td>
-                    <td className="py-3 text-gray-300">
-                      {new Date(occ.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </td>
-                    <td className="py-3">
-                      <span className={
-                        occ.status === 'overdue'
-                          ? (occ.days_overdue >= 25 ? 'text-red-500 font-bold animate-pulse' :
-                             occ.days_overdue >= 15 ? 'text-orange-400 font-semibold' :
-                             'text-red-400 font-medium')
-                          : occ.status === 'due_soon' ? 'text-yellow-400' : 'text-gray-400'
-                      }>
-                        {daysUntil(occ.due_date)}
-                      </span>
-                      {occ.days_overdue >= 25 && (
-                        <span className="block text-[10px] text-red-500 font-semibold">CREDIT DANGER</span>
+          <div className="space-y-6">
+            {/* Select All + sort controls */}
+            <div className="flex items-center gap-4 text-xs text-gray-400">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sortedOccurrences.length > 0 && selectedOccurrences.size === sortedOccurrences.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                />
+                Select All
+              </label>
+              <span className="text-gray-600">|</span>
+              <span>Sort by:</span>
+              {[{col: 'due_date', label: 'Date'}, {col: 'bill_name', label: 'Name'}, {col: 'amount', label: 'Amount'}, {col: 'status', label: 'Status'}].map(s => (
+                <button key={s.col} onClick={() => handleSort(s.col)} className={`hover:text-gray-200 ${sortColumn === s.col ? 'text-blue-400 font-medium' : ''}`}>
+                  {s.label}<SortIcon column={s.col} />
+                </button>
+              ))}
+            </div>
+
+            {groupedByMonthWeek.map(({ monthKey, weeks }) => (
+              <div key={monthKey}>
+                {/* Month Header */}
+                <div className="border-b-2 border-gray-600 pb-2 mb-4">
+                  <h3 className="text-base font-bold text-gray-100 uppercase tracking-wide">{monthKey}</h3>
+                </div>
+
+                {weeks.map(({ week, items, subtotal, hasOverdue }) => {
+                  const weekKey = `${monthKey}-W${week}`
+                  const isCollapsed = collapsedWeeks.has(weekKey)
+                  const weekRanges = { 1: '1st – 7th', 2: '8th – 14th', 3: '15th – 21st', 4: '22nd – 31st' }
+
+                  return (
+                    <div key={weekKey} className="mb-4">
+                      {/* Week Header */}
+                      <button
+                        onClick={() => toggleWeekCollapse(weekKey)}
+                        className="w-full flex items-center justify-between py-2 px-3 rounded-lg bg-gray-700/40 hover:bg-gray-700/60 transition-colors mb-1"
+                      >
+                        <div className="flex items-center gap-3">
+                          {isCollapsed
+                            ? <ChevronDownIcon className="h-4 w-4 text-gray-400" />
+                            : <ChevronUpIcon className="h-4 w-4 text-gray-400" />
+                          }
+                          <span className="text-sm font-bold text-gray-200 uppercase tracking-wider">Week {week}</span>
+                          <span className="text-xs text-gray-500">{weekRanges[week]}</span>
+                          {hasOverdue && (
+                            <span className="text-xs font-bold text-red-400 uppercase">OVERDUE</span>
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold text-gray-300">{fmt(subtotal)}</span>
+                      </button>
+
+                      {!isCollapsed && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-left text-gray-500 text-xs">
+                                <th className="pb-1 pr-2 w-8"></th>
+                                <th className="pb-1 pr-2 w-8">{hasOverdue ? <span className="text-red-500 font-bold">!</span> : ''}</th>
+                                <th className="pb-1 font-medium">Bill</th>
+                                <th className="pb-1 font-medium text-center w-16">Day</th>
+                                <th className="pb-1 font-medium text-right w-28">Amount</th>
+                                <th className="pb-1 font-medium text-center w-16" title="Include in cash flow">$</th>
+                                <th className="pb-1 font-medium text-center w-16">Auto</th>
+                                <th className="pb-1 font-medium text-right w-48">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {items.map((occ) => {
+                                const isOverdue = occ.status === 'overdue'
+                                const isPaid = occ.status === 'paid'
+                                const isSkipped = occ.status === 'skipped'
+                                const isDueSoon = occ.status === 'due_soon'
+                                const isCreditDanger = isOverdue && occ.days_overdue >= 25
+                                const nameColor = isCreditDanger ? 'text-red-500 font-bold animate-pulse'
+                                  : isOverdue ? 'text-red-400 font-medium'
+                                  : isPaid || isSkipped ? 'text-gray-600 line-through'
+                                  : isDueSoon ? 'text-yellow-300'
+                                  : 'text-gray-200'
+                                const amountColor = isCreditDanger ? 'text-red-500 font-bold'
+                                  : isOverdue ? 'text-red-400'
+                                  : isPaid || isSkipped ? 'text-gray-600'
+                                  : 'text-gray-100'
+
+                                return (
+                                  <tr key={occ.id} className={`border-b border-gray-700/30 hover:bg-gray-700/20 ${selectedOccurrences.has(occ.id) ? 'bg-blue-900/20' : ''}`}>
+                                    <td className="py-2 pr-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedOccurrences.has(occ.id)}
+                                        onChange={() => toggleSelect(occ.id)}
+                                        className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                                      />
+                                    </td>
+                                    <td className="py-2 pr-2 text-center">
+                                      {isOverdue && <span className="text-red-500 font-bold text-xs">Y</span>}
+                                    </td>
+                                    <td className="py-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className={nameColor}>{occ.bill_name}</span>
+                                        {isCreditDanger && <span className="text-[10px] text-red-500 font-semibold bg-red-900/40 px-1.5 py-0.5 rounded">CREDIT DANGER</span>}
+                                        <StatusBadge status={occ.status} />
+                                      </div>
+                                      <p className="text-gray-500 text-xs">{occ.vendor_name}{occ.notes ? ` — ${occ.notes}` : ''}</p>
+                                    </td>
+                                    <td className="py-2 text-center">
+                                      <span className={`font-mono text-sm ${isOverdue ? 'text-red-400' : 'text-gray-300'}`}>
+                                        {new Date(occ.due_date).getDate()}
+                                      </span>
+                                    </td>
+                                    <td className={`py-2 text-right font-medium ${amountColor}`}>{fmt(occ.amount)}</td>
+                                    <td className="py-2 text-center">
+                                      {!isPaid && !isSkipped && (
+                                        <button
+                                          onClick={() => handleToggleCashflow(occ.id)}
+                                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                            occ.included_in_cashflow ? 'bg-blue-600' : 'bg-gray-600'
+                                          }`}
+                                          title={occ.included_in_cashflow ? 'Included in cash flow — click to exclude' : 'Excluded from cash flow — click to include'}
+                                        >
+                                          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                                            occ.included_in_cashflow ? 'translate-x-[18px]' : 'translate-x-[2px]'
+                                          }`} />
+                                        </button>
+                                      )}
+                                    </td>
+                                    <td className="py-2 text-center">
+                                      {occ.is_auto_pay && <span className="text-xs text-blue-400 font-medium">Y</span>}
+                                    </td>
+                                    <td className="py-2 text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        {!isSkipped && !isPaid && (
+                                          <button
+                                            onClick={() => openPaymentModal(occ)}
+                                            className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800 transition-colors"
+                                            title="Mark as paid"
+                                          >
+                                            <CheckCircleIcon className="h-4 w-4 inline -mt-0.5 mr-0.5" />
+                                            Paid
+                                          </button>
+                                        )}
+                                        {!isSkipped && !isPaid && (
+                                          <button
+                                            onClick={() => handleSkip(occ.id)}
+                                            className="px-2 py-0.5 text-xs font-medium rounded bg-yellow-900/50 text-yellow-400 hover:bg-yellow-800 transition-colors"
+                                            title="Skip this occurrence"
+                                          >
+                                            <ForwardIcon className="h-4 w-4 inline -mt-0.5 mr-0.5" />
+                                            Skip
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => {
+                                            const parentBill = bills.find(b => b.id === occ.recurring_bill_id)
+                                            if (parentBill) openEditForm(parentBill)
+                                          }}
+                                          className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
+                                          title="Edit recurring bill"
+                                        >
+                                          <PencilIcon className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t border-gray-600">
+                                <td colSpan={4} className="py-2 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide pr-2">Week {week} Total</td>
+                                <td className="py-2 text-right font-bold text-gray-200">{fmt(subtotal)}</td>
+                                <td colSpan={3}></td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
                       )}
-                    </td>
-                    <td className="py-3"><StatusBadge status={occ.status} /></td>
-                    <td className="py-3 text-center">
-                      {occ.status !== 'paid' && occ.status !== 'skipped' && (
-                        <button
-                          onClick={() => handleToggleCashflow(occ.id)}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                            occ.included_in_cashflow ? 'bg-blue-600' : 'bg-gray-600'
-                          }`}
-                          title={occ.included_in_cashflow ? 'Included in cash flow — click to exclude' : 'Excluded from cash flow — click to include'}
-                        >
-                          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                            occ.included_in_cashflow ? 'translate-x-[18px]' : 'translate-x-[2px]'
-                          }`} />
-                        </button>
-                      )}
-                    </td>
-                    <td className="py-3 text-center">
-                      {occ.is_auto_pay && (
-                        <span className="text-xs bg-blue-900/50 text-blue-400 px-2 py-0.5 rounded-full">auto</span>
-                      )}
-                      {occ.matched_invoice_id && (
-                        <span className="text-xs bg-purple-900/50 text-purple-400 px-2 py-0.5 rounded-full ml-1" title={`Matched to invoice #${occ.matched_invoice_id}`}>linked</span>
-                      )}
-                    </td>
-                    <td className="py-3 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        {occ.status !== 'skipped' && occ.status !== 'paid' && (
-                          <button
-                            onClick={() => openPaymentModal(occ)}
-                            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800 transition-colors"
-                            title="Mark as paid"
-                          >
-                            <CheckCircleIcon className="h-5 w-5 inline -mt-0.5 mr-1" />
-                            Paid
-                          </button>
-                        )}
-                        {occ.status !== 'skipped' && occ.status !== 'paid' && (
-                          <button
-                            onClick={() => handleSkip(occ.id)}
-                            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-yellow-900/50 text-yellow-400 hover:bg-yellow-800 transition-colors"
-                            title="Skip this occurrence"
-                          >
-                            <ForwardIcon className="h-5 w-5 inline -mt-0.5 mr-1" />
-                            Skip
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            const parentBill = bills.find(b => b.id === occ.recurring_bill_id)
-                            if (parentBill) openEditForm(parentBill)
-                          }}
-                          className="p-1.5 text-gray-400 hover:text-blue-400 transition-colors"
-                          title="Edit recurring bill"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
           </div>
         )}
         </div>
