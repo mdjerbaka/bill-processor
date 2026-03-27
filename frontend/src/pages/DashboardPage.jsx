@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { invoicesAPI, payablesAPI, healthAPI, settingsAPI, recurringBillsAPI } from '../services/api'
+import { invoicesAPI, payablesAPI, healthAPI, settingsAPI, recurringBillsAPI, quickbooksAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import OverdueAlertBanner from '../components/OverdueAlertBanner'
 import {
@@ -43,6 +43,7 @@ export default function DashboardPage() {
     overdueBills: [],
   })
   const [health, setHealth] = useState(null)
+  const [qbStatus, setQbStatus] = useState(null)
   const [recentInvoices, setRecentInvoices] = useState([])
   const [polling, setPolling] = useState(false)
   useEffect(() => {
@@ -57,12 +58,13 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
     try {
-      const [invoicesRes, payablesRes, balanceRes, healthRes, cashFlowRes] = await Promise.allSettled([
+      const [invoicesRes, payablesRes, balanceRes, healthRes, cashFlowRes, qbRes] = await Promise.allSettled([
         invoicesAPI.list({ page: 1, page_size: 15 }),
         payablesAPI.list(),
         payablesAPI.getRealBalance(),
         healthAPI.check(),
         recurringBillsAPI.getCashFlow(),
+        quickbooksAPI.status(),
       ])
 
       if (invoicesRes.status === 'fulfilled') {
@@ -86,6 +88,10 @@ export default function DashboardPage() {
 
       if (healthRes.status === 'fulfilled') {
         setHealth(healthRes.value.data)
+      }
+
+      if (qbRes.status === 'fulfilled') {
+        setQbStatus(qbRes.value.data)
       }
 
       if (cashFlowRes.status === 'fulfilled') {
@@ -299,6 +305,12 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-400">Version</span>
                 <span className="text-sm font-medium">{health.version}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-400">QuickBooks</span>
+                <span className={`text-sm font-medium ${qbStatus?.connected ? 'text-green-600' : 'text-red-600'}`}>
+                  {qbStatus ? (qbStatus.connected ? 'Connected' : 'Not Connected') : '...'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-400">Last Email Poll</span>
