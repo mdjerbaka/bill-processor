@@ -328,6 +328,7 @@ class QBOToken(Base):
     __tablename__ = "qbo_tokens"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     access_token: Mapped[str] = mapped_column(Text, nullable=False)
     refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
     realm_id: Mapped[str] = mapped_column(String(100), nullable=False)

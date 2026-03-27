@@ -137,8 +137,13 @@ class QuickBooksService:
         return True
 
     async def _save_tokens(self, data: dict, realm_id: str) -> None:
-        """Save or update QBO tokens in the database."""
-        result = await self.db.execute(select(QBOToken).limit(1))
+        """Save or update QBO tokens in the database for the current user."""
+        query = select(QBOToken)
+        if self.user_id:
+            query = query.where(QBOToken.user_id == self.user_id)
+        else:
+            query = query.limit(1)
+        result = await self.db.execute(query)
         token = result.scalar_one_or_none()
 
         now = datetime.now(timezone.utc)
@@ -153,6 +158,7 @@ class QuickBooksService:
             token.refresh_expires_at = refresh_expires
         else:
             token = QBOToken(
+                user_id=self.user_id,
                 access_token=encrypt_value(data["access_token"]),
                 refresh_token=encrypt_value(data["refresh_token"]),
                 realm_id=realm_id,
@@ -164,8 +170,13 @@ class QuickBooksService:
         await self.db.flush()
 
     async def _get_valid_token(self) -> Optional[QBOToken]:
-        """Get a valid access token, refreshing if needed."""
-        result = await self.db.execute(select(QBOToken).limit(1))
+        """Get a valid access token for the current user, refreshing if needed."""
+        query = select(QBOToken)
+        if self.user_id:
+            query = query.where(QBOToken.user_id == self.user_id)
+        else:
+            query = query.limit(1)
+        result = await self.db.execute(query)
         token = result.scalar_one_or_none()
         if not token:
             return None
@@ -185,7 +196,12 @@ class QuickBooksService:
             if not success:
                 return None
             # Re-fetch after refresh
-            result = await self.db.execute(select(QBOToken).limit(1))
+            query2 = select(QBOToken)
+            if self.user_id:
+                query2 = query2.where(QBOToken.user_id == self.user_id)
+            else:
+                query2 = query2.limit(1)
+            result = await self.db.execute(query2)
             token = result.scalar_one_or_none()
 
         return token

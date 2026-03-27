@@ -40,7 +40,11 @@ async def qbo_connect(
         raise HTTPException(status_code=400, detail="QuickBooks client ID not configured. Go to Settings to add your QuickBooks credentials.")
 
     svc = QuickBooksService(db, user.id)
-    auth_url = await svc.get_auth_url()
+    # Encode user_id into the OAuth state so the callback knows which user connected
+    from app.core.security import create_access_token
+    from datetime import timedelta
+    state_token = create_access_token({"sub": str(user.id), "purpose": "qbo_connect"}, expires_delta=timedelta(minutes=15))
+    auth_url = await svc.get_auth_url(state=state_token)
     return {"auth_url": auth_url}
 
 
@@ -52,7 +56,17 @@ async def qbo_callback(
     db: AsyncSession = Depends(get_db),
 ):
     """QuickBooks OAuth2 callback — exchanges code for tokens."""
-    svc = QuickBooksService(db)
+    # Decode user_id from the signed state token
+    from app.core.security import decode_access_token
+    user_id = None
+    payload = decode_access_token(state)
+    if payload and payload.get("purpose") == "qbo_connect":
+        try:
+            user_id = int(payload["sub"])
+        except (ValueError, KeyError):
+            pass
+
+    svc = QuickBooksService(db, user_id)
     success = await svc.exchange_code(code, realmId)
 
     if not success:
@@ -202,10 +216,10 @@ async def qbo_disconnect(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Disconnect from QuickBooks by removing stored OAuth tokens."""
+    """Disconnect from QuickBooks by removing the current user's OAuth tokens."""
     from app.models.models import QBOToken
 
-    result = await db.execute(select(QBOToken))
+    result = await db.execute(select(QBOToken).where(QBOToken.user_id == user.id))
     tokens = result.scalars().all()
     if not tokens:
         raise HTTPException(status_code=400, detail="QuickBooks is not connected")
