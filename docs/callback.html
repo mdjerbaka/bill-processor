@@ -17,12 +17,14 @@
         <p>Completing connection, please wait...</p>
     </div>
     <script>
-        // Relay OAuth callback from GitHub Pages (HTTPS) to local backend (HTTP)
+        // Relay OAuth callback from GitHub Pages (HTTPS) to the backend API.
         // Intuit requires HTTPS redirect URIs for production apps.
-        // This page receives the auth code and forwards it to localhost.
+        // This page receives the auth code and forwards it to the API server.
         const params = window.location.search;
         if (params) {
-            window.location.href = 'http://localhost:8000/api/v1/quickbooks/callback' + params;
+            // Use production API by default; fall back to localhost for local dev
+            const API_BASE = 'http://45.55.159.91:8000';
+            window.location.href = API_BASE + '/api/v1/quickbooks/callback' + params;
         } else {
             document.querySelector('p').textContent = 'Error: No authorization parameters received.';
         }
