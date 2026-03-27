@@ -294,9 +294,16 @@ class Payable(Base):
     )
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     is_permanent: Mapped[bool] = mapped_column(Boolean, default=False)
+    included_in_cashflow: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     is_junked: Mapped[bool] = mapped_column(Boolean, default=False)
     junked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    # Denormalized fields (copied from Invoice/Job before invoice deletion)
+    invoice_number: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    job_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    qbo_bill_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    qbo_vendor_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     invoice: Mapped["Invoice"] = relationship(back_populates="payable")
 
@@ -419,6 +426,7 @@ class ReceivableCheck(Base):
     sent_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    qbo_invoice_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

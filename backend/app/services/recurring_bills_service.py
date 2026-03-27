@@ -656,12 +656,13 @@ class RecurringBillsService:
         )
         expected_receivables = float(recv_result.scalar() or 0.0)
 
-        # Outstanding payables (invoices to pay)
+        # Outstanding payables (invoices to pay) — only those toggled into cashflow
         payables_result = await self.db.execute(
             select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
                 Payable.user_id == self.user_id,
                 Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
                 Payable.is_junked == False,  # noqa: E712
+                Payable.included_in_cashflow == True,  # noqa: E712
             )
         )
         total_payables = float(payables_result.scalar() or 0.0)

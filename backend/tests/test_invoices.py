@@ -187,7 +187,7 @@ class TestInvoiceApprove:
             f"/api/v1/invoices/{inv.id}/approve", headers=auth_headers
         )
         assert resp.status_code == 200
-        assert resp.json()["status"] == "approved"
+        assert "payable_id" in resp.json()
 
     async def test_approve_already_approved(
         self, client: AsyncClient, auth_headers, db_session

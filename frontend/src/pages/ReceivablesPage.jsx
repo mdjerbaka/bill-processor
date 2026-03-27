@@ -27,6 +27,7 @@ export default function ReceivablesPage() {
   const [showImport, setShowImport] = useState(false)
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [sortColumn, setSortColumn] = useState('job_name')
   const [sortDirection, setSortDirection] = useState('asc')
   const [selectedChecks, setSelectedChecks] = useState(new Set())
@@ -185,6 +186,20 @@ export default function ReceivablesPage() {
     }
   }
 
+  async function handleSyncQuickbooks() {
+    setSyncing(true)
+    try {
+      const res = await receivablesAPI.syncQuickbooks()
+      const { created, updated, skipped } = res.data
+      toast.success(`QB Sync: ${created} added, ${updated} updated, ${skipped} unchanged`)
+      loadData()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'QuickBooks sync failed')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   function toggleSelectAll() {
     if (selectedChecks.size === sortedChecks.length) {
       setSelectedChecks(new Set())
@@ -227,6 +242,14 @@ export default function ReceivablesPage() {
               Delete All
             </button>
           )}
+          <button
+            onClick={handleSyncQuickbooks}
+            disabled={syncing}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1 disabled:opacity-50"
+          >
+            <ArrowPathIcon className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync from QuickBooks'}
+          </button>
           <button
             onClick={() => setShowImport(true)}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1"

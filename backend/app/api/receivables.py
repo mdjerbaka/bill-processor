@@ -131,6 +131,24 @@ async def delete_all_receivable_checks(
     return {"detail": f"Deleted {count} receivable checks"}
 
 
+@router.post("/sync-quickbooks")
+async def sync_quickbooks_receivables(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Sync customer invoices from QuickBooks into receivable checks."""
+    from app.services.quickbooks_service import QuickBooksService
+    qb_svc = QuickBooksService(db, user.id)
+    result = await qb_svc.sync_customer_invoices(user.id)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    await db.commit()
+    return {
+        "detail": f"Synced from QuickBooks: {result['created']} created, {result['updated']} updated, {result['skipped']} unchanged",
+        **result,
+    }
+
+
 @router.post("/import-csv", status_code=201)
 async def import_receivable_checks_csv(
     file: UploadFile = File(...),

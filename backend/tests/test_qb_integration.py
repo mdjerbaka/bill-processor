@@ -147,11 +147,11 @@ class TestApproveToQB:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] in ("approved", "sent_to_qb")
+        assert "payable_id" in data
 
-        # Payable created
+        # Payable created (invoice_id cleared since invoice is hard-deleted)
         pay_result = await db_session.execute(
-            select(Payable).where(Payable.invoice_id == inv.id)
+            select(Payable).where(Payable.id == data["payable_id"])
         )
         payable = pay_result.scalar_one_or_none()
         assert payable is not None
@@ -170,10 +170,10 @@ class TestApproveToQB:
         )
 
         assert resp.status_code == 200
-        assert resp.json()["status"] == "approved"
+        assert "payable_id" in resp.json()
 
         pay_result = await db_session.execute(
-            select(Payable).where(Payable.invoice_id == inv.id)
+            select(Payable).where(Payable.id == resp.json()["payable_id"])
         )
         assert pay_result.scalar_one_or_none() is not None
 

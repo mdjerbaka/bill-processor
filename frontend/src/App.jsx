@@ -8,6 +8,7 @@ import InvoiceListPage from './pages/InvoiceListPage'
 import InvoiceDetailPage from './pages/InvoiceDetailPage'
 import PayablesPage from './pages/PayablesPage'
 import PaymentsOutPage from './pages/PaymentsOutPage'
+import PaymentHistoryPage from './pages/PaymentHistoryPage'
 import BillsPage from './pages/BillsPage'
 import ReceivablesPage from './pages/ReceivablesPage'
 import JobsPage from './pages/JobsPage'
@@ -58,6 +59,7 @@ function AppRoutes() {
         <Route path="invoices/:id" element={<InvoiceDetailPage />} />
         <Route path="payables" element={<PayablesPage />} />
         <Route path="payments-out" element={<PaymentsOutPage />} />
+        <Route path="payment-history" element={<PaymentHistoryPage />} />
         <Route path="bills" element={<BillsPage />} />
         <Route path="receivables" element={<ReceivablesPage />} />
         <Route path="jobs" element={<JobsPage />} />

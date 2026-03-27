@@ -185,6 +185,7 @@ class PayableSchema(BaseModel):
     invoice_number: Optional[str] = None
     job_name: Optional[str] = None
     is_permanent: bool = False
+    included_in_cashflow: bool = True
 
     class Config:
         from_attributes = True
@@ -208,6 +209,7 @@ class PayableCreateRequest(BaseModel):
     status: Optional[str] = "outstanding"
     invoice_number: Optional[str] = None
     is_permanent: Optional[bool] = False
+    included_in_cashflow: Optional[bool] = True
 
 
 class PayableUpdateRequest(BaseModel):
@@ -217,6 +219,7 @@ class PayableUpdateRequest(BaseModel):
     status: Optional[str] = None
     invoice_number: Optional[str] = None
     is_permanent: Optional[bool] = None
+    included_in_cashflow: Optional[bool] = None
 
 
 class InvoiceCreateRequest(BaseModel):
@@ -407,6 +410,7 @@ class ReceivableCheckSchema(BaseModel):
     sent_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     notes: Optional[str] = None
+    qbo_invoice_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -473,3 +477,22 @@ class MarkPaidWithPaymentRequest(BaseModel):
     check_number: Optional[str] = None
     job_name: Optional[str] = None
     notes: Optional[str] = None
+
+
+# ── Combined Payment History ────────────────────────
+class CombinedPaymentSchema(BaseModel):
+    id: int
+    date: datetime
+    vendor: str
+    amount: float
+    type: str  # payment_out, bill, payable
+    method: Optional[str] = None
+    reference: Optional[str] = None
+    job_name: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class CombinedPaymentListResponse(BaseModel):
+    items: List[CombinedPaymentSchema]
+    total: int
+    total_amount: float

@@ -5,10 +5,20 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, union_all, literal, case, String, Float, DateTime
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
-from app.models.models import PaymentOut, PaymentOutStatus, PaymentMethod
+from app.models.models import (
+    PaymentOut,
+    PaymentOutStatus,
+    PaymentMethod,
+    Payable,
+    PayableStatus,
+    BillOccurrence,
+    OccurrenceStatus,
+    RecurringBill,
+)
 
 
 class PaymentsOutService:
@@ -118,3 +128,119 @@ class PaymentsOutService:
             )
         )
         return float(result.scalar() or 0.0)
+
+    async def get_combined_payment_history(
+        self,
+        search: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        page: int = 1,
+        per_page: int = 50,
+    ) -> dict:
+        """Return a combined list of all paid items: cleared PaymentOut, paid Payable, paid BillOccurrence."""
+        # --- PaymentOut (cleared) ---
+        po_q = (
+            select(
+                PaymentOut.id.label("id"),
+                PaymentOut.cleared_at.label("date"),
+                PaymentOut.vendor_name.label("vendor"),
+                PaymentOut.amount.label("amount"),
+                literal("payment_out").label("type"),
+                PaymentOut.payment_method.label("method"),
+                PaymentOut.check_number.label("reference"),
+                PaymentOut.job_name.label("job_name"),
+                PaymentOut.notes.label("notes"),
+            )
+            .where(
+                PaymentOut.user_id == self.user_id,
+                PaymentOut.status == PaymentOutStatus.CLEARED,
+            )
+        )
+
+        # --- Payable (paid) ---
+        pay_q = (
+            select(
+                Payable.id.label("id"),
+                Payable.paid_at.label("date"),
+                Payable.vendor_name.label("vendor"),
+                Payable.amount.label("amount"),
+                literal("payable").label("type"),
+                literal(None).label("method"),
+                Payable.invoice_number.label("reference"),
+                Payable.job_name.label("job_name"),
+                literal(None).label("notes"),
+            )
+            .where(
+                Payable.user_id == self.user_id,
+                Payable.status == PayableStatus.PAID,
+            )
+        )
+
+        # --- BillOccurrence (paid) ---
+        bill_q = (
+            select(
+                BillOccurrence.id.label("id"),
+                BillOccurrence.paid_at.label("date"),
+                RecurringBill.vendor_name.label("vendor"),
+                BillOccurrence.amount.label("amount"),
+                literal("bill").label("type"),
+                literal(None).label("method"),
+                RecurringBill.name.label("reference"),
+                literal(None).label("job_name"),
+                BillOccurrence.notes.label("notes"),
+            )
+            .join(RecurringBill, BillOccurrence.recurring_bill_id == RecurringBill.id)
+            .where(
+                RecurringBill.user_id == self.user_id,
+                BillOccurrence.status == OccurrenceStatus.PAID,
+            )
+        )
+
+        combined = union_all(po_q, pay_q, bill_q).subquery()
+
+        # Apply filters
+        q = select(combined)
+        if search:
+            pattern = f"%{search}%"
+            q = q.where(
+                combined.c.vendor.ilike(pattern)
+                | combined.c.reference.ilike(pattern)
+                | combined.c.job_name.ilike(pattern)
+                | combined.c.notes.ilike(pattern)
+            )
+        if start_date:
+            q = q.where(combined.c.date >= start_date)
+        if end_date:
+            q = q.where(combined.c.date <= end_date)
+
+        # Get total count and amount
+        count_q = select(func.count(), func.coalesce(func.sum(combined.c.amount), 0.0)).select_from(q.subquery())
+        count_result = await self.db.execute(count_q)
+        total_count, total_amount = count_result.one()
+
+        # Paginate
+        offset = (page - 1) * per_page
+        q = q.order_by(combined.c.date.desc()).limit(per_page).offset(offset)
+
+        result = await self.db.execute(q)
+        rows = result.all()
+
+        items = []
+        for row in rows:
+            items.append({
+                "id": row.id,
+                "date": row.date,
+                "vendor": row.vendor,
+                "amount": float(row.amount),
+                "type": row.type,
+                "method": row.method.value if hasattr(row.method, "value") else row.method,
+                "reference": row.reference,
+                "job_name": row.job_name,
+                "notes": row.notes,
+            })
+
+        return {
+            "items": items,
+            "total": int(total_count),
+            "total_amount": float(total_amount),
+        }

@@ -33,6 +33,11 @@ class PayablesService:
 
     async def create_payable(self, invoice: Invoice) -> Payable:
         """Create a payable record from an approved invoice."""
+        # Get job name if invoice has a matched job
+        job_name = None
+        if invoice.job:
+            job_name = invoice.job.name
+
         payable = Payable(
             invoice_id=invoice.id,
             vendor_name=invoice.vendor_name or "Unknown",
@@ -40,6 +45,10 @@ class PayablesService:
             due_date=invoice.due_date,
             status=PayableStatus.OUTSTANDING,
             user_id=self.user_id,
+            invoice_number=invoice.invoice_number,
+            job_name=job_name,
+            qbo_bill_id=invoice.qbo_bill_id,
+            qbo_vendor_id=invoice.qbo_vendor_id,
         )
         self.db.add(payable)
         await self.db.flush()
@@ -78,7 +87,8 @@ class PayablesService:
         result = await self.db.execute(
             select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
                 Payable.user_id == self.user_id,
-                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE])
+                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
+                Payable.included_in_cashflow == True,  # noqa: E712
             )
         )
         total_outstanding = result.scalar()
@@ -87,7 +97,8 @@ class PayablesService:
         result = await self.db.execute(
             select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
                 Payable.user_id == self.user_id,
-                Payable.status == PayableStatus.OVERDUE
+                Payable.status == PayableStatus.OVERDUE,
+                Payable.included_in_cashflow == True,  # noqa: E712
             )
         )
         total_overdue = result.scalar()

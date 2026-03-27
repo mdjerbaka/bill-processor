@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { payablesAPI } from '../services/api'
-import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon, LockClosedIcon, LockOpenIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon, LockClosedIcon, LockOpenIcon, ArrowUpTrayIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 import ContextMenu from '../components/ContextMenu'
 import toast from 'react-hot-toast'
 
@@ -222,6 +222,16 @@ export default function PayablesPage() {
     }
   }
 
+  async function handleToggleCashflow(payable) {
+    try {
+      const res = await payablesAPI.toggleCashflow(payable.id)
+      toast.success(res.data.included_in_cashflow ? 'Included in cash flow' : 'Excluded from cash flow')
+      loadData()
+    } catch {
+      toast.error('Failed to toggle cash flow')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -346,8 +356,15 @@ export default function PayablesPage() {
               const dueDate = p.due_date ? new Date(p.due_date) : null
               const daysUntil = dueDate ? Math.ceil((dueDate - new Date()) / 86400000) : null
               return (
-                <tr key={p.id} className={`${isOverdue ? 'bg-red-900/20' : ''} cursor-context-menu`} onContextMenu={(e) => contextMenu.show(e, p)}>
+                <tr key={p.id} className={`${isOverdue ? 'bg-red-900/20' : ''} ${!p.included_in_cashflow ? 'opacity-50' : ''} cursor-context-menu`} onContextMenu={(e) => contextMenu.show(e, p)}>
                   <td className="px-4 py-3 text-sm font-medium text-gray-200">
+                    <button
+                      onClick={() => handleToggleCashflow(p)}
+                      className={`inline-flex items-center mr-1.5 -mt-0.5 ${p.included_in_cashflow ? 'text-green-400 hover:text-green-300' : 'text-gray-600 hover:text-green-400'} transition-colors`}
+                      title={p.included_in_cashflow ? 'Click to exclude from cash flow' : 'Click to include in cash flow'}
+                    >
+                      {p.included_in_cashflow ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
+                    </button>
                     <button
                       onClick={() => handleTogglePermanent(p)}
                       className={`inline-flex items-center mr-1 -mt-0.5 ${p.is_permanent ? 'text-orange-400 hover:text-orange-300' : 'text-gray-600 hover:text-orange-400'} transition-colors`}

@@ -511,6 +511,111 @@ class QuickBooksService:
             logger.info(f"Auto-paid QBO bill {invoice.qbo_bill_id}, payment ID: {payment_id}")
         return payment_id
 
+    async def sync_customer_invoices(self, user_id: int) -> dict:
+        """Pull open customer invoices from QBO and sync into ReceivableCheck table.
+
+        Queries invoices with Balance > 0 (unpaid/partially paid).
+        Creates new ReceivableCheck entries or updates existing ones.
+        Returns counts of created, updated, and skipped records.
+        """
+        if not await self.is_connected():
+            return {"created": 0, "updated": 0, "skipped": 0, "error": "QuickBooks not connected"}
+
+        from app.models.models import ReceivableCheck
+
+        # Query open invoices from QB
+        result = await self._api_request(
+            "GET",
+            "query?query=SELECT * FROM Invoice WHERE Balance > '0' MAXRESULTS 1000"
+        )
+        if not result or "QueryResponse" not in result:
+            return {"created": 0, "updated": 0, "skipped": 0, "error": "Failed to query QB invoices"}
+
+        qb_invoices = result["QueryResponse"].get("Invoice", [])
+        if not qb_invoices:
+            return {"created": 0, "updated": 0, "skipped": 0}
+
+        created = 0
+        updated = 0
+        skipped = 0
+
+        for qb_inv in qb_invoices:
+            qbo_invoice_id = str(qb_inv.get("Id", ""))
+            if not qbo_invoice_id:
+                skipped += 1
+                continue
+
+            customer_name = ""
+            customer_ref = qb_inv.get("CustomerRef")
+            if customer_ref:
+                customer_name = customer_ref.get("name", "")
+
+            doc_number = qb_inv.get("DocNumber", "")
+            job_name = f"{customer_name} #{doc_number}".strip() if customer_name else doc_number
+
+            total_amt = float(qb_inv.get("TotalAmt", 0))
+            balance = float(qb_inv.get("Balance", 0))
+
+            # Parse dates
+            due_date = None
+            txn_date = None
+            if qb_inv.get("DueDate"):
+                try:
+                    due_date = datetime.strptime(qb_inv["DueDate"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError):
+                    pass
+            if qb_inv.get("TxnDate"):
+                try:
+                    txn_date = datetime.strptime(qb_inv["TxnDate"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError):
+                    pass
+
+            memo = ""
+            if qb_inv.get("CustomerMemo"):
+                memo = qb_inv["CustomerMemo"].get("value", "")
+
+            # Check if already exists
+            existing_result = await self.db.execute(
+                select(ReceivableCheck).where(
+                    ReceivableCheck.qbo_invoice_id == qbo_invoice_id,
+                    ReceivableCheck.user_id == user_id,
+                )
+            )
+            existing = existing_result.scalar_one_or_none()
+
+            if existing:
+                # Update if amount or dates changed
+                changed = False
+                if existing.invoiced_amount != total_amt:
+                    existing.invoiced_amount = total_amt
+                    changed = True
+                if due_date and existing.due_date != due_date:
+                    existing.due_date = due_date
+                    changed = True
+                if txn_date and existing.sent_date != txn_date:
+                    existing.sent_date = txn_date
+                    changed = True
+                if changed:
+                    updated += 1
+                else:
+                    skipped += 1
+            else:
+                check = ReceivableCheck(
+                    user_id=user_id,
+                    job_name=job_name or "Unknown",
+                    invoiced_amount=total_amt,
+                    collect=True,
+                    sent_date=txn_date,
+                    due_date=due_date,
+                    notes=memo or None,
+                    qbo_invoice_id=qbo_invoice_id,
+                )
+                self.db.add(check)
+                created += 1
+
+        await self.db.flush()
+        return {"created": created, "updated": updated, "skipped": skipped}
+
     async def get_vendors(self) -> list[dict]:
         """Fetch all vendors from QuickBooks."""
         result = await self._api_request(

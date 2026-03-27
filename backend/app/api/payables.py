@@ -67,9 +67,10 @@ async def list_payables(
             status=p.status.value,
             paid_at=p.paid_at,
             created_at=p.created_at,
-            invoice_number=inv.invoice_number if inv else None,
-            job_name=job.name if job else None,
+            invoice_number=p.invoice_number or (inv.invoice_number if inv else None),
+            job_name=p.job_name or (job.name if job else None),
             is_permanent=p.is_permanent,
+            included_in_cashflow=p.included_in_cashflow,
         )
         for p, inv, job in rows
     ]
@@ -95,6 +96,8 @@ async def create_payable(
         due_date=req.due_date,
         status=PayableStatus(req.status) if req.status else PayableStatus.OUTSTANDING,
         is_permanent=req.is_permanent if req.is_permanent else False,
+        included_in_cashflow=req.included_in_cashflow if req.included_in_cashflow is not None else True,
+        invoice_number=req.invoice_number,
         user_id=user.id,
     )
     db.add(payable)
@@ -111,6 +114,7 @@ async def create_payable(
         invoice_number=req.invoice_number,
         job_name=None,
         is_permanent=payable.is_permanent,
+        included_in_cashflow=payable.included_in_cashflow,
     )
 
 
@@ -166,10 +170,33 @@ async def update_payable(
         status=payable.status.value,
         paid_at=payable.paid_at,
         created_at=payable.created_at,
-        invoice_number=inv_number,
-        job_name=job_name,
+        invoice_number=payable.invoice_number or inv_number,
+        job_name=payable.job_name or job_name,
         is_permanent=payable.is_permanent,
+        included_in_cashflow=payable.included_in_cashflow,
     )
+
+
+@router.post("/{payable_id}/toggle-cashflow")
+async def toggle_payable_cashflow(
+    payable_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Toggle whether a payable is included in cash flow calculations."""
+    result = await db.execute(
+        select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
+    )
+    payable = result.scalar_one_or_none()
+    if not payable:
+        raise HTTPException(status_code=404, detail="Payable not found")
+
+    payable.included_in_cashflow = not payable.included_in_cashflow
+    await db.flush()
+    return {
+        "detail": f"Payable {'included in' if payable.included_in_cashflow else 'excluded from'} cash flow",
+        "included_in_cashflow": payable.included_in_cashflow,
+    }
 
 
 @router.post("/{payable_id}/mark-paid")

@@ -20,6 +20,7 @@ from app.schemas.schemas import (
     PaymentOutListResponse,
     PaymentOutSchema,
     PaymentOutUpdate,
+    CombinedPaymentListResponse,
 )
 from app.services.payments_out_service import PaymentsOutService
 
@@ -75,6 +76,26 @@ async def list_cleared_payments(
     items = [_to_schema(p) for p in payments]
     total_cleared = sum(p.amount for p in payments)
     return PaymentOutListResponse(items=items, total=total_cleared, total_outstanding=0)
+
+
+@router.get("/all-history", response_model=CombinedPaymentListResponse)
+async def all_payment_history(
+    search: Optional[str] = Query(None, description="Search vendor, reference, job, notes"),
+    start_date: Optional[str] = Query(None, description="ISO date YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="ISO date YYYY-MM-DD"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Combined history of all payments: cleared PaymentOuts, paid Payables, paid BillOccurrences."""
+    svc = PaymentsOutService(db, user.id)
+    sd = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc) if start_date else None
+    ed = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) if end_date else None
+    result = await svc.get_combined_payment_history(
+        search=search, start_date=sd, end_date=ed, page=page, per_page=per_page,
+    )
+    return CombinedPaymentListResponse(**result)
 
 
 @router.get("/total-outstanding")

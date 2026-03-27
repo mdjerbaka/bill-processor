@@ -581,10 +581,35 @@ async def send_daily_digest(ctx: dict) -> dict:
     return {"sent": sent_count}
 
 
+async def sync_qb_receivables(ctx: dict) -> dict:
+    """Cron: Sync customer invoices from QuickBooks into receivables every 5 minutes."""
+    async with async_session_factory() as db:
+        users_result = await db.execute(select(User))
+        users = users_result.scalars().all()
+        total_created = 0
+        total_updated = 0
+
+        for u in users:
+            qb_svc = QuickBooksService(db, u.id)
+            try:
+                result = await qb_svc.sync_customer_invoices(u.id)
+                total_created += result.get("created", 0)
+                total_updated += result.get("updated", 0)
+            except Exception:
+                # QB not connected or token expired — skip this user
+                continue
+
+        await db.commit()
+
+    if total_created == 0 and total_updated == 0:
+        return {"skipped": True, "reason": "No new QB invoices"}
+    return {"created": total_created, "updated": total_updated}
+
+
 class WorkerSettings:
     """ARQ worker configuration."""
 
-    functions = [poll_email_inbox, process_email_attachments, generate_bill_occurrences, send_daily_digest]
+    functions = [poll_email_inbox, process_email_attachments, generate_bill_occurrences, send_daily_digest, sync_qb_receivables]
 
     cron_jobs = [
         cron(
@@ -601,6 +626,10 @@ class WorkerSettings:
             send_daily_digest,
             hour={12},
             minute={0},
+        ),
+        cron(
+            sync_qb_receivables,
+            minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55},
         ),
     ]
 

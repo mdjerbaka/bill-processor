@@ -13,6 +13,7 @@ from sqlalchemy.orm import joinedload
 from app.api.auth import get_current_user
 from app.core.database import get_db
 from app.models.models import (
+    Attachment,
     Invoice,
     InvoiceLineItem,
     InvoiceStatus,
@@ -250,13 +251,13 @@ async def update_invoice(
     return _invoice_to_schema(invoice)
 
 
-@router.post("/{invoice_id}/approve", response_model=InvoiceSchema)
+@router.post("/{invoice_id}/approve")
 async def approve_invoice(
     invoice_id: int,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Approve an invoice and create a payable entry."""
+    """Approve an invoice, create a payable entry, then permanently delete the invoice."""
     result = await db.execute(
         select(Invoice)
         .options(joinedload(Invoice.job), joinedload(Invoice.line_items))
@@ -286,9 +287,14 @@ async def approve_invoice(
         existing_payable.vendor_name = invoice.vendor_name or "Unknown"
         existing_payable.amount = invoice.total_amount or 0.0
         existing_payable.due_date = invoice.due_date
+        existing_payable.invoice_number = invoice.invoice_number
+        existing_payable.job_name = invoice.job.name if invoice.job else None
+        existing_payable.qbo_bill_id = invoice.qbo_bill_id
+        existing_payable.qbo_vendor_id = invoice.qbo_vendor_id
+        payable = existing_payable
     else:
         payables_svc = PayablesService(db, user.id)
-        await payables_svc.create_payable(invoice)
+        payable = await payables_svc.create_payable(invoice)
 
     await db.flush()
 
@@ -298,23 +304,43 @@ async def approve_invoice(
         if await qb_svc.is_connected() and not invoice.qbo_bill_id:
             bill_id, vendor_id = await qb_svc.auto_send_bill(invoice)
             if bill_id:
-                invoice.qbo_bill_id = bill_id
-                invoice.qbo_vendor_id = vendor_id
-                invoice.status = InvoiceStatus.SENT_TO_QB
+                # Copy QB IDs to payable (invoice will be deleted)
+                payable.qbo_bill_id = bill_id
+                payable.qbo_vendor_id = vendor_id
                 await db.flush()
                 logger.info(f"Auto-sent invoice {invoice.id} to QB as bill {bill_id}")
     except Exception as e:
         logger.error(f"Auto-send to QB failed for invoice {invoice.id}: {e}")
         # Don't fail the approval — QB sync is best-effort
 
-    # Re-fetch with relationships for response
-    result = await db.execute(
-        select(Invoice)
-        .options(joinedload(Invoice.job), joinedload(Invoice.line_items))
-        .where(Invoice.id == invoice_id, Invoice.user_id == user.id)
-    )
-    invoice = result.unique().scalar_one_or_none()
-    return _invoice_to_schema(invoice)
+    # Detach payable from invoice before deletion
+    payable.invoice_id = None
+    await db.flush()
+
+    # Delete attachment file from disk if present
+    if invoice.attachment_id:
+        att_result = await db.execute(
+            select(Attachment).where(Attachment.id == invoice.attachment_id)
+        )
+        attachment = att_result.scalar_one_or_none()
+        if attachment and attachment.file_path:
+            import os
+            try:
+                if os.path.exists(attachment.file_path):
+                    os.remove(attachment.file_path)
+            except OSError:
+                logger.warning(f"Could not delete attachment file: {attachment.file_path}")
+
+    # Hard-delete the invoice (cascades to line items)
+    await db.delete(invoice)
+    await db.flush()
+
+    return {
+        "detail": "Invoice approved and moved to payables",
+        "payable_id": payable.id,
+        "vendor_name": payable.vendor_name,
+        "amount": payable.amount,
+    }
 
 
 @router.get("/{invoice_id}/match-suggestions", response_model=list[JobMatchSuggestion])

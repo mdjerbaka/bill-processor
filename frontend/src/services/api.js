@@ -82,6 +82,7 @@ export const payablesAPI = {
   markPaid: (id, body) => api.post(`/payables/${id}/mark-paid`, body || null),
   junk: (id) => api.post(`/payables/${id}/junk`),
   restore: (id) => api.post(`/payables/${id}/restore`),
+  toggleCashflow: (id) => api.post(`/payables/${id}/toggle-cashflow`),
   setBankBalance: (balance) => api.post('/payables/bank-balance', { bank_balance: balance }),
   setBuffer: (buffer) => api.post('/payables/buffer', { buffer }),
   getRealBalance: () => api.get('/payables/real-balance'),
@@ -195,6 +196,7 @@ export const receivablesAPI = {
   deleteAll: () => api.delete('/receivables/all'),
   toggleCollect: (id) => api.post(`/receivables/${id}/toggle-collect`),
   getTotals: () => api.get('/receivables/totals'),
+  syncQuickbooks: () => api.post('/receivables/sync-quickbooks'),
   importCSV: (file) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -213,6 +215,7 @@ export const paymentsOutAPI = {
   delete: (id) => api.delete(`/payments-out/${id}`),
   markCleared: (id) => api.post(`/payments-out/${id}/mark-cleared`),
   totalOutstanding: () => api.get('/payments-out/total-outstanding'),
+  allHistory: (params) => api.get('/payments-out/all-history', { params }),
   importCSV: (file) => {
     const formData = new FormData()
     formData.append('file', file)

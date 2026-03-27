@@ -80,9 +80,9 @@ export default function InvoiceDetailPage() {
 
   async function handleApprove() {
     try {
-      const res = await invoicesAPI.approve(id)
-      setInvoice(res.data)
-      toast.success('Invoice approved and added to payables')
+      await invoicesAPI.approve(id)
+      toast.success('Invoice approved and moved to payables')
+      navigate('/invoices')
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to approve')
     }

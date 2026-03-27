@@ -17,6 +17,7 @@ import {
   XMarkIcon,
   DocumentCheckIcon,
   BanknotesIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline'
 
 const navigation = [
@@ -24,6 +25,7 @@ const navigation = [
   { name: 'Invoices', href: '/invoices', icon: InboxIcon },
   { name: 'Payables', href: '/payables', icon: CurrencyDollarIcon },
   { name: 'Payments Out', href: '/payments-out', icon: BanknotesIcon },
+  { name: 'Payment History', href: '/payment-history', icon: ClockIcon },
   { name: 'Bills', href: '/bills', icon: CalendarDaysIcon },
   { name: 'Receivables', href: '/receivables', icon: DocumentCheckIcon },
   { name: 'Jobs', href: '/jobs', icon: WrenchScrewdriverIcon },
