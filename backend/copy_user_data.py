@@ -18,9 +18,9 @@ async def main():
         invoice_map = {}
         payable_map = {}
 
-        # 1. AppSettings
+        # 1. AppSettings - copy all columns
         rows = (await db.execute(text(
-            "SELECT key, value, is_encrypted FROM app_settings WHERE user_id = 2"
+            "SELECT key, value, is_encrypted, updated_at FROM app_settings WHERE user_id = 2"
         ))).fetchall()
         for r in rows:
             exists = (await db.execute(text(
@@ -28,11 +28,13 @@ async def main():
             ), {"k": r[0]})).fetchone()
             if exists:
                 await db.execute(text(
-                    "UPDATE app_settings SET value = :v, is_encrypted = :enc WHERE user_id = 1 AND key = :k"
-                ), {"v": r[1], "k": r[0], "enc": r[2]})
+                    "UPDATE app_settings SET value = :v, is_encrypted = :enc, updated_at = :u "
+                    "WHERE user_id = 1 AND key = :k"
+                ), {"v": r[1], "k": r[0], "enc": r[2], "u": r[3]})
             else:
                 await db.execute(text(
-                    "INSERT INTO app_settings (key, value, user_id, is_encrypted) VALUES (:k, :v, 1, :enc)"
+                    "INSERT INTO app_settings (key, value, user_id, is_encrypted, updated_at) "
+                    "VALUES (:k, :v, 1, :enc, NOW())"
                 ), {"k": r[0], "v": r[1], "enc": r[2]})
         print(f"Copied {len(rows)} app_settings")
 
