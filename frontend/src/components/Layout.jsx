@@ -109,7 +109,8 @@ export default function Layout() {
               </p>
               <div className="mt-1 text-xs text-gray-500 space-y-0.5">
                 <p>Bank: ${parseFloat(balance.bank_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                <p>Outstanding: ${parseFloat(balance.total_outstanding).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                <p>Receivables: +${parseFloat(balance.total_receivables || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                <p>Outstanding: -${parseFloat(balance.total_outstanding).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
           )}

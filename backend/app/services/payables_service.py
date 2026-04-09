@@ -119,7 +119,10 @@ class PayablesService:
         }
 
     async def get_real_balance(self) -> dict:
-        """Calculate real available funds."""
+        """Calculate real available funds.
+
+        Formula: bank + receivables (collect) - outstanding payables - buffer
+        """
         # Get current bank balance from settings
         result = await self.db.execute(
             select(AppSetting).where(AppSetting.key == "bank_balance", AppSetting.user_id == self.user_id)
@@ -136,11 +139,23 @@ class PayablesService:
 
         summary = await self.get_payables_summary()
 
+        # Get total receivables expected to collect
+        from app.models.models import ReceivableCheck
+        recv_result = await self.db.execute(
+            select(func.coalesce(func.sum(ReceivableCheck.invoiced_amount), 0.0))
+            .where(
+                ReceivableCheck.user_id == self.user_id,
+                ReceivableCheck.collect == True,  # noqa: E712
+            )
+        )
+        total_receivables = float(recv_result.scalar() or 0.0)
+
         return {
             "bank_balance": bank_balance,
             "total_outstanding": summary["total_outstanding"],
+            "total_receivables": total_receivables,
             "buffer": buffer,
-            "real_available": bank_balance - summary["total_outstanding"] - buffer,
+            "real_available": bank_balance + total_receivables - summary["total_outstanding"] - buffer,
         }
 
     async def export_to_excel(self) -> bytes:
@@ -234,12 +249,16 @@ class PayablesService:
         bal_cell = ws.cell(row=summary_row + 1, column=2, value=balance_data["bank_balance"])
         bal_cell.number_format = money_format
 
-        ws.cell(row=summary_row + 2, column=1, value="Total Outstanding Payables")
-        out_cell = ws.cell(row=summary_row + 2, column=2, value=balance_data["total_outstanding"])
+        ws.cell(row=summary_row + 2, column=1, value="Receivables (Collect)")
+        recv_cell = ws.cell(row=summary_row + 2, column=2, value=balance_data["total_receivables"])
+        recv_cell.number_format = money_format
+
+        ws.cell(row=summary_row + 3, column=1, value="Total Outstanding Payables")
+        out_cell = ws.cell(row=summary_row + 3, column=2, value=balance_data["total_outstanding"])
         out_cell.number_format = money_format
 
-        ws.cell(row=summary_row + 3, column=1, value="Real Available Funds").font = Font(bold=True)
-        real_cell = ws.cell(row=summary_row + 3, column=2, value=balance_data["real_available"])
+        ws.cell(row=summary_row + 4, column=1, value="Real Available Funds").font = Font(bold=True)
+        real_cell = ws.cell(row=summary_row + 4, column=2, value=balance_data["real_available"])
         real_cell.number_format = money_format
         real_cell.font = Font(bold=True, size=12)
 
