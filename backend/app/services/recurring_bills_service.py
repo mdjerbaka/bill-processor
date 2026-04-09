@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone, date
 from typing import Optional
 
-from sqlalchemy import select, func, and_, or_, delete
+from sqlalchemy import select, func, and_, or_, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -245,6 +245,17 @@ class RecurringBillsService:
                 else:
                     setattr(bill, key, value)
 
+        # If included_in_cashflow changed, propagate to upcoming/due_soon occurrences
+        if "included_in_cashflow" in data and data["included_in_cashflow"] is not None:
+            await self.db.execute(
+                update(BillOccurrence)
+                .where(
+                    BillOccurrence.recurring_bill_id == bill_id,
+                    BillOccurrence.status.in_([OccurrenceStatus.UPCOMING, OccurrenceStatus.DUE_SOON]),
+                )
+                .values(included_in_cashflow=data["included_in_cashflow"])
+            )
+
         # Recompute next due date
         bill.next_due_date = _compute_next_due_date(
             bill.frequency, bill.due_day_of_month, bill.due_month, custom_months=bill.custom_months
@@ -323,6 +334,7 @@ class RecurringBillsService:
                     due_date=due_dt,
                     amount=bill.amount,
                     status=OccurrenceStatus.UPCOMING,
+                    included_in_cashflow=bill.included_in_cashflow,
                 )
                 self.db.add(occ)
                 created_count += 1

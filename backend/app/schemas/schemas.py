@@ -285,6 +285,7 @@ class RecurringBillCreate(BaseModel):
     category: str = "other"
     notes: Optional[str] = None
     is_auto_pay: bool = False
+    included_in_cashflow: bool = True
     alert_days_before: int = Field(default=7, ge=1, le=90)
 
 
@@ -299,6 +300,7 @@ class RecurringBillUpdate(BaseModel):
     category: Optional[str] = None
     notes: Optional[str] = None
     is_auto_pay: Optional[bool] = None
+    included_in_cashflow: Optional[bool] = None
     alert_days_before: Optional[int] = Field(default=None, ge=1, le=90)
 
 
@@ -315,6 +317,7 @@ class RecurringBillSchema(BaseModel):
     notes: Optional[str] = None
     is_auto_pay: bool
     is_active: bool
+    included_in_cashflow: bool = True
     next_due_date: Optional[datetime] = None
     alert_days_before: int
     created_at: datetime

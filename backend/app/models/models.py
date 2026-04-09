@@ -372,6 +372,7 @@ class RecurringBill(Base):
     next_due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     alert_days_before: Mapped[int] = mapped_column(Integer, default=7)
     custom_months: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # e.g. [1,4,8,10] for custom frequency
+    included_in_cashflow: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

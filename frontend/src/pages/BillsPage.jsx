@@ -19,6 +19,7 @@ import {
   CheckCircleIcon,
   ChevronUpDownIcon,
   InformationCircleIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline'
 
 const FREQUENCY_OPTIONS = [
@@ -124,6 +125,7 @@ const emptyForm = {
   category: 'other',
   notes: '',
   is_auto_pay: false,
+  included_in_cashflow: true,
   alert_days_before: 7,
   custom_months: [],
 }
@@ -288,6 +290,7 @@ export default function BillsPage() {
       category: bill.category,
       notes: bill.notes || '',
       is_auto_pay: bill.is_auto_pay,
+      included_in_cashflow: bill.included_in_cashflow ?? true,
       alert_days_before: bill.alert_days_before,
       custom_months: bill.custom_months || [],
     })
@@ -405,6 +408,24 @@ export default function BillsPage() {
         o.id === occurrenceId ? { ...o, included_in_cashflow: res.data.included_in_cashflow } : o
       ))
       refreshCashFlow()
+    } catch {
+      toast.error('Failed to toggle cash flow inclusion')
+    }
+  }
+
+  async function handleToggleBillCashflow(billId) {
+    try {
+      const bill = bills.find(b => b.id === billId)
+      if (!bill) return
+      const res = await recurringBillsAPI.update(billId, { included_in_cashflow: !bill.included_in_cashflow })
+      setBills(prev => prev.map(b => b.id === billId ? { ...b, included_in_cashflow: res.data.included_in_cashflow } : b))
+      // Also update occurrences in-place
+      setOccurrences(prev => prev.map(o =>
+        o.recurring_bill_id === billId && (o.status === 'upcoming' || o.status === 'due_soon')
+          ? { ...o, included_in_cashflow: res.data.included_in_cashflow } : o
+      ))
+      refreshCashFlow()
+      toast.success(res.data.included_in_cashflow ? 'Bill included in cash flow' : 'Bill excluded from cash flow')
     } catch {
       toast.error('Failed to toggle cash flow inclusion')
     }
@@ -1087,6 +1108,9 @@ export default function BillsPage() {
                         {bill.is_auto_pay && (
                           <span className="text-xs bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded">auto</span>
                         )}
+                        {!bill.included_in_cashflow && (
+                          <span className="text-xs bg-yellow-900/50 text-yellow-400 px-1.5 py-0.5 rounded">excluded from cash flow</span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500">
                         {bill.vendor_name} · {fmt(bill.amount)} · {bill.frequency.replace(/_/g, ' ')} · Day {bill.due_day_of_month}
@@ -1100,6 +1124,13 @@ export default function BillsPage() {
                           Next: {new Date(bill.next_due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
                       )}
+                      <button
+                        onClick={() => handleToggleBillCashflow(bill.id)}
+                        title={bill.included_in_cashflow ? 'Exclude from cash flow' : 'Include in cash flow'}
+                        className={`p-1.5 transition-colors ${bill.included_in_cashflow ? 'text-green-400 hover:text-yellow-400' : 'text-yellow-400 hover:text-green-400'}`}
+                      >
+                        <CurrencyDollarIcon className="h-4 w-4" />
+                      </button>
                       <button onClick={() => openEditForm(bill)} className="p-1.5 text-gray-400 hover:text-blue-400 transition-colors">
                         <PencilIcon className="h-4 w-4" />
                       </button>
@@ -1263,6 +1294,15 @@ export default function BillsPage() {
                     className="rounded bg-gray-700 border-gray-600"
                   />
                   Auto-Pay (auto-withdrawal)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={form.included_in_cashflow}
+                    onChange={(e) => setForm({ ...form, included_in_cashflow: e.target.checked })}
+                    className="rounded bg-gray-700 border-gray-600"
+                  />
+                  Include in Cash Flow
                 </label>
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-gray-400">Alert</label>
