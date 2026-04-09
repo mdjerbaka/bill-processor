@@ -6,15 +6,14 @@ import SetupWizard from './pages/SetupWizard'
 import DashboardPage from './pages/DashboardPage'
 import InvoiceListPage from './pages/InvoiceListPage'
 import InvoiceDetailPage from './pages/InvoiceDetailPage'
+import InvoicesReviewPage from './pages/InvoicesReviewPage'
 import PayablesPage from './pages/PayablesPage'
 import PaymentsOutPage from './pages/PaymentsOutPage'
 import PaymentHistoryPage from './pages/PaymentHistoryPage'
 import BillsPage from './pages/BillsPage'
 import ReceivablesPage from './pages/ReceivablesPage'
-import JobsPage from './pages/JobsPage'
 import SettingsPage from './pages/SettingsPage'
 import JunkBinPage from './pages/JunkBinPage'
-import HelpPage from './pages/HelpPage'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -57,15 +56,14 @@ function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="invoices" element={<InvoiceListPage />} />
         <Route path="invoices/:id" element={<InvoiceDetailPage />} />
+        <Route path="invoices-review" element={<InvoicesReviewPage />} />
         <Route path="payables" element={<PayablesPage />} />
         <Route path="payments-out" element={<PaymentsOutPage />} />
         <Route path="payment-history" element={<PaymentHistoryPage />} />
         <Route path="bills" element={<BillsPage />} />
         <Route path="receivables" element={<ReceivablesPage />} />
-        <Route path="jobs" element={<JobsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="junk" element={<JunkBinPage />} />
-        <Route path="help" element={<HelpPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

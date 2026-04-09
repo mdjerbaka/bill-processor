@@ -15,6 +15,8 @@ from app.api.auth import get_current_user
 from app.core.database import get_db
 from app.models.models import User
 from app.schemas.schemas import (
+    AgingSummaryResponse,
+    AgingCustomerRow,
     ReceivableCheckCreate,
     ReceivableCheckListResponse,
     ReceivableCheckSchema,
@@ -129,6 +131,42 @@ async def delete_all_receivable_checks(
     count = await svc.delete_all()
     await db.commit()
     return {"detail": f"Deleted {count} receivable checks"}
+
+
+@router.get("/aging-summary", response_model=AgingSummaryResponse)
+async def get_aging_summary(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get A/R Aging Summary grouped by customer (split on '#' in job_name)."""
+    svc = ReceivableChecksService(db, user.id)
+    checks = await svc.list_checks()
+
+    from collections import OrderedDict
+    customer_map: dict[str, list] = OrderedDict()
+    for c in checks:
+        # Parse customer name: everything before '#' is the customer
+        name = c.job_name or ""
+        if "#" in name:
+            customer_name = name.split("#")[0].strip()
+        else:
+            customer_name = name.strip() or "Unknown"
+        if not customer_name:
+            customer_name = "Unknown"
+        customer_map.setdefault(customer_name, []).append(c)
+
+    customers = []
+    grand_total = 0.0
+    for cust_name, cust_checks in customer_map.items():
+        total = sum(c.invoiced_amount for c in cust_checks)
+        grand_total += total
+        customers.append(AgingCustomerRow(
+            customer_name=cust_name,
+            invoices=[ReceivableCheckSchema.model_validate(c) for c in cust_checks],
+            total=total,
+        ))
+
+    return AgingSummaryResponse(customers=customers, grand_total=grand_total)
 
 
 @router.post("/sync-quickbooks")

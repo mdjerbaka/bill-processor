@@ -33,6 +33,7 @@ def _compute_next_due_date(
     due_day: Optional[int],
     due_month: Optional[int] = None,
     after: Optional[datetime] = None,
+    custom_months: Optional[list[int]] = None,
 ) -> datetime:
     """Compute the next due date for a recurring bill based on frequency."""
     now = after or datetime.now(timezone.utc)
@@ -97,6 +98,18 @@ def _compute_next_due_date(
             candidate = _safe_date(today.year + 2, month, due_day)
         return datetime(candidate.year, candidate.month, candidate.day, tzinfo=timezone.utc)
 
+    if frequency == BillFrequency.CUSTOM:
+        months = sorted(custom_months or [])
+        if not months:
+            return datetime(today.year, today.month, due_day or 1, tzinfo=timezone.utc)
+        for year_offset in range(3):
+            y = today.year + year_offset
+            for m in months:
+                candidate = _safe_date(y, m, due_day or 1)
+                if candidate > today:
+                    return datetime(candidate.year, candidate.month, candidate.day, tzinfo=timezone.utc)
+        return datetime(today.year + 3, months[0], due_day or 1, tzinfo=timezone.utc)
+
     # Default fallback
     return datetime(today.year, today.month, due_day, tzinfo=timezone.utc)
 
@@ -107,6 +120,7 @@ def _generate_dates_in_range(
     due_month: Optional[int],
     start: date,
     end: date,
+    custom_months: Optional[list[int]] = None,
 ) -> list[date]:
     """Generate all occurrence dates within [start, end] for the given frequency."""
     dates = []
@@ -167,6 +181,14 @@ def _generate_dates_in_range(
             if start <= candidate <= end:
                 dates.append(candidate)
 
+    elif frequency == BillFrequency.CUSTOM:
+        months = sorted(custom_months or [])
+        for year in range(start.year, end.year + 1):
+            for m in months:
+                candidate = _safe_date(year, m, due_day or 1)
+                if start <= candidate <= end:
+                    dates.append(candidate)
+
     return dates
 
 
@@ -191,6 +213,7 @@ class RecurringBillsService:
             frequency=freq,
             due_day_of_month=data["due_day_of_month"],
             due_month=data.get("due_month"),
+            custom_months=data.get("custom_months"),
             category=cat,
             notes=data.get("notes"),
             is_auto_pay=data.get("is_auto_pay", False),
@@ -198,7 +221,7 @@ class RecurringBillsService:
             user_id=self.user_id,
         )
         bill.next_due_date = _compute_next_due_date(
-            freq, bill.due_day_of_month, bill.due_month
+            freq, bill.due_day_of_month, bill.due_month, custom_months=bill.custom_months
         )
         self.db.add(bill)
         await self.db.flush()
@@ -224,7 +247,7 @@ class RecurringBillsService:
 
         # Recompute next due date
         bill.next_due_date = _compute_next_due_date(
-            bill.frequency, bill.due_day_of_month, bill.due_month
+            bill.frequency, bill.due_day_of_month, bill.due_month, custom_months=bill.custom_months
         )
         await self.db.flush()
         return bill
@@ -280,7 +303,8 @@ class RecurringBillsService:
 
         for bill in bills:
             dates = _generate_dates_in_range(
-                bill.frequency, bill.due_day_of_month, bill.due_month, today, end_date
+                bill.frequency, bill.due_day_of_month, bill.due_month, today, end_date,
+                custom_months=bill.custom_months,
             )
             for d in dates:
                 due_dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
@@ -305,7 +329,7 @@ class RecurringBillsService:
 
             # Update next_due_date on the bill
             bill.next_due_date = _compute_next_due_date(
-                bill.frequency, bill.due_day_of_month, bill.due_month
+                bill.frequency, bill.due_day_of_month, bill.due_month, custom_months=bill.custom_months
             )
 
         await self.db.flush()

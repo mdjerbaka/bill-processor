@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.security import decrypt_value
-from app.models.models import AppSetting, Attachment, Email, EmailStatus
+from app.models.models import AppSetting, Attachment, Email, EmailStatus, Notification, NotificationType
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -136,7 +136,17 @@ class EmailService:
                             has_body = True
 
                     if not has_attachment and not has_body:
-                        # Skip emails without attachments or meaningful body
+                        # Create notification for email without supported attachment
+                        from_addr_notify = self._decode_header(msg.get("From", ""))
+                        subject_notify = self._decode_header(msg.get("Subject", ""))
+                        notification = Notification(
+                            user_id=self.user_id,
+                            type=NotificationType.EMAIL_NO_ATTACHMENT,
+                            title="Email without attachment",
+                            message=f"From: {from_addr_notify}\nSubject: {subject_notify}",
+                        )
+                        self.db.add(notification)
+                        await self.db.flush()
                         client.add_flags([uid], [b"\\Seen"])
                         continue
 

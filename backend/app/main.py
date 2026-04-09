@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import init_db, get_db, async_session_factory
-from app.api import auth, invoices, jobs, payables, settings as settings_router, quickbooks, junk, microsoft, recurring_bills, notifications, receivables, payments_out
+from app.api import auth, invoices, jobs, payables, settings as settings_router, quickbooks, junk, microsoft, recurring_bills, notifications, receivables, payments_out, vendor_accounts
 from app.api.auth import get_current_user
 from app.models.models import AppSetting, User
 
@@ -78,6 +78,7 @@ app.include_router(recurring_bills.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(receivables.router, prefix="/api/v1")
 app.include_router(payments_out.router, prefix="/api/v1")
+app.include_router(vendor_accounts.router, prefix="/api/v1")
 
 
 # ── Health check ─────────────────────────────────────────

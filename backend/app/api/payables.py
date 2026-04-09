@@ -354,6 +354,39 @@ async def get_real_balance(
     return RealBalanceResponse(**balance)
 
 
+@router.get("/combined-total")
+async def get_combined_total(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get combined total of outstanding payables + upcoming recurring bill occurrences (included in cashflow)."""
+    from app.models.models import BillOccurrence, OccurrenceStatus, RecurringBill
+    svc = PayablesService(db, user.id)
+    summary = await svc.get_payables_summary()
+
+    # Sum bill occurrences that are upcoming/due_soon/overdue and included in cashflow
+    bills_result = await db.execute(
+        select(func.coalesce(func.sum(BillOccurrence.amount), 0.0))
+        .join(RecurringBill)
+        .where(
+            RecurringBill.user_id == user.id,
+            BillOccurrence.status.in_([
+                OccurrenceStatus.UPCOMING,
+                OccurrenceStatus.DUE_SOON,
+                OccurrenceStatus.OVERDUE,
+            ]),
+            BillOccurrence.included_in_cashflow == True,
+        )
+    )
+    bills_total = float(bills_result.scalar() or 0.0)
+
+    return {
+        "payables_outstanding": summary["total_outstanding"],
+        "bills_outstanding": bills_total,
+        "combined_total": summary["total_outstanding"] + bills_total,
+    }
+
+
 @router.get("/export")
 async def export_payables_excel(
     db: AsyncSession = Depends(get_db),

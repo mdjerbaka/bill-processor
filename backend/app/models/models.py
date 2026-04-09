@@ -67,6 +67,7 @@ class BillFrequency(str, enum.Enum):
     SEMI_ANNUAL = "semi_annual"
     ANNUAL = "annual"
     BIENNIAL = "biennial"
+    CUSTOM = "custom"
 
 
 class BillCategory(str, enum.Enum):
@@ -110,6 +111,7 @@ class NotificationType(str, enum.Enum):
     BILL_CREDIT_DANGER = "bill_credit_danger"
     DAILY_DIGEST = "daily_digest"
     BALANCE_LOW = "balance_low"
+    EMAIL_NO_ATTACHMENT = "email_no_attachment"
 
 
 class PaymentMethod(str, enum.Enum):
@@ -369,6 +371,7 @@ class RecurringBill(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     next_due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     alert_days_before: Mapped[int] = mapped_column(Integer, default=7)
+    custom_months: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # e.g. [1,4,8,10] for custom frequency
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -448,5 +451,23 @@ class PaymentOut(Base):
     status: Mapped[PaymentOutStatus] = mapped_column(Enum(PaymentOutStatus), default=PaymentOutStatus.OUTSTANDING)
     cleared_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     payable_id: Mapped[Optional[int]] = mapped_column(ForeignKey("payables.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ── Vendor Account (Top Vendor Accounts) ─────────────────
+class VendorAccount(Base):
+    __tablename__ = "vendor_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    vendor_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    account_info: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    as_of_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    notes_due_dates: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    links: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

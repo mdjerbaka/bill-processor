@@ -32,10 +32,8 @@ function StatCard({ title, value, icon: Icon, color, link }) {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
-    totalInvoices: 0,
     needsReview: 0,
-    outstanding: 0,
-    overdue: 0,
+    combinedOutstanding: 0,
     realBalance: null,
     billsDueSoon: 0,
     billsOverdue: 0,
@@ -58,27 +56,24 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
     try {
-      const [invoicesRes, payablesRes, balanceRes, healthRes, cashFlowRes, qbRes] = await Promise.allSettled([
+      const [invoicesRes, balanceRes, healthRes, cashFlowRes, qbRes, combinedRes] = await Promise.allSettled([
         invoicesAPI.list({ page: 1, page_size: 15 }),
-        payablesAPI.list(),
         payablesAPI.getRealBalance(),
         healthAPI.check(),
         recurringBillsAPI.getCashFlow(),
         quickbooksAPI.status(),
+        payablesAPI.getCombinedTotal(),
       ])
 
       if (invoicesRes.status === 'fulfilled') {
         const data = invoicesRes.value.data
         setRecentInvoices(data.items)
-        setStats((s) => ({ ...s, totalInvoices: data.total }))
       }
 
-      if (payablesRes.status === 'fulfilled') {
-        const data = payablesRes.value.data
+      if (combinedRes.status === 'fulfilled') {
         setStats((s) => ({
           ...s,
-          outstanding: data.total_outstanding,
-          overdue: data.total_overdue,
+          combinedOutstanding: combinedRes.value.data.combined_total || 0,
         }))
       }
 
@@ -180,24 +175,17 @@ export default function DashboardPage() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <StatCard
-          title="Total Invoices"
-          value={stats.totalInvoices}
-          icon={InboxIcon}
-          color="bg-blue-500"
-          link="/invoices"
-        />
-        <StatCard
-          title="Needs Review"
+          title="Invoices to Review"
           value={stats.needsReview}
           icon={ExclamationTriangleIcon}
           color="bg-yellow-500"
-          link="/invoices?status=needs_review"
+          link="/invoices-review"
         />
         <StatCard
           title="Outstanding Payables"
-          value={`$${stats.outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={`$${stats.combinedOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
           icon={CurrencyDollarIcon}
           color="bg-red-500"
           link="/payables"

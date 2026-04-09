@@ -278,9 +278,10 @@ class RecurringBillCreate(BaseModel):
     name: str = Field(min_length=1, max_length=500)
     vendor_name: str = Field(min_length=1, max_length=500)
     amount: float = Field(gt=0)
-    frequency: str  # weekly, monthly, quarterly, semi_annual, annual, biennial
+    frequency: str  # weekly, monthly, quarterly, semi_annual, annual, biennial, custom
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
     due_month: Optional[int] = Field(default=None, ge=1, le=12)
+    custom_months: Optional[List[int]] = None  # e.g. [1, 4, 8, 10] for Jan/Apr/Aug/Oct
     category: str = "other"
     notes: Optional[str] = None
     is_auto_pay: bool = False
@@ -294,6 +295,7 @@ class RecurringBillUpdate(BaseModel):
     frequency: Optional[str] = None
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
     due_month: Optional[int] = Field(default=None, ge=1, le=12)
+    custom_months: Optional[List[int]] = None
     category: Optional[str] = None
     notes: Optional[str] = None
     is_auto_pay: Optional[bool] = None
@@ -308,6 +310,7 @@ class RecurringBillSchema(BaseModel):
     frequency: str
     due_day_of_month: Optional[int] = None
     due_month: Optional[int] = None
+    custom_months: Optional[List[int]] = None
     category: str
     notes: Optional[str] = None
     is_auto_pay: bool
@@ -496,3 +499,61 @@ class CombinedPaymentListResponse(BaseModel):
     items: List[CombinedPaymentSchema]
     total: int
     total_amount: float
+
+
+# ── Vendor Accounts ──────────────────────────────────────
+class VendorAccountCreate(BaseModel):
+    vendor_name: str = Field(min_length=1, max_length=500)
+    account_info: Optional[str] = None
+    as_of_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    amount: float = 0.0
+    notes_due_dates: Optional[str] = None
+    links: Optional[str] = None
+    sort_order: int = 0
+
+
+class VendorAccountUpdate(BaseModel):
+    vendor_name: Optional[str] = Field(default=None, max_length=500)
+    account_info: Optional[str] = None
+    as_of_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    amount: Optional[float] = None
+    notes_due_dates: Optional[str] = None
+    links: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class VendorAccountSchema(BaseModel):
+    id: int
+    vendor_name: str
+    account_info: Optional[str] = None
+    as_of_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    amount: float
+    notes_due_dates: Optional[str] = None
+    links: Optional[str] = None
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VendorAccountListResponse(BaseModel):
+    items: List[VendorAccountSchema]
+    total: int
+    total_amount: float
+
+
+# ── A/R Aging Summary ────────────────────────────────────
+class AgingCustomerRow(BaseModel):
+    customer_name: str
+    invoices: List[ReceivableCheckSchema]
+    total: float
+
+
+class AgingSummaryResponse(BaseModel):
+    customers: List[AgingCustomerRow]
+    grand_total: float

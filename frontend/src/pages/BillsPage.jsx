@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { recurringBillsAPI, payablesAPI } from '../services/api'
+import { recurringBillsAPI, payablesAPI, vendorAccountsAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import OverdueAlertBanner from '../components/OverdueAlertBanner'
 import {
@@ -28,6 +28,12 @@ const FREQUENCY_OPTIONS = [
   { value: 'semi_annual', label: 'Semi-Annual' },
   { value: 'annual', label: 'Annual' },
   { value: 'biennial', label: 'Biennial (2 years)' },
+  { value: 'custom', label: 'Custom Months' },
+]
+
+const MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
 const CATEGORY_OPTIONS = [
@@ -119,6 +125,7 @@ const emptyForm = {
   notes: '',
   is_auto_pay: false,
   alert_days_before: 7,
+  custom_months: [],
 }
 
 export default function BillsPage() {
@@ -144,6 +151,11 @@ export default function BillsPage() {
   const [sortDirection, setSortDirection] = useState('asc')
   const [selectedOccurrences, setSelectedOccurrences] = useState(new Set())
   const [collapsedWeeks, setCollapsedWeeks] = useState(new Set())
+  const [lockedBills, setLockedBills] = useState([])
+  const [vendorAccounts, setVendorAccounts] = useState([])
+  const [showVendorForm, setShowVendorForm] = useState(false)
+  const [editingVendor, setEditingVendor] = useState(null)
+  const [vendorForm, setVendorForm] = useState({ vendor_name: '', account_info: '', as_of_date: '', due_date: '', amount: '', notes_due_dates: '', links: '' })
 
   function handleSort(column) {
     if (sortColumn === column) {
@@ -176,7 +188,7 @@ export default function BillsPage() {
     }
   })
 
-  // Group occurrences by month then by week (1-7, 8-14, 15-21, 22-31)
+  // Group occurrences by week only (1-7, 8-14, 15-21, 22-31) — no month grouping
   function getWeekBucket(day) {
     if (day <= 7) return 1
     if (day <= 14) return 2
@@ -184,31 +196,21 @@ export default function BillsPage() {
     return 4
   }
 
-  const groupedByMonthWeek = (() => {
-    const groups = {}
+  const groupedByWeek = (() => {
+    const weeks = { 1: [], 2: [], 3: [], 4: [] }
     for (const occ of sortedOccurrences) {
       const d = new Date(occ.due_date)
-      const monthKey = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      const day = d.getDate()
-      const week = getWeekBucket(day)
-      if (!groups[monthKey]) groups[monthKey] = {}
-      if (!groups[monthKey][week]) groups[monthKey][week] = []
-      groups[monthKey][week].push(occ)
+      const week = getWeekBucket(d.getDate())
+      weeks[week].push(occ)
     }
-    // Sort month keys chronologically
-    const sortedMonths = Object.keys(groups).sort((a, b) => new Date('1 ' + a) - new Date('1 ' + b))
     const result = []
-    for (const monthKey of sortedMonths) {
-      const weeks = []
-      for (const wk of [1, 2, 3, 4]) {
-        if (groups[monthKey][wk]) {
-          const items = groups[monthKey][wk]
-          const subtotal = items.reduce((sum, o) => sum + (o.included_in_cashflow && o.status !== 'paid' && o.status !== 'skipped' ? (o.amount || 0) : 0), 0)
-          const hasOverdue = items.some(o => o.status === 'overdue')
-          weeks.push({ week: wk, items, subtotal, hasOverdue })
-        }
+    for (const wk of [1, 2, 3, 4]) {
+      if (weeks[wk].length > 0) {
+        const items = weeks[wk]
+        const subtotal = items.reduce((sum, o) => sum + (o.included_in_cashflow && o.status !== 'paid' && o.status !== 'skipped' ? (o.amount || 0) : 0), 0)
+        const hasOverdue = items.some(o => o.status === 'overdue')
+        result.push({ week: wk, items, subtotal, hasOverdue })
       }
-      result.push({ monthKey, weeks })
     }
     return result
   })()
@@ -224,13 +226,15 @@ export default function BillsPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [cfRes, occRes, billsRes] = await Promise.allSettled([
+      const [cfRes, occRes, billsRes, payablesRes, vendorRes] = await Promise.allSettled([
         recurringBillsAPI.getCashFlow(),
         recurringBillsAPI.listOccurrences({
           ...(filterStatus && { status: filterStatus }),
           ...(filterCategory && { category: filterCategory }),
         }),
         recurringBillsAPI.list(),
+        payablesAPI.list(),
+        vendorAccountsAPI.list(),
       ])
       if (cfRes.status === 'fulfilled') {
         setCashFlow(cfRes.value.data)
@@ -238,6 +242,11 @@ export default function BillsPage() {
       }
       if (occRes.status === 'fulfilled') setOccurrences(occRes.value.data.items || [])
       if (billsRes.status === 'fulfilled') setBills(billsRes.value.data.items || [])
+      if (payablesRes.status === 'fulfilled') {
+        const allPayables = payablesRes.value.data.items || []
+        setLockedBills(allPayables.filter(p => p.is_permanent))
+      }
+      if (vendorRes.status === 'fulfilled') setVendorAccounts(vendorRes.value.data.items || [])
     } catch {
       toast.error('Failed to load bills data')
     } finally {
@@ -280,6 +289,7 @@ export default function BillsPage() {
       notes: bill.notes || '',
       is_auto_pay: bill.is_auto_pay,
       alert_days_before: bill.alert_days_before,
+      custom_months: bill.custom_months || [],
     })
     setEditingBill(bill)
     setShowForm(true)
@@ -293,6 +303,7 @@ export default function BillsPage() {
       due_day_of_month: parseInt(form.due_day_of_month),
       due_month: form.due_month ? parseInt(form.due_month) : null,
       alert_days_before: parseInt(form.alert_days_before),
+      custom_months: form.frequency === 'custom' ? form.custom_months : null,
     }
     try {
       if (editingBill) {
@@ -490,6 +501,61 @@ export default function BillsPage() {
     return `${diff}d`
   }
 
+  // Vendor Account handlers
+  function openAddVendor() {
+    setVendorForm({ vendor_name: '', account_info: '', as_of_date: '', due_date: '', amount: '', notes_due_dates: '', links: '' })
+    setEditingVendor(null)
+    setShowVendorForm(true)
+  }
+
+  function openEditVendor(v) {
+    setVendorForm({
+      vendor_name: v.vendor_name,
+      account_info: v.account_info || '',
+      as_of_date: v.as_of_date ? v.as_of_date.split('T')[0] : '',
+      due_date: v.due_date ? v.due_date.split('T')[0] : '',
+      amount: v.amount?.toString() || '',
+      notes_due_dates: v.notes_due_dates || '',
+      links: v.links || '',
+    })
+    setEditingVendor(v)
+    setShowVendorForm(true)
+  }
+
+  async function handleVendorSubmit(e) {
+    e.preventDefault()
+    const payload = {
+      ...vendorForm,
+      amount: vendorForm.amount ? parseFloat(vendorForm.amount) : 0,
+      as_of_date: vendorForm.as_of_date || null,
+      due_date: vendorForm.due_date || null,
+    }
+    try {
+      if (editingVendor) {
+        await vendorAccountsAPI.update(editingVendor.id, payload)
+        toast.success('Vendor account updated')
+      } else {
+        await vendorAccountsAPI.create(payload)
+        toast.success('Vendor account added')
+      }
+      setShowVendorForm(false)
+      loadData()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to save vendor account')
+    }
+  }
+
+  async function handleDeleteVendor(id) {
+    if (!confirm('Delete this vendor account?')) return
+    try {
+      await vendorAccountsAPI.delete(id)
+      toast.success('Vendor account deleted')
+      loadData()
+    } catch { toast.error('Failed to delete') }
+  }
+
+  const vendorTotal = vendorAccounts.reduce((sum, v) => sum + (v.amount || 0), 0)
+
   const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
   if (loading) {
@@ -648,6 +714,113 @@ export default function BillsPage() {
         </div>
       )}
 
+      {/* Locked Bills (Permanent Payables) */}
+      {lockedBills.length > 0 && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 mb-6">
+          <div className="p-4 border-b border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-100">Locked Bills</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Fixed recurring costs — always included</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-400 border-b border-gray-700">
+                  <th className="px-4 py-2 font-medium">Bill</th>
+                  <th className="px-4 py-2 font-medium text-right">Amount</th>
+                  <th className="px-4 py-2 font-medium">Due Date</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 font-medium">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lockedBills.map((lb) => (
+                  <tr key={lb.id} className="border-b border-gray-700/30">
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium text-gray-200">{lb.vendor_name}</p>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-medium text-gray-200">{fmt(lb.amount)}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs">{lb.due_date ? new Date(lb.due_date).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-2.5"><StatusBadge status={lb.status} /></td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs max-w-[200px] truncate">{lb.notes || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-600">
+                  <td className="px-4 py-2 font-semibold text-gray-300">Total</td>
+                  <td className="px-4 py-2 text-right font-bold text-blue-400">{fmt(lockedBills.reduce((s, l) => s + (l.amount || 0), 0))}</td>
+                  <td colSpan={3}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Top Vendor Accounts */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 mb-6">
+        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-100">Top Vendor Accounts</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Total: <span className="text-blue-400 font-medium">{fmt(vendorTotal)}</span></p>
+          </div>
+          <button onClick={openAddVendor} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+            <PlusIcon className="h-4 w-4" /> Add Vendor
+          </button>
+        </div>
+        {vendorAccounts.length === 0 ? (
+          <p className="text-gray-500 text-sm text-center py-6">No vendor accounts yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-400 border-b border-gray-700">
+                  <th className="px-4 py-2 font-medium">Vendor</th>
+                  <th className="px-4 py-2 font-medium">As of Date</th>
+                  <th className="px-4 py-2 font-medium">Due Date</th>
+                  <th className="px-4 py-2 font-medium text-right">Amount</th>
+                  <th className="px-4 py-2 font-medium">Notes / Due Dates</th>
+                  <th className="px-4 py-2 font-medium">Links</th>
+                  <th className="px-4 py-2 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorAccounts.map((v) => (
+                  <tr key={v.id} className="border-b border-gray-700/30 hover:bg-gray-700/20">
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium text-gray-200">{v.vendor_name}</p>
+                      {v.account_info && <p className="text-xs text-gray-500">{v.account_info}</p>}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs">{v.as_of_date ? new Date(v.as_of_date).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs">{v.due_date ? new Date(v.due_date).toLocaleDateString() : '—'}</td>
+                    <td className={`px-4 py-2.5 text-right font-medium ${(v.amount || 0) > 0 ? 'text-red-400' : 'text-gray-200'}`}>{fmt(v.amount)}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs max-w-[180px] truncate">{v.notes_due_dates || '—'}</td>
+                    <td className="px-4 py-2.5 text-xs">
+                      {v.links ? (
+                        <a href={v.links} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Login</a>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button onClick={() => openEditVendor(v)} className="p-1 text-gray-400 hover:text-blue-400"><PencilIcon className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => handleDeleteVendor(v.id)} className="p-1 text-gray-400 hover:text-red-400"><TrashIcon className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-600">
+                  <td colSpan={3} className="px-4 py-2 font-semibold text-gray-300">Total</td>
+                  <td className="px-4 py-2 text-right font-bold text-blue-400">{fmt(vendorTotal)}</td>
+                  <td colSpan={3}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Upcoming Bills */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 mb-6">
         <button
@@ -705,7 +878,7 @@ export default function BillsPage() {
             No upcoming bill occurrences. Add some recurring bills to get started.
           </p>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Select All + sort controls */}
             <div className="flex items-center gap-4 text-xs text-gray-400">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -726,17 +899,10 @@ export default function BillsPage() {
               ))}
             </div>
 
-            {groupedByMonthWeek.map(({ monthKey, weeks }) => (
-              <div key={monthKey}>
-                {/* Month Header */}
-                <div className="border-b-2 border-gray-600 pb-2 mb-4">
-                  <h3 className="text-base font-bold text-gray-100 uppercase tracking-wide">{monthKey}</h3>
-                </div>
-
-                {weeks.map(({ week, items, subtotal, hasOverdue }) => {
-                  const weekKey = `${monthKey}-W${week}`
-                  const isCollapsed = collapsedWeeks.has(weekKey)
-                  const weekRanges = { 1: '1st – 7th', 2: '8th – 14th', 3: '15th – 21st', 4: '22nd – 31st' }
+            {groupedByWeek.map(({ week, items, subtotal, hasOverdue }) => {
+              const weekKey = `W${week}`
+              const isCollapsed = collapsedWeeks.has(weekKey)
+              const weekRanges = { 1: '1st – 7th', 2: '8th – 14th', 3: '15th – 21st', 4: '22nd – 31st' }
 
                   return (
                     <div key={weekKey} className="mb-4">
@@ -887,8 +1053,6 @@ export default function BillsPage() {
                     </div>
                   )
                 })}
-              </div>
-            ))}
           </div>
         )}
         </div>
@@ -1048,6 +1212,39 @@ export default function BillsPage() {
                   </select>
                 </div>
               </div>
+              {form.frequency === 'custom' && (
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Select Months</label>
+                  <div className="grid grid-cols-6 gap-2">
+                    {MONTH_NAMES.map((name, idx) => {
+                      const monthNum = idx + 1
+                      const isSelected = form.custom_months.includes(monthNum)
+                      return (
+                        <button
+                          key={monthNum}
+                          type="button"
+                          onClick={() => {
+                            const next = isSelected
+                              ? form.custom_months.filter(m => m !== monthNum)
+                              : [...form.custom_months, monthNum].sort((a, b) => a - b)
+                            setForm({ ...form, custom_months: next })
+                          }}
+                          className={`px-2 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                            isSelected
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                          }`}
+                        >
+                          {name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {form.custom_months.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">Selected: {form.custom_months.map(m => MONTH_NAMES[m - 1]).join(', ')}</p>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Notes</label>
                 <textarea
@@ -1256,6 +1453,56 @@ export default function BillsPage() {
                 {importing ? 'Importing...' : 'Import'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vendor Account Modal */}
+      {showVendorForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-100">{editingVendor ? 'Edit Vendor Account' : 'Add Vendor Account'}</h3>
+              <button onClick={() => setShowVendorForm(false)} className="text-gray-400 hover:text-white"><XMarkIcon className="h-5 w-5" /></button>
+            </div>
+            <form onSubmit={handleVendorSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Vendor Name</label>
+                  <input value={vendorForm.vendor_name} onChange={(e) => setVendorForm({ ...vendorForm, vendor_name: e.target.value })} className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm" required />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Account Info</label>
+                  <input value={vendorForm.account_info} onChange={(e) => setVendorForm({ ...vendorForm, account_info: e.target.value })} className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="e.g. Account #713046" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">As of Date</label>
+                  <input type="date" value={vendorForm.as_of_date} onChange={(e) => setVendorForm({ ...vendorForm, as_of_date: e.target.value })} className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Due Date</label>
+                  <input type="date" value={vendorForm.due_date} onChange={(e) => setVendorForm({ ...vendorForm, due_date: e.target.value })} className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Amount ($)</label>
+                  <input type="number" step="0.01" value={vendorForm.amount} onChange={(e) => setVendorForm({ ...vendorForm, amount: e.target.value })} className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Notes / Due Dates</label>
+                <textarea value={vendorForm.notes_due_dates} onChange={(e) => setVendorForm({ ...vendorForm, notes_due_dates: e.target.value })} rows={2} className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Login Link (URL)</label>
+                <input type="url" value={vendorForm.links} onChange={(e) => setVendorForm({ ...vendorForm, links: e.target.value })} className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="https://..." />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowVendorForm(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
+                <button type="submit" className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg">{editingVendor ? 'Update' : 'Add'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

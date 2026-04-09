@@ -86,6 +86,7 @@ export const payablesAPI = {
   setBankBalance: (balance) => api.post('/payables/bank-balance', { bank_balance: balance }),
   setBuffer: (buffer) => api.post('/payables/buffer', { buffer }),
   getRealBalance: () => api.get('/payables/real-balance'),
+  getCombinedTotal: () => api.get('/payables/combined-total'),
   exportExcel: () => api.get('/payables/export', { responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData()
@@ -197,6 +198,7 @@ export const receivablesAPI = {
   toggleCollect: (id) => api.post(`/receivables/${id}/toggle-collect`),
   getTotals: () => api.get('/receivables/totals'),
   syncQuickbooks: () => api.post('/receivables/sync-quickbooks'),
+  getAgingSummary: () => api.get('/receivables/aging-summary'),
   importCSV: (file) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -224,6 +226,14 @@ export const paymentsOutAPI = {
     })
   },
   downloadTemplate: () => api.get('/payments-out/template-csv', { responseType: 'blob' }),
+}
+
+// ── Vendor Accounts ────────────────────────────────────────
+export const vendorAccountsAPI = {
+  list: () => api.get('/vendor-accounts'),
+  create: (data) => api.post('/vendor-accounts', data),
+  update: (id, data) => api.put(`/vendor-accounts/${id}`, data),
+  delete: (id) => api.delete(`/vendor-accounts/${id}`),
 }
 
 export default api

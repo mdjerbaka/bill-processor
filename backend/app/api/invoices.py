@@ -59,6 +59,7 @@ def _invoice_to_schema(inv: Invoice) -> InvoiceSchema:
         qbo_bill_id=inv.qbo_bill_id,
         qbo_payment_id=inv.qbo_payment_id,
         error_message=inv.error_message,
+        notes=inv.notes,
         line_items=[
             {
                 "id": li.id,

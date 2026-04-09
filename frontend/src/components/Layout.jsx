@@ -6,31 +6,27 @@ import NotificationBell from './NotificationBell'
 import {
   InboxIcon,
   CurrencyDollarIcon,
-  WrenchScrewdriverIcon,
   Cog6ToothIcon,
   HomeIcon,
   TrashIcon,
   ArrowRightOnRectangleIcon,
-  QuestionMarkCircleIcon,
   CalendarDaysIcon,
   Bars3Icon,
   XMarkIcon,
   DocumentCheckIcon,
   BanknotesIcon,
   ClockIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Invoices', href: '/invoices', icon: InboxIcon },
-  { name: 'Payables', href: '/payables', icon: CurrencyDollarIcon },
+  { name: 'Receivables', href: '/receivables', icon: DocumentCheckIcon },
   { name: 'Payments Out', href: '/payments-out', icon: BanknotesIcon },
   { name: 'Payment History', href: '/payment-history', icon: ClockIcon },
-  { name: 'Bills', href: '/bills', icon: CalendarDaysIcon },
-  { name: 'Receivables', href: '/receivables', icon: DocumentCheckIcon },
-  { name: 'Jobs', href: '/jobs', icon: WrenchScrewdriverIcon },
-  { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
-  { name: 'Help', href: '/help', icon: QuestionMarkCircleIcon },
+  { name: 'Invoices to be Reviewed', href: '/invoices-review', icon: EyeIcon },
+  { name: 'Payables', href: '/payables', icon: CurrencyDollarIcon },
+  { name: 'Recurring Bills', href: '/bills', icon: CalendarDaysIcon },
 ]
 
 export default function Layout() {
@@ -137,6 +133,19 @@ export default function Layout() {
         </nav>
 
         <div className="p-4 border-t border-gray-800">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `flex items-center px-3 py-2 text-sm rounded-lg transition-colors mb-2 ${
+                isActive
+                  ? 'bg-gray-800 text-gray-200'
+                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+              }`
+            }
+          >
+            <Cog6ToothIcon className="h-4 w-4 mr-3" />
+            Settings
+          </NavLink>
           <NavLink
             to="/junk"
             className={({ isActive }) =>

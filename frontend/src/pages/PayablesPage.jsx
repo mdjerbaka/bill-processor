@@ -42,7 +42,7 @@ export default function PayablesPage() {
         payablesAPI.list(),
         payablesAPI.getRealBalance(),
       ])
-      setPayables(payRes.data.items)
+      setPayables(payRes.data.items.filter(p => !p.is_permanent))
       setSummary({ total_outstanding: payRes.data.total_outstanding, total_overdue: payRes.data.total_overdue })
       setBankBalance(realRes.data.bank_balance)
       setBalanceInput(realRes.data.bank_balance?.toString() || '0')
