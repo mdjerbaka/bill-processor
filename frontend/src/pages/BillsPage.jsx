@@ -80,10 +80,10 @@ function StatusBadge({ status }) {
   )
 }
 
-function SummaryCard({ title, value, color, icon: Icon, tooltip }) {
+function SummaryCard({ title, value, color, icon: Icon, tooltip, onClick }) {
   const [showTooltip, setShowTooltip] = useState(false)
   return (
-    <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+    <div className={`bg-gray-800 rounded-xl border border-gray-700 p-5${onClick ? ' cursor-pointer hover:border-gray-500 transition-colors' : ''}`} onClick={onClick}>
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-1">
@@ -661,13 +661,12 @@ export default function BillsPage() {
               </div>
             </div>
           </div>
-          <SummaryCard title="Due in 7 Days" value={fmt(cashFlow.total_upcoming_7d)} icon={CalendarDaysIcon} color="text-yellow-400" />
-          <SummaryCard title="Due in 30 Days" value={fmt(cashFlow.total_upcoming_30d)} icon={CalendarDaysIcon} color="text-orange-400" />
           <SummaryCard
-            title="Overdue"
-            value={fmt(cashFlow.total_overdue)}
-            icon={ExclamationTriangleIcon}
-            color={cashFlow.total_overdue > 0 ? 'text-red-400' : 'text-gray-400'}
+            title="Receivable Payments"
+            value={fmt(cashFlow.expected_receivables || 0)}
+            icon={BanknotesIcon}
+            color="text-green-400"
+            onClick={() => navigate('/receivables')}
           />
           <div
             className="bg-gray-800 rounded-xl border border-gray-700 p-5 cursor-pointer hover:border-amber-700/50 transition-colors"
@@ -676,8 +675,8 @@ export default function BillsPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Outstanding Checks</p>
-                <p className="text-xs text-gray-500 mt-0.5">Auto-calculated from Payments Out</p>
+                <p className="text-sm text-gray-400">Payments Out</p>
+                <p className="text-xs text-gray-500 mt-0.5">Outstanding checks & ACH</p>
                 <p className="text-2xl font-bold text-amber-400 mt-1">
                   ${(cashFlow.outstanding_checks || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
@@ -687,25 +686,21 @@ export default function BillsPage() {
               </div>
             </div>
           </div>
-          <div
-            className="bg-gray-800 rounded-xl border border-gray-700 p-5 cursor-pointer hover:border-green-700/50 transition-colors"
-            onClick={() => navigate('/receivables')}
-            title="Click to manage receivable checks"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Expected Receivables</p>
-                <p className="text-xs text-gray-500 mt-0.5">From receivable checks</p>
-                <p className="text-2xl font-bold text-green-400 mt-1">
-                  ${(cashFlow.expected_receivables || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  <span className="text-xs text-green-400/60 ml-2">view &rarr;</span>
-                </p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-gray-700/50">
-                <BanknotesIcon className="h-5 w-5 text-green-400" />
-              </div>
-            </div>
-          </div>
+          <SummaryCard
+            title="Available to Spend"
+            value={fmt(cashFlow.real_available)}
+            icon={BanknotesIcon}
+            color={cashFlow.real_available >= 0 ? 'text-green-400' : 'text-red-400'}
+            tooltip={`Bank Balance + Receivable Payments − Payments Out\n\n${fmt(cashFlow.bank_balance)} + ${fmt(cashFlow.expected_receivables || 0)} − ${fmt(cashFlow.outstanding_checks)} = ${fmt(cashFlow.real_available)}`}
+          />
+          <SummaryCard title="Due in 7 Days" value={fmt(cashFlow.total_upcoming_7d)} icon={CalendarDaysIcon} color="text-yellow-400" />
+          <SummaryCard title="Due in 30 Days" value={fmt(cashFlow.total_upcoming_30d)} icon={CalendarDaysIcon} color="text-orange-400" />
+          <SummaryCard
+            title="Overdue"
+            value={fmt(cashFlow.total_overdue)}
+            icon={ExclamationTriangleIcon}
+            color={cashFlow.total_overdue > 0 ? 'text-red-400' : 'text-gray-400'}
+          />
           <div
             className="bg-gray-800 rounded-xl border border-gray-700 p-5 cursor-pointer hover:border-red-700/50 transition-colors"
             onClick={() => navigate('/payables')}
@@ -713,7 +708,7 @@ export default function BillsPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Outstanding Payables</p>
+                <p className="text-sm text-gray-400">Total Payables</p>
                 <p className="text-xs text-gray-500 mt-0.5">Invoices to pay</p>
                 <p className="text-2xl font-bold text-red-400 mt-1">
                   ${(cashFlow.total_payables || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -725,13 +720,6 @@ export default function BillsPage() {
               </div>
             </div>
           </div>
-          <SummaryCard
-            title="Real Available"
-            value={fmt(cashFlow.real_available)}
-            icon={BanknotesIcon}
-            color={cashFlow.real_available >= 0 ? 'text-green-400' : 'text-red-400'}
-            tooltip={`Bank Balance\n+ Expected Receivables\n− Outstanding Checks\n− Outstanding Payables\n− Toggled bills (30 days)\n− All overdue bills\n\n${fmt(cashFlow.bank_balance)} + ${fmt(cashFlow.expected_receivables || 0)} − ${fmt(cashFlow.outstanding_checks)} − ${fmt(cashFlow.total_payables || 0)} − ${fmt(cashFlow.total_upcoming_30d)} − ${fmt(cashFlow.total_overdue)} = ${fmt(cashFlow.real_available)}`}
-          />
         </div>
       )}
 
