@@ -1,7 +1,7 @@
 """add custom_months and vendor_accounts
 
 Revision ID: g7b8c9d0e1f2
-Revises: f6a7b8c9d0e1
+Revises: b3c4d5e6f7a8
 Create Date: 2025-01-01 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import JSON
 
 # revision identifiers, used by Alembic.
 revision: str = 'g7b8c9d0e1f2'
-down_revision: Union[str, None] = 'f6a7b8c9d0e1'
+down_revision: Union[str, None] = 'b3c4d5e6f7a8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
