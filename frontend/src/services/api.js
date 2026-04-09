@@ -223,6 +223,7 @@ export const paymentsOutAPI = {
   update: (id, data) => api.put(`/payments-out/${id}`, data),
   delete: (id) => api.delete(`/payments-out/${id}`),
   markCleared: (id) => api.post(`/payments-out/${id}/mark-cleared`),
+  unmarkCleared: (id) => api.post(`/payments-out/${id}/unmark-cleared`),
   totalOutstanding: () => api.get('/payments-out/total-outstanding'),
   allHistory: (params) => api.get('/payments-out/all-history', { params }),
   importCSV: (file) => {

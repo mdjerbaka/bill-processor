@@ -168,6 +168,21 @@ async def mark_payment_cleared(
     return {"detail": "Payment marked as cleared", "cleared_at": payment.cleared_at.isoformat()}
 
 
+@router.post("/{payment_id}/unmark-cleared")
+async def unmark_payment_cleared(
+    payment_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Revert a cleared payment back to outstanding."""
+    svc = PaymentsOutService(db, user.id)
+    payment = await svc.unmark_cleared(payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    await db.commit()
+    return {"detail": "Payment reverted to outstanding"}
+
+
 @router.post("/import-csv", status_code=201)
 async def import_payments_csv(
     file: UploadFile = File(...),

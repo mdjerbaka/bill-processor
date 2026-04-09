@@ -20,6 +20,7 @@ import {
   ChevronUpDownIcon,
   InformationCircleIcon,
   CurrencyDollarIcon,
+  LockOpenIcon,
 } from '@heroicons/react/24/outline'
 
 const FREQUENCY_OPTIONS = [
@@ -739,6 +740,7 @@ export default function BillsPage() {
                   <th className="px-4 py-2 font-medium">Due Date</th>
                   <th className="px-4 py-2 font-medium">Status</th>
                   <th className="px-4 py-2 font-medium">Notes</th>
+                  <th className="px-4 py-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -751,6 +753,21 @@ export default function BillsPage() {
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{lb.due_date ? new Date(lb.due_date).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={lb.status} /></td>
                     <td className="px-4 py-2.5 text-gray-400 text-xs max-w-[200px] truncate">{lb.notes || '—'}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await payablesAPI.update(lb.id, { is_permanent: false })
+                            toast.success('Unlocked')
+                            loadData()
+                          } catch { toast.error('Failed to unlock') }
+                        }}
+                        className="p-1 text-gray-500 hover:text-orange-400 transition-colors"
+                        title="Unlock — move back to payables"
+                      >
+                        <LockOpenIcon className="h-4 w-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -758,7 +775,7 @@ export default function BillsPage() {
                 <tr className="border-t border-gray-600">
                   <td className="px-4 py-2 font-semibold text-gray-300">Total</td>
                   <td className="px-4 py-2 text-right font-bold text-blue-400">{fmt(lockedBills.reduce((s, l) => s + (l.amount || 0), 0))}</td>
-                  <td colSpan={3}></td>
+                  <td colSpan={4}></td>
                 </tr>
               </tfoot>
             </table>

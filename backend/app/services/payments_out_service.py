@@ -120,6 +120,22 @@ class PaymentsOutService:
         await self.db.flush()
         return payment
 
+    async def unmark_cleared(self, payment_id: int) -> Optional[PaymentOut]:
+        result = await self.db.execute(
+            select(PaymentOut).where(
+                PaymentOut.id == payment_id,
+                PaymentOut.user_id == self.user_id,
+            )
+        )
+        payment = result.scalar_one_or_none()
+        if not payment:
+            return None
+        payment.status = PaymentOutStatus.OUTSTANDING
+        payment.cleared_at = None
+        payment.updated_at = datetime.now(timezone.utc)
+        await self.db.flush()
+        return payment
+
     async def get_total_outstanding(self) -> float:
         result = await self.db.execute(
             select(func.coalesce(func.sum(PaymentOut.amount), 0.0)).where(
