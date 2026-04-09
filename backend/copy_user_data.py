@@ -20,7 +20,7 @@ async def main():
 
         # 1. AppSettings
         rows = (await db.execute(text(
-            "SELECT key, value FROM app_settings WHERE user_id = 2"
+            "SELECT key, value, is_encrypted FROM app_settings WHERE user_id = 2"
         ))).fetchall()
         for r in rows:
             exists = (await db.execute(text(
@@ -28,12 +28,12 @@ async def main():
             ), {"k": r[0]})).fetchone()
             if exists:
                 await db.execute(text(
-                    "UPDATE app_settings SET value = :v WHERE user_id = 1 AND key = :k"
-                ), {"v": r[1], "k": r[0]})
+                    "UPDATE app_settings SET value = :v, is_encrypted = :enc WHERE user_id = 1 AND key = :k"
+                ), {"v": r[1], "k": r[0], "enc": r[2]})
             else:
                 await db.execute(text(
-                    "INSERT INTO app_settings (key, value, user_id) VALUES (:k, :v, 1)"
-                ), {"k": r[0], "v": r[1]})
+                    "INSERT INTO app_settings (key, value, user_id, is_encrypted) VALUES (:k, :v, 1, :enc)"
+                ), {"k": r[0], "v": r[1], "enc": r[2]})
         print(f"Copied {len(rows)} app_settings")
 
         # 2. ReceivableChecks
