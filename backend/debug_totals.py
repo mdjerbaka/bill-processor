@@ -6,10 +6,10 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 async def main():
-    from app.core.database import async_session
+    from app.core.database import async_session_factory
     from sqlalchemy import text
 
-    async with async_session() as db:
+    async with async_session_factory() as db:
         # Payables outstanding
         r = await db.execute(text(
             "SELECT user_id, SUM(amount) as total, COUNT(*) as cnt "
