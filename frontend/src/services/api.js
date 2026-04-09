@@ -133,6 +133,7 @@ export const quickbooksAPI = {
     api.post(`/quickbooks/send-bill/${invoiceId}`, null, {
       params: { qbo_vendor_id: vendorId, qbo_account_id: accountId },
     }),
+  syncPayments: () => api.post('/quickbooks/sync-payments'),
   disconnect: () => api.post('/quickbooks/disconnect'),
 }
 

@@ -662,6 +662,101 @@ class QuickBooksService:
             return result["QueryResponse"].get("Account", [])
         return []
 
+    async def sync_paid_bills(self, user_id: int) -> dict:
+        """Check QuickBooks for paid bills and mark matching Payables/PaymentOuts.
+
+        1. Find all outstanding Payables that have a qbo_bill_id.
+        2. Batch-query those bills in QBO.
+        3. If a bill's Balance == 0 → mark Payable as PAID and linked PaymentOut as CLEARED.
+        Returns counts: {payables_marked, payments_cleared, checked, errors}.
+        """
+        from app.models.models import Payable, PayableStatus, PaymentOut, PaymentOutStatus
+
+        if not await self.is_connected():
+            return {"error": "QuickBooks not connected", "payables_marked": 0, "payments_cleared": 0, "checked": 0}
+
+        # Get all outstanding/overdue Payables with a qbo_bill_id
+        result = await self.db.execute(
+            select(Payable).where(
+                Payable.user_id == user_id,
+                Payable.qbo_bill_id.isnot(None),
+                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
+                Payable.is_junked == False,
+            )
+        )
+        payables = list(result.scalars().all())
+
+        if not payables:
+            return {"payables_marked": 0, "payments_cleared": 0, "checked": 0}
+
+        # Build a map: qbo_bill_id → Payable
+        bill_map: dict[str, Payable] = {p.qbo_bill_id: p for p in payables}
+        bill_ids = list(bill_map.keys())
+
+        # Query QBO in batches of 50 (IN clause limit)
+        paid_bill_ids: set[str] = set()
+        errors = 0
+        for i in range(0, len(bill_ids), 50):
+            batch = bill_ids[i : i + 50]
+            id_list = ", ".join(f"'{bid}'" for bid in batch)
+            qb_result = await self._api_request(
+                "GET",
+                f"query?query=SELECT Id, Balance FROM Bill WHERE Id IN ({id_list})"
+            )
+            if qb_result and "QueryResponse" in qb_result:
+                for bill in qb_result["QueryResponse"].get("Bill", []):
+                    balance = float(bill.get("Balance", 1))
+                    if balance == 0:
+                        paid_bill_ids.add(str(bill["Id"]))
+            else:
+                errors += 1
+                logger.warning(f"QBO batch query failed for bill IDs: {batch}")
+
+        if not paid_bill_ids:
+            return {"payables_marked": 0, "payments_cleared": 0, "checked": len(bill_ids), "errors": errors}
+
+        # Mark matching Payables as PAID
+        now = datetime.now(timezone.utc)
+        payables_marked = 0
+        payable_ids_marked: list[int] = []
+
+        for qbo_id in paid_bill_ids:
+            payable = bill_map.get(qbo_id)
+            if payable:
+                payable.status = PayableStatus.PAID
+                payable.paid_at = now
+                payables_marked += 1
+                payable_ids_marked.append(payable.id)
+
+        # Mark linked outstanding PaymentOuts as CLEARED
+        payments_cleared = 0
+        if payable_ids_marked:
+            po_result = await self.db.execute(
+                select(PaymentOut).where(
+                    PaymentOut.user_id == user_id,
+                    PaymentOut.payable_id.in_(payable_ids_marked),
+                    PaymentOut.status == PaymentOutStatus.OUTSTANDING,
+                )
+            )
+            for po in po_result.scalars().all():
+                po.status = PaymentOutStatus.CLEARED
+                po.cleared_at = now
+                po.updated_at = now
+                payments_cleared += 1
+
+        await self.db.flush()
+        logger.info(
+            f"QB sync: checked {len(bill_ids)} bills, "
+            f"marked {payables_marked} payables paid, "
+            f"{payments_cleared} payments cleared"
+        )
+        return {
+            "payables_marked": payables_marked,
+            "payments_cleared": payments_cleared,
+            "checked": len(bill_ids),
+            "errors": errors,
+        }
+
     async def is_connected(self) -> bool:
         """Check if a valid QBO connection exists."""
         token = await self._get_valid_token()

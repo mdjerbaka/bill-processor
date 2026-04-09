@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { paymentsOutAPI } from '../services/api'
+import { paymentsOutAPI, quickbooksAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   PlusIcon,
@@ -49,6 +49,7 @@ export default function PaymentsOutPage() {
   const [sortColumn, setSortColumn] = useState('payment_date')
   const [sortDirection, setSortDirection] = useState('desc')
   const [selectedPayments, setSelectedPayments] = useState(new Set())
+  const [syncing, setSyncing] = useState(false)
 
   // History date filters
   const [historyStart, setHistoryStart] = useState('')
@@ -221,6 +222,24 @@ export default function PaymentsOutPage() {
     }
   }
 
+  async function handleSyncQB() {
+    setSyncing(true)
+    try {
+      const res = await quickbooksAPI.syncPayments()
+      const { payables_marked, payments_cleared, checked } = res.data
+      if (payables_marked === 0 && payments_cleared === 0) {
+        toast(`Checked ${checked} bills in QuickBooks — nothing new to clear`, { icon: '✓' })
+      } else {
+        toast.success(`Synced from QuickBooks: ${payables_marked} payable(s) marked paid, ${payments_cleared} payment(s) cleared`)
+        loadData()
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'QuickBooks sync failed')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   async function handleDownloadTemplate() {
     try {
       const res = await paymentsOutAPI.downloadTemplate()
@@ -269,6 +288,14 @@ export default function PaymentsOutPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Payments Out</h1>
         <div className="flex gap-2">
+          <button
+            onClick={handleSyncQB}
+            disabled={syncing}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+          >
+            <ArrowPathIcon className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing…' : 'Sync QB Payments'}
+          </button>
           <button
             onClick={() => setShowImport(true)}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1"

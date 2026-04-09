@@ -216,6 +216,20 @@ async def send_bill_to_qbo(
     return {"qbo_bill_id": bill_id, "status": "sent_to_qb"}
 
 
+@router.post("/sync-payments")
+async def qbo_sync_payments(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Check QuickBooks for paid bills and mark matching Payables/PaymentOuts as cleared."""
+    svc = QuickBooksService(db, user.id)
+    result = await svc.sync_paid_bills(user.id)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    await db.commit()
+    return result
+
+
 @router.post("/disconnect")
 async def qbo_disconnect(
     db: AsyncSession = Depends(get_db),
