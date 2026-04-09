@@ -10,6 +10,17 @@ async def main():
     from sqlalchemy import text
 
     async with async_session_factory() as db:
+        # Delete notifications referencing user 1's recurring bills
+        r = await db.execute(text(
+            "DELETE FROM notifications WHERE related_bill_id IN "
+            "(SELECT id FROM recurring_bills WHERE user_id = 1)"
+        ))
+        print(f"Deleted {r.rowcount} notifications for user 1's bills")
+
+        # Delete notifications for user 1 directly
+        r = await db.execute(text("DELETE FROM notifications WHERE user_id = 1"))
+        print(f"Deleted {r.rowcount} notifications for user 1")
+
         # Delete bill occurrences for user 1's recurring bills
         r = await db.execute(text(
             "DELETE FROM bill_occurrences WHERE recurring_bill_id IN "
@@ -21,17 +32,25 @@ async def main():
         r = await db.execute(text("DELETE FROM recurring_bills WHERE user_id = 1"))
         print(f"Deleted {r.rowcount} recurring_bills for user 1")
 
+        # Delete payments_out for user 1
+        r = await db.execute(text("DELETE FROM payments_out WHERE user_id = 1"))
+        print(f"Deleted {r.rowcount} payments_out for user 1")
+
         # Delete payables for user 1
         r = await db.execute(text("DELETE FROM payables WHERE user_id = 1"))
         print(f"Deleted {r.rowcount} payables for user 1")
 
-        # Delete invoices for user 1 (should be 0)
+        # Delete invoices for user 1
         r = await db.execute(text("DELETE FROM invoices WHERE user_id = 1"))
         print(f"Deleted {r.rowcount} invoices for user 1")
 
-        # Delete receivable_checks for user 1 (should be 0)
+        # Delete receivable_checks for user 1
         r = await db.execute(text("DELETE FROM receivable_checks WHERE user_id = 1"))
         print(f"Deleted {r.rowcount} receivable_checks for user 1")
+
+        # Delete emails for user 1
+        r = await db.execute(text("DELETE FROM emails WHERE user_id = 1"))
+        print(f"Deleted {r.rowcount} emails for user 1")
 
         await db.commit()
         print("\nDone! User 1 (markdjerbaka) data cleaned up.")
