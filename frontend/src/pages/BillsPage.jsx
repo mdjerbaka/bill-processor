@@ -691,7 +691,7 @@ export default function BillsPage() {
             value={fmt(cashFlow.real_available)}
             icon={BanknotesIcon}
             color={cashFlow.real_available >= 0 ? 'text-green-400' : 'text-red-400'}
-            tooltip={`Bank Balance + Receivable Payments − Payments Out\n\n${fmt(cashFlow.bank_balance)} + ${fmt(cashFlow.expected_receivables || 0)} − ${fmt(cashFlow.outstanding_checks)} = ${fmt(cashFlow.real_available)}`}
+            tooltip={`Bank Balance + Receivable Payments − Payments Out − Bills (30d) − Overdue Bills\n\n${fmt(cashFlow.bank_balance)} + ${fmt(cashFlow.expected_receivables || 0)} − ${fmt(cashFlow.outstanding_checks)} − ${fmt(cashFlow.total_upcoming_30d)} − ${fmt(cashFlow.total_overdue)} = ${fmt(cashFlow.real_available)}`}
           />
           <SummaryCard title="Due in 7 Days" value={fmt(cashFlow.total_upcoming_7d)} icon={CalendarDaysIcon} color="text-yellow-400" />
           <SummaryCard title="Due in 30 Days" value={fmt(cashFlow.total_upcoming_30d)} icon={CalendarDaysIcon} color="text-orange-400" />

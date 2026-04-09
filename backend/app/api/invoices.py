@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -122,6 +122,67 @@ async def create_invoice(
     )
     invoice = result.unique().scalar_one_or_none()
     return _invoice_to_schema(invoice)
+
+
+@router.post("/{invoice_id}/upload-attachment")
+async def upload_invoice_attachment(
+    invoice_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Upload an attachment file for an existing invoice."""
+    import os
+    import uuid
+    from pathlib import Path
+
+    # Verify invoice exists and belongs to user
+    result = await db.execute(
+        select(Invoice).where(Invoice.id == invoice_id, Invoice.user_id == user.id)
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Validate file type
+    allowed_types = {
+        "application/pdf", "image/png", "image/jpeg", "image/jpg",
+        "image/tiff", "image/bmp",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel", "text/csv",
+    }
+    content_type = file.content_type or "application/octet-stream"
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    allowed_exts = {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".xlsx", ".xls", ".csv"}
+
+    if content_type not in allowed_types and ext not in allowed_exts:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    # Save file to disk
+    upload_dir = Path(os.environ.get("UPLOAD_DIR", Path(__file__).resolve().parent.parent.parent / "data" / "attachments"))
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    unique_name = f"{uuid.uuid4()}{ext}"
+    file_path = upload_dir / unique_name
+
+    contents = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contents)
+
+    # Create attachment record
+    attachment = Attachment(
+        filename=file.filename or unique_name,
+        content_type=content_type,
+        file_path=str(file_path),
+        file_size=len(contents),
+    )
+    db.add(attachment)
+    await db.flush()
+
+    # Link to invoice
+    invoice.attachment_id = attachment.id
+    await db.commit()
+
+    return {"attachment_id": attachment.id, "filename": attachment.filename}
 
 
 @router.get("", response_model=InvoiceListResponse)

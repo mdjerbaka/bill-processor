@@ -703,7 +703,7 @@ class RecurringBillsService:
         )
         total_payables = float(payables_result.scalar() or 0.0)
 
-        real_available = bank_balance + expected_receivables - outstanding_checks
+        real_available = bank_balance + expected_receivables - outstanding_checks - total_30d - total_overdue
 
         # Populate bills due soon (within 7 days, not paid/skipped)
         due_soon_result = await self.db.execute(

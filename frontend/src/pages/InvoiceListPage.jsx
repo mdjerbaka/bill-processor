@@ -36,7 +36,7 @@ export default function InvoiceListPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [invoiceForm, setInvoiceForm] = useState({
-    vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '',
+    vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '', attachment: null,
   })
 
   const loadInvoices = useCallback(async (silent = false) => {
@@ -92,10 +92,18 @@ export default function InvoiceListPage() {
       notes: invoiceForm.notes || null,
     }
     try {
-      await invoicesAPI.create(payload)
+      const res = await invoicesAPI.create(payload)
+      // Upload attachment if provided
+      if (invoiceForm.attachment) {
+        try {
+          await invoicesAPI.uploadAttachment(res.data.id, invoiceForm.attachment)
+        } catch {
+          toast.error('Invoice created but attachment upload failed')
+        }
+      }
       toast.success('Invoice created')
       setShowForm(false)
-      setInvoiceForm({ vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '' })
+      setInvoiceForm({ vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '', attachment: null })
       loadInvoices()
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to create invoice')
@@ -289,6 +297,18 @@ export default function InvoiceListPage() {
                   className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm"
                   placeholder="Follow-up notes, payment instructions, etc."
                 />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Invoice Attachment (optional)</label>
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif,.bmp,.xlsx,.xls,.csv"
+                  onChange={(e) => setInvoiceForm({ ...invoiceForm, attachment: e.target.files[0] || null })}
+                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                />
+                {invoiceForm.attachment && (
+                  <p className="text-xs text-gray-500 mt-1">{invoiceForm.attachment.name}</p>
+                )}
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button

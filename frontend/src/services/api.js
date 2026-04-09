@@ -48,6 +48,13 @@ export const invoicesAPI = {
   get: (id) => api.get(`/invoices/${id}`),
   create: (data) => api.post('/invoices', data),
   update: (id, data) => api.put(`/invoices/${id}`, data),
+  uploadAttachment: (id, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post(`/invoices/${id}/upload-attachment`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
   approve: (id) => api.post(`/invoices/${id}/approve`),
   junk: (id) => api.post(`/invoices/${id}/junk`),
   restore: (id) => api.post(`/invoices/${id}/restore`),

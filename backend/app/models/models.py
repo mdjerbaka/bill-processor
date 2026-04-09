@@ -166,7 +166,7 @@ class Attachment(Base):
     __tablename__ = "attachments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    email_id: Mapped[int] = mapped_column(ForeignKey("emails.id"), nullable=False)
+    email_id: Mapped[Optional[int]] = mapped_column(ForeignKey("emails.id"), nullable=True)
     filename: Mapped[str] = mapped_column(String(500), nullable=False)
     content_type: Mapped[str] = mapped_column(String(200), nullable=False)
     file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
