@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { invoicesAPI, payablesAPI, healthAPI, settingsAPI, recurringBillsAPI, quickbooksAPI } from '../services/api'
+import { invoicesAPI, payablesAPI, healthAPI, settingsAPI, recurringBillsAPI, quickbooksAPI, receivablesAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import OverdueAlertBanner from '../components/OverdueAlertBanner'
 import {
@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     needsReview: 0,
     combinedOutstanding: 0,
+    totalReceivables: 0,
     realBalance: null,
     billsDueSoon: 0,
     billsOverdue: 0,
@@ -56,13 +57,14 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
     try {
-      const [invoicesRes, balanceRes, healthRes, cashFlowRes, qbRes, combinedRes] = await Promise.allSettled([
+      const [invoicesRes, balanceRes, healthRes, cashFlowRes, qbRes, combinedRes, receivablesTotalsRes] = await Promise.allSettled([
         invoicesAPI.list({ page: 1, page_size: 15 }),
         payablesAPI.getRealBalance(),
         healthAPI.check(),
         recurringBillsAPI.getCashFlow(),
         quickbooksAPI.status(),
         payablesAPI.getCombinedTotal(),
+        receivablesAPI.getTotals(),
       ])
 
       if (invoicesRes.status === 'fulfilled') {
@@ -74,6 +76,13 @@ export default function DashboardPage() {
         setStats((s) => ({
           ...s,
           combinedOutstanding: combinedRes.value.data.combined_total || 0,
+        }))
+      }
+
+      if (receivablesTotalsRes.status === 'fulfilled') {
+        setStats((s) => ({
+          ...s,
+          totalReceivables: receivablesTotalsRes.value.data.total_receivables || 0,
         }))
       }
 
@@ -175,7 +184,7 @@ export default function DashboardPage() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <StatCard
           title="Invoices to Review"
           value={stats.needsReview}
@@ -189,6 +198,13 @@ export default function DashboardPage() {
           icon={CurrencyDollarIcon}
           color="bg-red-500"
           link="/payables"
+        />
+        <StatCard
+          title="Total Receivables"
+          value={`$${stats.totalReceivables.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          icon={InboxIcon}
+          color="bg-blue-500"
+          link="/receivables"
         />
         <StatCard
           title="Real Available Funds"

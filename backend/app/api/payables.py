@@ -364,14 +364,14 @@ async def get_combined_total(
     svc = PayablesService(db, user.id)
     summary = await svc.get_payables_summary()
 
-    # Sum bill occurrences that are upcoming/due_soon/overdue and included in cashflow
+    # Sum bill occurrences that are due_soon/overdue and included in cashflow
+    # (exclude UPCOMING — those are future obligations, not currently outstanding)
     bills_result = await db.execute(
         select(func.coalesce(func.sum(BillOccurrence.amount), 0.0))
         .join(RecurringBill)
         .where(
             RecurringBill.user_id == user.id,
             BillOccurrence.status.in_([
-                OccurrenceStatus.UPCOMING,
                 OccurrenceStatus.DUE_SOON,
                 OccurrenceStatus.OVERDUE,
             ]),
