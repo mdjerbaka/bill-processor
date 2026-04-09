@@ -128,11 +128,11 @@ async def ms_get_folder_setting(
 ):
     """Get the currently configured mail folder for polling."""
     result = await db.execute(
-        select(AppSetting).where(AppSetting.key == "ms_mail_folder_id")
+        select(AppSetting).where(AppSetting.key == "ms_mail_folder_id", AppSetting.user_id == user.id)
     )
     folder_id_setting = result.scalar_one_or_none()
     result2 = await db.execute(
-        select(AppSetting).where(AppSetting.key == "ms_mail_folder_name")
+        select(AppSetting).where(AppSetting.key == "ms_mail_folder_name", AppSetting.user_id == user.id)
     )
     folder_name_setting = result2.scalar_one_or_none()
     return {
@@ -152,12 +152,12 @@ async def ms_save_folder_setting(
     folder_name = body.get("folder_name", "All Folders")
 
     for key, value in [("ms_mail_folder_id", folder_id), ("ms_mail_folder_name", folder_name)]:
-        result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+        result = await db.execute(select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id))
         setting = result.scalar_one_or_none()
         if setting:
             setting.value = value
         else:
-            db.add(AppSetting(key=key, value=value))
+            db.add(AppSetting(key=key, value=value, user_id=user.id))
 
     await db.commit()
     return {"saved": True, "folder_id": folder_id, "folder_name": folder_name}
@@ -213,7 +213,7 @@ async def ms_poll_now(
 
         for email_id in new_ids:
             try:
-                await _process_email(db, email_id)
+                await _process_email(db, email_id, user.id)
                 processed += 1
             except Exception as e:
                 logger.error(f"Processing MS email {email_id} failed: {e}")

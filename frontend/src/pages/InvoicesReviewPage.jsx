@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { invoicesAPI } from '../services/api'
-import { TrashIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import ContextMenu from '../components/ContextMenu'
 import toast from 'react-hot-toast'
 
@@ -21,6 +21,10 @@ export default function InvoicesReviewPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [invoiceForm, setInvoiceForm] = useState({
+    vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '', attachment: null,
+  })
 
   const loadInvoices = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -54,11 +58,47 @@ export default function InvoicesReviewPage() {
     ],
   })
 
+  async function handleCreateInvoice(e) {
+    e.preventDefault()
+    const payload = {
+      vendor_name: invoiceForm.vendor_name,
+      invoice_number: invoiceForm.invoice_number || null,
+      total_amount: invoiceForm.total_amount ? parseFloat(invoiceForm.total_amount) : null,
+      due_date: invoiceForm.due_date ? new Date(invoiceForm.due_date).toISOString() : null,
+      notes: invoiceForm.notes || null,
+    }
+    try {
+      const res = await invoicesAPI.create(payload)
+      if (invoiceForm.attachment) {
+        try {
+          await invoicesAPI.uploadAttachment(res.data.id, invoiceForm.attachment)
+        } catch {
+          toast.error('Invoice created but attachment upload failed')
+        }
+      }
+      toast.success('Invoice created')
+      setShowForm(false)
+      setInvoiceForm({ vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '', attachment: null })
+      loadInvoices()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create invoice')
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Invoices to be Reviewed</h1>
-        <span className="text-sm text-gray-400">{total} pending review</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add Invoice
+          </button>
+          <span className="text-sm text-gray-400">{total} pending review</span>
+        </div>
       </div>
 
       <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 overflow-hidden overflow-x-auto">
@@ -131,6 +171,48 @@ export default function InvoicesReviewPage() {
         )}
       </div>
       {contextMenu.menu}
+
+      {/* Add Invoice Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-100">Add Invoice</h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-200"><XMarkIcon className="h-5 w-5" /></button>
+            </div>
+            <form onSubmit={handleCreateInvoice} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Vendor Name *</label>
+                <input type="text" required value={invoiceForm.vendor_name} onChange={(e) => setInvoiceForm({ ...invoiceForm, vendor_name: e.target.value })} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Invoice Number</label>
+                <input type="text" value={invoiceForm.invoice_number} onChange={(e) => setInvoiceForm({ ...invoiceForm, invoice_number: e.target.value })} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Amount</label>
+                <input type="number" step="0.01" value={invoiceForm.total_amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, total_amount: e.target.value })} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Due Date</label>
+                <input type="date" value={invoiceForm.due_date} onChange={(e) => setInvoiceForm({ ...invoiceForm, due_date: e.target.value })} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Notes</label>
+                <textarea value={invoiceForm.notes} onChange={(e) => setInvoiceForm({ ...invoiceForm, notes: e.target.value })} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 text-sm" rows={2} />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Attachment</label>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp,.xlsx,.xls,.csv" onChange={(e) => setInvoiceForm({ ...invoiceForm, attachment: e.target.files[0] || null })} className="w-full text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-300 hover:file:bg-gray-600" />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Add Invoice</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -66,6 +66,11 @@ async def qbo_callback(
         except (ValueError, KeyError):
             pass
 
+    if not user_id:
+        return HTMLResponse(
+            content="<html><body><h2>QuickBooks connection failed.</h2><p>Invalid or expired state token. Please try again.</p><script>window.close()</script></body></html>"
+        )
+
     svc = QuickBooksService(db, user_id)
     success = await svc.exchange_code(code, realmId)
 

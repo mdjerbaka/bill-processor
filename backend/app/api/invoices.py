@@ -336,7 +336,7 @@ async def approve_invoice(
 
     # Create or restore payable entry
     existing_payable_result = await db.execute(
-        select(Payable).where(Payable.invoice_id == invoice_id)
+        select(Payable).where(Payable.invoice_id == invoice_id, Payable.user_id == user.id)
     )
     existing_payable = existing_payable_result.scalar_one_or_none()
     if existing_payable:
@@ -444,7 +444,7 @@ async def junk_invoice(
 
     # Also junk the associated payable
     payable_result = await db.execute(
-        select(Payable).where(Payable.invoice_id == invoice_id)
+        select(Payable).where(Payable.invoice_id == invoice_id, Payable.user_id == user.id)
     )
     payable = payable_result.scalar_one_or_none()
     if payable:
@@ -474,7 +474,7 @@ async def restore_invoice(
 
     # Also restore the associated payable
     payable_result = await db.execute(
-        select(Payable).where(Payable.invoice_id == invoice_id)
+        select(Payable).where(Payable.invoice_id == invoice_id, Payable.user_id == user.id)
     )
     payable = payable_result.scalar_one_or_none()
     if payable:
