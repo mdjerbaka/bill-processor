@@ -145,11 +145,17 @@ class PayablesService:
 
     async def export_to_excel(self) -> bytes:
         """Export payables to an Excel spreadsheet matching 'Real Bank Balance' format."""
-        # Fetch all payables with invoice info
+        # Fetch non-junked, non-permanent payables with optional invoice info
         result = await self.db.execute(
             select(Payable, Invoice, Job)
-            .join(Invoice, Payable.invoice_id == Invoice.id)
+            .outerjoin(Invoice, Payable.invoice_id == Invoice.id)
             .outerjoin(Job, Invoice.job_id == Job.id)
+            .where(
+                Payable.user_id == self.user_id,
+                Payable.is_junked == False,  # noqa: E712
+                Payable.is_permanent == False,  # noqa: E712
+                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
+            )
             .order_by(Payable.due_date.asc())
         )
         rows = result.all()
@@ -191,7 +197,7 @@ class PayablesService:
             days_until = (payable.due_date - now).days if payable.due_date else None
 
             ws.cell(row=row_idx, column=1, value=payable.vendor_name).border = thin_border
-            ws.cell(row=row_idx, column=2, value=invoice.invoice_number or "").border = thin_border
+            ws.cell(row=row_idx, column=2, value=payable.invoice_number or (invoice.invoice_number if invoice else "") or "").border = thin_border
 
             amount_cell = ws.cell(row=row_idx, column=3, value=payable.amount)
             amount_cell.number_format = money_format

@@ -698,6 +698,7 @@ class RecurringBillsService:
                 Payable.user_id == self.user_id,
                 Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
                 Payable.is_junked == False,  # noqa: E712
+                Payable.is_permanent == False,  # noqa: E712
                 Payable.included_in_cashflow == True,  # noqa: E712
             )
         )

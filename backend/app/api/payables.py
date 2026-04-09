@@ -422,6 +422,7 @@ async def backfill_missing_payables(
     result = await db.execute(
         select(Invoice).where(
             and_(
+                Invoice.user_id == user.id,
                 Invoice.status.in_([
                     InvoiceStatus.AUTO_MATCHED,
                     InvoiceStatus.APPROVED,
