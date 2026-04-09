@@ -83,32 +83,32 @@ class PayablesService:
         )
         await self.db.flush()
 
-        # Total outstanding
+        # Base filter: non-junked, non-permanent, active payables for this user
+        base_filter = [
+            Payable.user_id == self.user_id,
+            Payable.is_junked == False,  # noqa: E712
+            Payable.is_permanent == False,  # noqa: E712
+            Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
+        ]
+
+        # Total outstanding (all non-junked, non-permanent)
         result = await self.db.execute(
-            select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
-                Payable.user_id == self.user_id,
-                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
-                Payable.included_in_cashflow == True,  # noqa: E712
-            )
+            select(func.coalesce(func.sum(Payable.amount), 0.0)).where(*base_filter)
         )
         total_outstanding = result.scalar()
 
-        # Total overdue
+        # Total overdue (all non-junked, non-permanent)
         result = await self.db.execute(
             select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
-                Payable.user_id == self.user_id,
+                *base_filter,
                 Payable.status == PayableStatus.OVERDUE,
-                Payable.included_in_cashflow == True,  # noqa: E712
             )
         )
         total_overdue = result.scalar()
 
         # Count
         result = await self.db.execute(
-            select(func.count(Payable.id)).where(
-                Payable.user_id == self.user_id,
-                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE])
-            )
+            select(func.count(Payable.id)).where(*base_filter)
         )
         count = result.scalar()
 
