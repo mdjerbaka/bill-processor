@@ -10,10 +10,10 @@ async def main():
     from sqlalchemy import text
 
     async with async_session_factory() as db:
-        r = await db.execute(text("SELECT id, email, created_at FROM users ORDER BY id"))
+        r = await db.execute(text("SELECT id, username, created_at FROM users ORDER BY id"))
         print("=== USERS ===")
         for row in r.fetchall():
-            print(f"  id={row[0]} email={row[1]} created={row[2]}")
+            print(f"  id={row[0]} username={row[1]} created={row[2]}")
 
         print()
         for table in ["payables", "recurring_bills", "invoices", "receivable_checks"]:
