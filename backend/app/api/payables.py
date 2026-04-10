@@ -71,6 +71,7 @@ async def list_payables(
             job_name=p.job_name or (job.name if job else None),
             is_permanent=p.is_permanent,
             included_in_cashflow=p.included_in_cashflow,
+            notes=p.notes,
             has_attachment=bool(p.attachment_path),
         )
         for p, inv, job in rows
@@ -99,6 +100,7 @@ async def create_payable(
         is_permanent=req.is_permanent if req.is_permanent else False,
         included_in_cashflow=req.included_in_cashflow if req.included_in_cashflow is not None else True,
         invoice_number=req.invoice_number,
+        notes=req.notes,
         user_id=user.id,
     )
     db.add(payable)
@@ -116,6 +118,7 @@ async def create_payable(
         job_name=None,
         is_permanent=payable.is_permanent,
         included_in_cashflow=payable.included_in_cashflow,
+        notes=payable.notes,
     )
 
 
@@ -175,6 +178,7 @@ async def update_payable(
         job_name=payable.job_name or job_name,
         is_permanent=payable.is_permanent,
         included_in_cashflow=payable.included_in_cashflow,
+        notes=payable.notes,
     )
 
 

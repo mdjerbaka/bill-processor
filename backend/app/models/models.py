@@ -306,6 +306,7 @@ class Payable(Base):
     job_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     qbo_bill_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     qbo_vendor_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     attachment_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     attachment_filename: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 

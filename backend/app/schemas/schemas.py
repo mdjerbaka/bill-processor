@@ -186,6 +186,7 @@ class PayableSchema(BaseModel):
     job_name: Optional[str] = None
     is_permanent: bool = False
     included_in_cashflow: bool = True
+    notes: Optional[str] = None
     has_attachment: bool = False
 
     class Config:
@@ -217,6 +218,7 @@ class PayableCreateRequest(BaseModel):
     invoice_number: Optional[str] = None
     is_permanent: Optional[bool] = False
     included_in_cashflow: Optional[bool] = True
+    notes: Optional[str] = None
 
 
 class PayableUpdateRequest(BaseModel):
@@ -227,6 +229,7 @@ class PayableUpdateRequest(BaseModel):
     invoice_number: Optional[str] = None
     is_permanent: Optional[bool] = None
     included_in_cashflow: Optional[bool] = None
+    notes: Optional[str] = None
 
 
 class InvoiceCreateRequest(BaseModel):
