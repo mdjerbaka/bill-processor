@@ -43,6 +43,15 @@ export default function PaymentsOutPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingPayment, setEditingPayment] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [editingNotesId, setEditingNotesId] = useState(null)
+  const [notesInput, setNotesInput] = useState('')
+
+  const handleUpdateNotes = async (id, notes) => {
+    try {
+      await paymentsOutAPI.update(id, { notes })
+      setPayments(prev => prev.map(p => p.id === id ? { ...p, notes } : p))
+    } catch { toast.error('Failed to update notes') }
+  }
   const [showImport, setShowImport] = useState(false)
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
@@ -514,8 +523,18 @@ export default function PaymentsOutPage() {
                     <td className="px-4 py-3 text-right font-medium text-gray-200">
                       {fmt(payment.amount)}
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs max-w-[150px] truncate">
-                      {payment.notes || '—'}
+                    <td className="px-4 py-3 text-gray-400 text-xs max-w-[150px]">
+                      {editingNotesId === payment.id ? (
+                        <div className="flex items-center gap-1">
+                          <input autoFocus value={notesInput} onChange={(e) => setNotesInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { handleUpdateNotes(payment.id, notesInput); setEditingNotesId(null) } if (e.key === 'Escape') setEditingNotesId(null) }}
+                            className="w-full bg-gray-700 border border-blue-500 text-gray-200 rounded px-2 py-0.5 text-xs" />
+                          <button onClick={() => { handleUpdateNotes(payment.id, notesInput); setEditingNotesId(null) }} className="text-green-400 text-xs px-1">✓</button>
+                          <button onClick={() => setEditingNotesId(null)} className="text-gray-500 text-xs px-1">✕</button>
+                        </div>
+                      ) : (
+                        <span className="cursor-pointer hover:text-blue-400 truncate block" onClick={() => { setEditingNotesId(payment.id); setNotesInput(payment.notes || '') }} title="Click to edit notes">{payment.notes || '—'}</span>
+                      )}
                     </td>
                     {tab === 'history' && (
                       <td className="px-4 py-3 text-green-400 text-xs">

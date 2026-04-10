@@ -164,6 +164,9 @@ export default function BillsPage() {
   const [vendorForm, setVendorForm] = useState({ vendor_name: '', account_info: '', as_of_date: '', due_date: '', amount: '', notes_due_dates: '', links: '' })
   const [editingLockedBillId, setEditingLockedBillId] = useState(null)
   const [lockedBillAmountInput, setLockedBillAmountInput] = useState('')
+  const [editingNotesId, setEditingNotesId] = useState(null)
+  const [editingNotesType, setEditingNotesType] = useState(null)
+  const [notesInput, setNotesInput] = useState('')
 
   function handleSort(column) {
     if (sortColumn === column) {
@@ -802,7 +805,22 @@ export default function BillsPage() {
                     </td>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{lb.due_date ? new Date(lb.due_date).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={lb.status} /></td>
-                    <td className="px-4 py-2.5 text-gray-400 text-xs max-w-[200px] truncate">{lb.notes || '—'}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs max-w-[200px]">
+                      {editingNotesId === lb.id && editingNotesType === 'locked' ? (
+                        <div className="flex items-center gap-1">
+                          <input autoFocus value={notesInput} onChange={(e) => setNotesInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') { payablesAPI.update(lb.id, { notes: notesInput }).then(() => { setEditingNotesId(null); loadData() }).catch(() => toast.error('Failed')) }
+                              if (e.key === 'Escape') setEditingNotesId(null)
+                            }}
+                            className="w-full bg-gray-700 border border-blue-500 text-gray-200 rounded px-2 py-0.5 text-xs" />
+                          <button onClick={() => { payablesAPI.update(lb.id, { notes: notesInput }).then(() => { setEditingNotesId(null); loadData() }).catch(() => toast.error('Failed')) }} className="text-green-400 text-xs px-1">✓</button>
+                          <button onClick={() => setEditingNotesId(null)} className="text-gray-500 text-xs px-1">✕</button>
+                        </div>
+                      ) : (
+                        <span className="cursor-pointer hover:text-blue-400 truncate block" onClick={() => { setEditingNotesId(lb.id); setEditingNotesType('locked'); setNotesInput(lb.notes || '') }} title="Click to edit notes">{lb.notes || '—'}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-right">
                       <button
                         onClick={async () => {
@@ -870,7 +888,22 @@ export default function BillsPage() {
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{v.as_of_date ? new Date(v.as_of_date).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{v.due_date ? new Date(v.due_date).toLocaleDateString() : '—'}</td>
                     <td className={`px-4 py-2.5 text-right font-medium ${(v.amount || 0) > 0 ? 'text-red-400' : 'text-gray-200'}`}>{fmt(v.amount)}</td>
-                    <td className="px-4 py-2.5 text-gray-400 text-xs max-w-[180px] truncate">{v.notes_due_dates || '—'}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs max-w-[180px]">
+                      {editingNotesId === v.id && editingNotesType === 'vendor' ? (
+                        <div className="flex items-center gap-1">
+                          <input autoFocus value={notesInput} onChange={(e) => setNotesInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') { vendorAccountsAPI.update(v.id, { notes_due_dates: notesInput }).then(() => { setEditingNotesId(null); loadData() }).catch(() => toast.error('Failed')) }
+                              if (e.key === 'Escape') setEditingNotesId(null)
+                            }}
+                            className="w-full bg-gray-700 border border-blue-500 text-gray-200 rounded px-2 py-0.5 text-xs" />
+                          <button onClick={() => { vendorAccountsAPI.update(v.id, { notes_due_dates: notesInput }).then(() => { setEditingNotesId(null); loadData() }).catch(() => toast.error('Failed')) }} className="text-green-400 text-xs px-1">✓</button>
+                          <button onClick={() => setEditingNotesId(null)} className="text-gray-500 text-xs px-1">✕</button>
+                        </div>
+                      ) : (
+                        <span className="cursor-pointer hover:text-blue-400 truncate block" onClick={() => { setEditingNotesId(v.id); setEditingNotesType('vendor'); setNotesInput(v.notes_due_dates || '') }} title="Click to edit notes">{v.notes_due_dates || '—'}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-xs">
                       {v.links ? (
                         <a href={v.links} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">Login</a>

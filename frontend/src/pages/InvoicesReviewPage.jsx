@@ -25,6 +25,15 @@ export default function InvoicesReviewPage() {
   const [invoiceForm, setInvoiceForm] = useState({
     vendor_name: '', invoice_number: '', total_amount: '', due_date: '', notes: '', attachment: null,
   })
+  const [editingNotesId, setEditingNotesId] = useState(null)
+  const [notesInput, setNotesInput] = useState('')
+
+  const handleUpdateNotes = async (id, notes) => {
+    try {
+      await invoicesAPI.update(id, { notes })
+      setInvoices(prev => prev.map(i => i.id === id ? { ...i, notes } : i))
+    } catch { toast.error('Failed to update notes') }
+  }
 
   const loadInvoices = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -134,7 +143,19 @@ export default function InvoicesReviewPage() {
                   <td className="px-6 py-4 text-sm text-gray-400">
                     {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-400 max-w-xs truncate">{inv.notes || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-400 max-w-xs">
+                    {editingNotesId === inv.id ? (
+                      <div className="flex items-center gap-1">
+                        <input autoFocus value={notesInput} onChange={(e) => setNotesInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { handleUpdateNotes(inv.id, notesInput); setEditingNotesId(null) } if (e.key === 'Escape') setEditingNotesId(null) }}
+                          className="w-full bg-gray-700 border border-blue-500 text-gray-200 rounded px-2 py-0.5 text-xs" />
+                        <button onClick={() => { handleUpdateNotes(inv.id, notesInput); setEditingNotesId(null) }} className="text-green-400 text-xs px-1">✓</button>
+                        <button onClick={() => setEditingNotesId(null)} className="text-gray-500 text-xs px-1">✕</button>
+                      </div>
+                    ) : (
+                      <span className="cursor-pointer hover:text-blue-400 truncate block" onClick={() => { setEditingNotesId(inv.id); setNotesInput(inv.notes || '') }} title="Click to edit notes">{inv.notes || '—'}</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[inv.status] || ''}`}>
                       {inv.status.replace(/_/g, ' ')}
