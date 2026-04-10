@@ -163,6 +163,13 @@ export default function ReceivablesPage() {
     return '#' + jobName.split('#').slice(1).join('#')
   }
 
+  // Parse job description (everything before #)
+  function parseJobDesc(jobName) {
+    if (!jobName) return '—'
+    if (!jobName.includes('#')) return jobName
+    return jobName.split('#')[0].trim() || jobName
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -247,6 +254,7 @@ export default function ReceivablesPage() {
                     onToggleCollect={handleToggleCollect}
                     fmt={fmt}
                     parseInvoiceNum={parseInvoiceNum}
+                    parseJobDesc={parseJobDesc}
                   />
                 ))}
               </tbody>
@@ -329,7 +337,7 @@ export default function ReceivablesPage() {
   )
 }
 
-function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggleCollect, fmt, parseInvoiceNum }) {
+function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggleCollect, fmt, parseInvoiceNum, parseJobDesc }) {
   const isOverdue = (dateStr) => dateStr && new Date(dateStr) < new Date()
 
   return (
@@ -353,7 +361,7 @@ function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggl
       {expanded && customer.invoices.map((inv) => (
         <tr key={inv.id} className="border-b border-gray-700/30 hover:bg-gray-700/20">
           <td className="px-4 py-2"></td>
-          <td className="px-4 py-2 text-gray-300 pl-10">{inv.job_name}</td>
+          <td className="px-4 py-2 text-gray-300 pl-10">{parseJobDesc(inv.job_name)}</td>
           <td className="px-4 py-2 text-gray-400 text-xs">{parseInvoiceNum(inv.job_name) || '—'}</td>
           <td className="px-4 py-2 text-right text-gray-200">{fmt(inv.invoiced_amount)}</td>
           <td className="px-4 py-2 text-center">

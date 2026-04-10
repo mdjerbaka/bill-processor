@@ -207,27 +207,10 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
 
                                 matcher = JobMatchingService(db, email_user_id)
                                 await matcher.match_invoice(invoice)
-
-                                # Create payable + auto-send to QuickBooks if auto-matched
+                                # Always require client review before creating payables
                                 if invoice.status == InvoiceStatus.AUTO_MATCHED:
-                                    try:
-                                        payables_svc = PayablesService(db, email_user_id)
-                                        await payables_svc.create_payable(invoice)
-                                        await db.flush()
-                                        logger.info(f"Created payable for auto-matched invoice {invoice.id}")
-                                    except Exception as pay_err:
-                                        logger.error(f"Payable creation failed for invoice {invoice.id}: {pay_err}")
-                                    try:
-                                        qb_svc = QuickBooksService(db, email_user_id)
-                                        bill_id, vendor_id = await qb_svc.auto_send_bill(invoice)
-                                        if bill_id:
-                                            invoice.qbo_bill_id = bill_id
-                                            invoice.qbo_vendor_id = vendor_id
-                                            invoice.status = InvoiceStatus.SENT_TO_QB
-                                            await db.flush()
-                                            logger.info(f"Auto-sent invoice {invoice.id} to QB as bill {bill_id}")
-                                    except Exception as qb_err:
-                                        logger.error(f"QB auto-send failed for invoice {invoice.id}: {qb_err}")
+                                    invoice.status = InvoiceStatus.NEEDS_REVIEW
+                                    await db.flush()
 
                                 logger.info(
                                     f"Extracted invoice {invoice.id} from email body: "
@@ -305,7 +288,7 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                     tax_amount=extracted.tax_amount,
                     extracted_data=extracted.to_dict(),
                     confidence_score=extracted.confidence_score,
-                    status=InvoiceStatus.EXTRACTED,
+                    status=InvoiceStatus.NEEDS_REVIEW,
                     user_id=email_user_id,
                 )
 
@@ -322,10 +305,6 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
                         invoice.due_date = parse_date(extracted.due_date)
                     except (ValueError, TypeError):
                         pass
-
-                # Set status based on confidence
-                if extracted.confidence_score < 0.8:
-                    invoice.status = InvoiceStatus.NEEDS_REVIEW
 
                 db.add(invoice)
                 await db.flush()
@@ -344,30 +323,13 @@ async def process_email_attachments(ctx: dict, email_id: int) -> dict:
 
                 await db.flush()
 
-                # Run job matching
+                # Run job matching (populates job_id suggestion but keeps NEEDS_REVIEW)
                 matcher = JobMatchingService(db, email_user_id)
                 await matcher.match_invoice(invoice)
-
-                # Create payable + auto-send to QuickBooks if auto-matched
+                # Always require client review before creating payables
                 if invoice.status == InvoiceStatus.AUTO_MATCHED:
-                    try:
-                        payables_svc = PayablesService(db, email_user_id)
-                        await payables_svc.create_payable(invoice)
-                        await db.flush()
-                        logger.info(f"Created payable for auto-matched invoice {invoice.id}")
-                    except Exception as pay_err:
-                        logger.error(f"Payable creation failed for invoice {invoice.id}: {pay_err}")
-                    try:
-                        qb_svc = QuickBooksService(db, email_user_id)
-                        bill_id, vendor_id = await qb_svc.auto_send_bill(invoice)
-                        if bill_id:
-                            invoice.qbo_bill_id = bill_id
-                            invoice.qbo_vendor_id = vendor_id
-                            invoice.status = InvoiceStatus.SENT_TO_QB
-                            await db.flush()
-                            logger.info(f"Auto-sent invoice {invoice.id} to QB as bill {bill_id}")
-                    except Exception as qb_err:
-                        logger.error(f"QB auto-send failed for invoice {invoice.id}: {qb_err}")
+                    invoice.status = InvoiceStatus.NEEDS_REVIEW
+                    await db.flush()
 
                 invoices_created += 1
                 logger.info(
