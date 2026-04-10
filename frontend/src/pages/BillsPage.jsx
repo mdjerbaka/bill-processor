@@ -878,8 +878,16 @@ export default function BillsPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button onClick={() => handleToggleVendorCashflow(v)} className={`p-1 ${v.included_in_cashflow !== false ? 'text-green-400 hover:text-green-300' : 'text-gray-600 hover:text-gray-400'}`} title={v.included_in_cashflow !== false ? 'Included in cashflow — click to exclude' : 'Excluded from cashflow — click to include'}>
-                          {v.included_in_cashflow !== false ? <EyeIcon className="h-3.5 w-3.5" /> : <EyeSlashIcon className="h-3.5 w-3.5" />}
+                        <button
+                          onClick={() => handleToggleVendorCashflow(v)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                            v.included_in_cashflow !== false
+                              ? 'bg-green-900/50 text-green-400 hover:bg-green-800/60'
+                              : 'bg-gray-700 text-gray-500 hover:bg-gray-600'
+                          }`}
+                          title={v.included_in_cashflow !== false ? 'Included in cashflow — click to exclude' : 'Excluded from cashflow — click to include'}
+                        >
+                          {v.included_in_cashflow !== false ? <><EyeIcon className="h-3.5 w-3.5" /> On</> : <><EyeSlashIcon className="h-3.5 w-3.5" /> Off</>}
                         </button>
                         <button onClick={() => openEditVendor(v)} className="p-1 text-gray-400 hover:text-blue-400"><PencilIcon className="h-3.5 w-3.5" /></button>
                         <button onClick={() => handleDeleteVendor(v.id)} className="p-1 text-gray-400 hover:text-red-400"><TrashIcon className="h-3.5 w-3.5" /></button>

@@ -129,6 +129,13 @@ export default function ReceivablesPage() {
     } catch { toast.error('Failed to toggle collect') }
   }
 
+  async function handleUpdateNotes(id, notes) {
+    try {
+      await receivablesAPI.update(id, { notes })
+      loadData()
+    } catch { toast.error('Failed to update notes') }
+  }
+
   async function handleImport() {
     if (!importFile) { toast.error('Please select a CSV file'); return }
     setImporting(true)
@@ -252,6 +259,7 @@ export default function ReceivablesPage() {
                     onEdit={openEditForm}
                     onDelete={handleDelete}
                     onToggleCollect={handleToggleCollect}
+                    onUpdateNotes={handleUpdateNotes}
                     fmt={fmt}
                     parseInvoiceNum={parseInvoiceNum}
                     parseJobDesc={parseJobDesc}
@@ -337,8 +345,10 @@ export default function ReceivablesPage() {
   )
 }
 
-function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggleCollect, fmt, parseInvoiceNum, parseJobDesc }) {
+function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggleCollect, onUpdateNotes, fmt, parseInvoiceNum, parseJobDesc }) {
   const isOverdue = (dateStr) => dateStr && new Date(dateStr) < new Date()
+  const [editingNotesId, setEditingNotesId] = useState(null)
+  const [notesInput, setNotesInput] = useState('')
 
   return (
     <>
@@ -378,7 +388,32 @@ function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggl
           <td className={`px-4 py-2 text-xs ${isOverdue(inv.due_date) ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
             {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'}
           </td>
-          <td className="px-4 py-2 text-gray-400 text-xs max-w-[180px] truncate">{inv.notes || '—'}</td>
+          <td className="px-4 py-2 text-gray-400 text-xs max-w-[200px]">
+            {editingNotesId === inv.id ? (
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  autoFocus
+                  value={notesInput}
+                  onChange={(e) => setNotesInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { onUpdateNotes(inv.id, notesInput); setEditingNotesId(null) }
+                    if (e.key === 'Escape') setEditingNotesId(null)
+                  }}
+                  className="w-full bg-gray-700 border border-blue-500 text-gray-200 rounded px-2 py-0.5 text-xs"
+                />
+                <button onClick={() => { onUpdateNotes(inv.id, notesInput); setEditingNotesId(null) }} className="text-green-400 hover:text-green-300 text-xs px-1">✓</button>
+                <button onClick={() => setEditingNotesId(null)} className="text-gray-500 hover:text-gray-300 text-xs px-1">✕</button>
+              </div>
+            ) : (
+              <span
+                className="cursor-pointer hover:text-blue-400 truncate block"
+                onClick={(e) => { e.stopPropagation(); setEditingNotesId(inv.id); setNotesInput(inv.notes || '') }}
+                title="Click to edit notes"
+              >
+                {inv.notes || '—'}
+              </span>
+            )}
+          </td>
           <td className="px-4 py-2 text-right">
             <div className="flex items-center justify-end gap-1.5">
               <button onClick={() => onEdit(inv)} className="p-1 text-gray-400 hover:text-blue-400"><PencilIcon className="h-3.5 w-3.5" /></button>
