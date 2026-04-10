@@ -95,6 +95,7 @@ export const payablesAPI = {
   getRealBalance: () => api.get('/payables/real-balance'),
   getCombinedTotal: () => api.get('/payables/combined-total'),
   exportExcel: () => api.get('/payables/export', { responseType: 'blob' }),
+  getAttachment: (id) => api.get(`/payables/${id}/attachment`, { responseType: 'blob' }),
   importCSV: (file) => {
     const formData = new FormData()
     formData.append('file', file)

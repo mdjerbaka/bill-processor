@@ -8,7 +8,7 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -71,6 +71,7 @@ async def list_payables(
             job_name=p.job_name or (job.name if job else None),
             is_permanent=p.is_permanent,
             included_in_cashflow=p.included_in_cashflow,
+            has_attachment=bool(p.attachment_path),
         )
         for p, inv, job in rows
     ]
@@ -385,6 +386,33 @@ async def get_combined_total(
         "bills_outstanding": bills_total,
         "combined_total": summary["total_outstanding"] + bills_total,
     }
+
+
+@router.get("/{payable_id}/attachment")
+async def get_payable_attachment(
+    payable_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Serve the attachment file associated with a payable."""
+    import os
+
+    result = await db.execute(
+        select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
+    )
+    payable = result.scalar_one_or_none()
+    if not payable:
+        raise HTTPException(status_code=404, detail="Payable not found")
+    if not payable.attachment_path:
+        raise HTTPException(status_code=404, detail="No attachment for this payable")
+    if not os.path.exists(payable.attachment_path):
+        raise HTTPException(status_code=404, detail="Attachment file not found on disk")
+
+    return FileResponse(
+        path=payable.attachment_path,
+        filename=payable.attachment_filename or "attachment",
+        media_type="application/octet-stream",
+    )
 
 
 @router.get("/export")

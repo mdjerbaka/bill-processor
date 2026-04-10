@@ -121,7 +121,7 @@ class PayablesService:
     async def get_real_balance(self) -> dict:
         """Calculate real available funds.
 
-        Formula: bank + receivables (collect) - outstanding payables - buffer
+        Formula: bank + receivables (collect) - outstanding payables - buffer - payments out - locked bills
         """
         # Get current bank balance from settings
         result = await self.db.execute(
@@ -150,12 +150,44 @@ class PayablesService:
         )
         total_receivables = float(recv_result.scalar() or 0.0)
 
+        # Get total outstanding payments out (checks/ACH not yet cleared)
+        from app.models.models import PaymentOut, PaymentOutStatus
+        po_result = await self.db.execute(
+            select(func.coalesce(func.sum(PaymentOut.amount), 0.0)).where(
+                PaymentOut.user_id == self.user_id,
+                PaymentOut.status == PaymentOutStatus.OUTSTANDING,
+            )
+        )
+        total_payments_out = float(po_result.scalar() or 0.0)
+
+        # Get total locked bills (permanent payables — payroll, buffer, 401k, etc.)
+        locked_result = await self.db.execute(
+            select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
+                Payable.user_id == self.user_id,
+                Payable.is_junked == False,  # noqa: E712
+                Payable.is_permanent == True,  # noqa: E712
+                Payable.status.in_([PayableStatus.OUTSTANDING, PayableStatus.OVERDUE]),
+            )
+        )
+        total_locked_bills = float(locked_result.scalar() or 0.0)
+
+        real_available = (
+            bank_balance
+            + total_receivables
+            - summary["total_outstanding"]
+            - buffer
+            - total_payments_out
+            - total_locked_bills
+        )
+
         return {
             "bank_balance": bank_balance,
             "total_outstanding": summary["total_outstanding"],
             "total_receivables": total_receivables,
             "buffer": buffer,
-            "real_available": bank_balance + total_receivables - summary["total_outstanding"] - buffer,
+            "total_payments_out": total_payments_out,
+            "total_locked_bills": total_locked_bills,
+            "real_available": real_available,
         }
 
     async def export_to_excel(self) -> bytes:

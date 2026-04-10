@@ -65,3 +65,14 @@ class VendorAccountsService:
             .where(VendorAccount.user_id == self.user_id)
         )
         return float(result.scalar() or 0.0)
+
+    async def get_cashflow_total(self) -> float:
+        """Total of only vendor accounts included in cashflow."""
+        result = await self.db.execute(
+            select(func.coalesce(func.sum(VendorAccount.amount), 0.0))
+            .where(
+                VendorAccount.user_id == self.user_id,
+                VendorAccount.included_in_cashflow == True,
+            )
+        )
+        return float(result.scalar() or 0.0)

@@ -306,6 +306,8 @@ class Payable(Base):
     job_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     qbo_bill_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     qbo_vendor_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    attachment_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    attachment_filename: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     invoice: Mapped["Invoice"] = relationship(back_populates="payable")
 
@@ -470,5 +472,6 @@ class VendorAccount(Base):
     notes_due_dates: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     links: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    included_in_cashflow: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

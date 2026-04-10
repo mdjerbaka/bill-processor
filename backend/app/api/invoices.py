@@ -379,19 +379,16 @@ async def approve_invoice(
     payable.invoice_id = None
     await db.flush()
 
-    # Delete attachment file from disk if present
+    # Preserve attachment info on payable (keep file on disk for viewing)
     if invoice.attachment_id:
         att_result = await db.execute(
             select(Attachment).where(Attachment.id == invoice.attachment_id)
         )
         attachment = att_result.scalar_one_or_none()
-        if attachment and attachment.file_path:
-            import os
-            try:
-                if os.path.exists(attachment.file_path):
-                    os.remove(attachment.file_path)
-            except OSError:
-                logger.warning(f"Could not delete attachment file: {attachment.file_path}")
+        if attachment:
+            payable.attachment_path = attachment.file_path
+            payable.attachment_filename = attachment.filename
+            await db.flush()
 
     # Hard-delete the invoice (cascades to line items)
     await db.delete(invoice)

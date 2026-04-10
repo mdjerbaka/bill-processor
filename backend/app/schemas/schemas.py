@@ -186,9 +186,16 @@ class PayableSchema(BaseModel):
     job_name: Optional[str] = None
     is_permanent: bool = False
     included_in_cashflow: bool = True
+    has_attachment: bool = False
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    def from_orm_with_attachment(cls, payable):
+        data = cls.model_validate(payable).model_dump()
+        data["has_attachment"] = bool(payable.attachment_path)
+        return cls(**data)
 
 
 class PayableListResponse(BaseModel):
@@ -238,7 +245,10 @@ class InvoiceCreateRequest(BaseModel):
 class RealBalanceResponse(BaseModel):
     bank_balance: float
     total_outstanding: float
+    total_receivables: float = 0.0
     buffer: float = 0.0
+    total_payments_out: float = 0.0
+    total_locked_bills: float = 0.0
     real_available: float
 
 
@@ -514,6 +524,7 @@ class VendorAccountCreate(BaseModel):
     notes_due_dates: Optional[str] = None
     links: Optional[str] = None
     sort_order: int = 0
+    included_in_cashflow: bool = True
 
 
 class VendorAccountUpdate(BaseModel):
@@ -525,6 +536,7 @@ class VendorAccountUpdate(BaseModel):
     notes_due_dates: Optional[str] = None
     links: Optional[str] = None
     sort_order: Optional[int] = None
+    included_in_cashflow: Optional[bool] = None
 
 
 class VendorAccountSchema(BaseModel):
@@ -537,6 +549,7 @@ class VendorAccountSchema(BaseModel):
     notes_due_dates: Optional[str] = None
     links: Optional[str] = None
     sort_order: int
+    included_in_cashflow: bool = True
     created_at: datetime
     updated_at: datetime
 

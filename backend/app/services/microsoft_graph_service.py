@@ -332,13 +332,13 @@ class MicrosoftGraphService:
         try:
             headers = {"Authorization": f"Bearer {access}"}
             async with httpx.AsyncClient(timeout=60.0) as client:
-                # Get recent unread messages that have attachments
+                # Get recent unread messages (with and without attachments)
                 since = (datetime.now(timezone.utc) - timedelta(days=2)).strftime(
                     "%Y-%m-%dT%H:%M:%SZ"
                 )
                 params = {
-                    "$filter": f"isRead eq false and hasAttachments eq true and receivedDateTime ge {since}",
-                    "$select": "id,subject,from,receivedDateTime,body,internetMessageId",
+                    "$filter": f"isRead eq false and receivedDateTime ge {since}",
+                    "$select": "id,subject,from,receivedDateTime,body,internetMessageId,hasAttachments",
                     "$top": "20",
                 }
                 # $orderby combined with $filter is rejected by Graph API
@@ -365,10 +365,10 @@ class MicrosoftGraphService:
 
                 messages = resp.json().get("value", [])
                 if not messages:
-                    logger.info("No unread messages with attachments in MS 365 inbox")
+                    logger.info("No unread messages in MS 365 inbox")
                     return []
 
-                logger.info(f"Found {len(messages)} unread messages with attachments")
+                logger.info(f"Found {len(messages)} unread messages")
 
                 for msg in messages:
                     try:
@@ -451,7 +451,44 @@ class MicrosoftGraphService:
                 valid_attachments.append(att)
 
         if not valid_attachments:
-            # No invoice-like attachments, skip
+            # No invoice-like attachments — check for body-text invoice or create notification
+            has_body = body_text and len(body_text.strip()) > 50 if body_text else False
+
+            if has_body:
+                # Ingest as body-text-only email (like IMAP service does)
+                try:
+                    email_record = Email(
+                        message_id=message_id,
+                        from_address=from_addr,
+                        subject=subject,
+                        body_text=body_text[:5000] if body_text else "",
+                        status=EmailStatus.PENDING,
+                        user_id=self.user_id,
+                    )
+                    self.db.add(email_record)
+                    await self.db.flush()
+                    await self.db.commit()
+                    logger.info(f"Ingested body-only MS Graph email {email_record.id}: {subject}")
+                    return email_record.id
+                except Exception as e:
+                    await self.db.rollback()
+                    if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                        return None
+                    logger.error(f"Failed to ingest body-only email '{subject}': {e}")
+                    raise
+
+            # Create notification for email without supported attachment
+            from app.models.models import Notification, NotificationType
+            notification = Notification(
+                user_id=self.user_id,
+                type=NotificationType.EMAIL_NO_ATTACHMENT,
+                title="Email without attachment",
+                message=f"From: {from_addr}\nSubject: {subject}",
+            )
+            self.db.add(notification)
+            await self.db.flush()
+            await self.db.commit()
+            logger.info(f"Created no-attachment notification for MS Graph email: {subject}")
             return None
 
         try:

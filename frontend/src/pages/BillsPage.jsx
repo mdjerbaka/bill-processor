@@ -21,6 +21,8 @@ import {
   InformationCircleIcon,
   CurrencyDollarIcon,
   LockOpenIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline'
 
 const FREQUENCY_OPTIONS = [
@@ -74,6 +76,7 @@ const STATUS_COLORS = {
 }
 
 function StatusBadge({ status }) {
+  if (status === 'upcoming') return null
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[status] || 'bg-gray-700 text-gray-400'}`}>
       {status.replace(/_/g, ' ')}
@@ -159,6 +162,8 @@ export default function BillsPage() {
   const [showVendorForm, setShowVendorForm] = useState(false)
   const [editingVendor, setEditingVendor] = useState(null)
   const [vendorForm, setVendorForm] = useState({ vendor_name: '', account_info: '', as_of_date: '', due_date: '', amount: '', notes_due_dates: '', links: '' })
+  const [editingLockedBillId, setEditingLockedBillId] = useState(null)
+  const [lockedBillAmountInput, setLockedBillAmountInput] = useState('')
 
   function handleSort(column) {
     if (sortColumn === column) {
@@ -576,7 +581,18 @@ export default function BillsPage() {
     } catch { toast.error('Failed to delete') }
   }
 
-  const vendorTotal = vendorAccounts.reduce((sum, v) => sum + (v.amount || 0), 0)
+  const vendorTotal = vendorAccounts.filter(v => v.included_in_cashflow !== false).reduce((sum, v) => sum + (v.amount || 0), 0)
+
+  const handleToggleVendorCashflow = async (v) => {
+    try {
+      const newVal = !v.included_in_cashflow
+      await vendorAccountsAPI.update(v.id, { included_in_cashflow: newVal })
+      setVendorAccounts(prev => prev.map(a => a.id === v.id ? { ...a, included_in_cashflow: newVal } : a))
+      toast.success(newVal ? 'Included in cashflow' : 'Excluded from cashflow')
+    } catch (err) {
+      toast.error('Failed to toggle vendor account')
+    }
+  }
 
   const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
@@ -749,7 +765,41 @@ export default function BillsPage() {
                     <td className="px-4 py-2.5">
                       <p className="font-medium text-gray-200">{lb.vendor_name}</p>
                     </td>
-                    <td className="px-4 py-2.5 text-right font-medium text-gray-200">{fmt(lb.amount)}</td>
+                    <td className="px-4 py-2.5 text-right font-medium text-gray-200">
+                      {editingLockedBillId === lb.id ? (
+                        <form
+                          className="flex items-center justify-end gap-1"
+                          onSubmit={async (e) => {
+                            e.preventDefault()
+                            try {
+                              await payablesAPI.update(lb.id, { amount: parseFloat(lockedBillAmountInput) })
+                              toast.success('Amount updated')
+                              setEditingLockedBillId(null)
+                              loadData()
+                            } catch { toast.error('Failed to update') }
+                          }}
+                        >
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={lockedBillAmountInput}
+                            onChange={(e) => setLockedBillAmountInput(e.target.value)}
+                            className="w-24 px-2 py-0.5 bg-gray-700 border border-gray-600 text-gray-200 rounded text-sm text-right"
+                            autoFocus
+                          />
+                          <button type="submit" className="px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded">Save</button>
+                          <button type="button" onClick={() => setEditingLockedBillId(null)} className="px-1.5 py-0.5 text-xs text-gray-400">✕</button>
+                        </form>
+                      ) : (
+                        <span
+                          className="cursor-pointer hover:text-blue-400 transition-colors"
+                          onClick={() => { setEditingLockedBillId(lb.id); setLockedBillAmountInput(lb.amount?.toString() || '0') }}
+                          title="Click to edit amount"
+                        >
+                          {fmt(lb.amount)} <span className="text-xs text-gray-500">✎</span>
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{lb.due_date ? new Date(lb.due_date).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={lb.status} /></td>
                     <td className="px-4 py-2.5 text-gray-400 text-xs max-w-[200px] truncate">{lb.notes || '—'}</td>
@@ -812,7 +862,7 @@ export default function BillsPage() {
               </thead>
               <tbody>
                 {vendorAccounts.map((v) => (
-                  <tr key={v.id} className="border-b border-gray-700/30 hover:bg-gray-700/20">
+                  <tr key={v.id} className={`border-b border-gray-700/30 hover:bg-gray-700/20 ${v.included_in_cashflow === false ? 'opacity-40' : ''}`}>
                     <td className="px-4 py-2.5">
                       <p className="font-medium text-gray-200">{v.vendor_name}</p>
                       {v.account_info && <p className="text-xs text-gray-500">{v.account_info}</p>}
@@ -828,6 +878,9 @@ export default function BillsPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button onClick={() => handleToggleVendorCashflow(v)} className={`p-1 ${v.included_in_cashflow !== false ? 'text-green-400 hover:text-green-300' : 'text-gray-600 hover:text-gray-400'}`} title={v.included_in_cashflow !== false ? 'Included in cashflow — click to exclude' : 'Excluded from cashflow — click to include'}>
+                          {v.included_in_cashflow !== false ? <EyeIcon className="h-3.5 w-3.5" /> : <EyeSlashIcon className="h-3.5 w-3.5" />}
+                        </button>
                         <button onClick={() => openEditVendor(v)} className="p-1 text-gray-400 hover:text-blue-400"><PencilIcon className="h-3.5 w-3.5" /></button>
                         <button onClick={() => handleDeleteVendor(v.id)} className="p-1 text-gray-400 hover:text-red-400"><TrashIcon className="h-3.5 w-3.5" /></button>
                       </div>
@@ -872,7 +925,6 @@ export default function BillsPage() {
               className="bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg px-3 py-1.5"
             >
               <option value="">All Statuses</option>
-              <option value="upcoming">Upcoming</option>
               <option value="due_soon">Due Soon</option>
               <option value="overdue">Overdue</option>
               <option value="skipped">Skipped</option>

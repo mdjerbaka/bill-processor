@@ -509,7 +509,7 @@ export default function PaymentsOutPage() {
                       {payment.job_name || '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-300 text-xs">
-                      {payment.payment_date}
+                      {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-gray-200">
                       {fmt(payment.amount)}

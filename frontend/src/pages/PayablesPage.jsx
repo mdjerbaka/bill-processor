@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { payablesAPI } from '../services/api'
-import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon, LockClosedIcon, LockOpenIcon, ArrowUpTrayIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PencilIcon, PlusIcon, CheckCircleIcon, XMarkIcon, LockClosedIcon, LockOpenIcon, ArrowUpTrayIcon, EyeIcon, EyeSlashIcon, DocumentIcon } from '@heroicons/react/24/outline'
 import ContextMenu from '../components/ContextMenu'
 import toast from 'react-hot-toast'
 
@@ -399,6 +399,24 @@ export default function PayablesPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {p.has_attachment && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await payablesAPI.getAttachment(p.id)
+                              const blob = new Blob([res.data])
+                              const url = URL.createObjectURL(blob)
+                              window.open(url, '_blank')
+                            } catch {
+                              toast.error('Failed to load attachment')
+                            }
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-cyan-400 transition-colors"
+                          title="View invoice attachment"
+                        >
+                          <DocumentIcon className="h-4 w-4" />
+                        </button>
+                      )}
                       {p.status !== 'paid' && !p.is_permanent && (
                         <button
                           onClick={() => openPaymentModal(p)}

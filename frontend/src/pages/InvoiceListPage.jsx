@@ -156,6 +156,7 @@ export default function InvoiceListPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Amount</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Due Date</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Job</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Notes</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Confidence</th>
             </tr>
@@ -163,13 +164,13 @@ export default function InvoiceListPage() {
           <tbody className="divide-y divide-gray-700">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : invoices.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
                   No invoices found
                 </td>
               </tr>
@@ -189,6 +190,7 @@ export default function InvoiceListPage() {
                     {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-400">{inv.job_name || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-400 max-w-[200px] truncate">{inv.notes || '—'}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[inv.status] || ''}`}>
                       {inv.status.replace(/_/g, ' ')}
