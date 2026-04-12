@@ -248,6 +248,7 @@ class InvoiceCreateRequest(BaseModel):
 class RealBalanceResponse(BaseModel):
     bank_balance: float
     total_outstanding: float
+    total_included_payables: float = 0.0
     total_receivables: float = 0.0
     buffer: float = 0.0
     total_payments_out: float = 0.0

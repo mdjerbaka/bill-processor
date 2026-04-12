@@ -24,6 +24,7 @@ async def _create_payable(
     status: PayableStatus = PayableStatus.OUTSTANDING,
     overdue: bool = False,
     user_id: int = 1,
+    included_in_cashflow: bool = True,
 ) -> tuple[Invoice, Payable]:
     inv = Invoice(
         vendor_name=vendor,
@@ -45,6 +46,7 @@ async def _create_payable(
         due_date=due,
         status=status,
         user_id=user_id,
+        included_in_cashflow=included_in_cashflow,
     )
     db.add(payable)
     await db.flush()
@@ -122,7 +124,26 @@ class TestBankBalance:
         data = resp.json()
         assert data["bank_balance"] == 10000.0
         assert data["total_outstanding"] == 3000.0
+        assert data["total_included_payables"] == 3000.0
         assert data["real_available"] == 7000.0
+
+    async def test_excluded_payable_not_subtracted(
+        self, client: AsyncClient, auth_headers, db_session
+    ):
+        """Payables with included_in_cashflow=False should NOT reduce real balance."""
+        await _create_payable(db_session, amount=3000.0, included_in_cashflow=True)
+        await _create_payable(db_session, vendor="Excluded Vendor", amount=2000.0, included_in_cashflow=False)
+        setting = AppSetting(key="bank_balance", value="10000.0", user_id=1)
+        db_session.add(setting)
+        await db_session.commit()
+
+        resp = await client.get("/api/v1/payables/real-balance", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["bank_balance"] == 10000.0
+        assert data["total_outstanding"] == 5000.0  # all payables
+        assert data["total_included_payables"] == 3000.0  # only toggled-on
+        assert data["real_available"] == 7000.0  # 10000 - 3000 (excluded not subtracted)
 
 
 class TestBuffer:
@@ -160,6 +181,7 @@ class TestBuffer:
         data = resp.json()
         assert data["bank_balance"] == 50000.0
         assert data["total_outstanding"] == 5000.0
+        assert data["total_included_payables"] == 5000.0
         assert data["buffer"] == 20000.0
         assert data["real_available"] == 25000.0
 

@@ -53,6 +53,7 @@ export default function PayablesPage() {
       toast.error('Failed to load payables')
     }
     setLoading(false)
+    window.dispatchEvent(new Event('balance-changed'))
   }
 
   async function handleSaveBalance() {

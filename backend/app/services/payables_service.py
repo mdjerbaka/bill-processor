@@ -106,6 +106,15 @@ class PayablesService:
         )
         total_overdue = result.scalar()
 
+        # Total included in cashflow (only toggled-on payables)
+        result = await self.db.execute(
+            select(func.coalesce(func.sum(Payable.amount), 0.0)).where(
+                *base_filter,
+                Payable.included_in_cashflow == True,  # noqa: E712
+            )
+        )
+        total_included = result.scalar()
+
         # Count
         result = await self.db.execute(
             select(func.count(Payable.id)).where(*base_filter)
@@ -115,13 +124,15 @@ class PayablesService:
         return {
             "total_outstanding": float(total_outstanding),
             "total_overdue": float(total_overdue),
+            "total_included": float(total_included),
             "count": count,
         }
 
     async def get_real_balance(self) -> dict:
         """Calculate real available funds.
 
-        Formula: bank + receivables (collect) - outstanding payables - buffer - payments out - locked bills
+        Formula: bank + receivables (collect) - toggled payables - buffer - payments out - locked bills
+        Only payables with included_in_cashflow=True are subtracted.
         """
         # Get current bank balance from settings
         result = await self.db.execute(
@@ -174,7 +185,7 @@ class PayablesService:
         real_available = (
             bank_balance
             + total_receivables
-            - summary["total_outstanding"]
+            - summary["total_included"]
             - buffer
             - total_payments_out
             - total_locked_bills
@@ -183,6 +194,7 @@ class PayablesService:
         return {
             "bank_balance": bank_balance,
             "total_outstanding": summary["total_outstanding"],
+            "total_included_payables": summary["total_included"],
             "total_receivables": total_receivables,
             "buffer": buffer,
             "total_payments_out": total_payments_out,

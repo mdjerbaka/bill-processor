@@ -55,6 +55,13 @@ export default function Layout() {
     return () => clearInterval(interval)
   }, [fetchBalance])
 
+  // Listen for balance-changed events from child pages
+  useEffect(() => {
+    const handler = () => fetchBalance()
+    window.addEventListener('balance-changed', handler)
+    return () => window.removeEventListener('balance-changed', handler)
+  }, [fetchBalance])
+
   return (
     <div className="min-h-screen flex">
       {/* Mobile hamburger button */}
@@ -112,7 +119,7 @@ export default function Layout() {
                 <p>Receivables: +${parseFloat(balance.total_receivables || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 <p>Payments Out: -${parseFloat(balance.total_payments_out || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 <p>Locked Bills: -${parseFloat(balance.total_locked_bills || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                <p>Outstanding: -${parseFloat(balance.total_outstanding).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                <p>Included Payables: -${parseFloat(balance.total_included_payables || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 <p>Buffer: -${parseFloat(balance.buffer || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>

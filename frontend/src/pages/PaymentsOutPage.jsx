@@ -110,6 +110,7 @@ export default function PaymentsOutPage() {
       toast.error('Failed to load payments')
     } finally {
       setLoading(false)
+      window.dispatchEvent(new Event('balance-changed'))
     }
   }, [tab, historyStart, historyEnd])
 
