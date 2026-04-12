@@ -131,8 +131,8 @@ class PayablesService:
     async def get_real_balance(self) -> dict:
         """Calculate real available funds.
 
-        Formula: bank + receivables (collect) - toggled payables - buffer - payments out - locked bills
-        Only payables with included_in_cashflow=True are subtracted.
+        Formula: bank + receivables - toggled payables - buffer - payments out - locked bills - toggled bills
+        Only payables/bills with included_in_cashflow=True are subtracted.
         """
         # Get current bank balance from settings
         result = await self.db.execute(
@@ -182,6 +182,20 @@ class PayablesService:
         )
         total_locked_bills = float(locked_result.scalar() or 0.0)
 
+        # Get total toggled-on recurring bill occurrences (not paid/skipped)
+        from app.models.models import BillOccurrence, OccurrenceStatus, RecurringBill
+        bills_result = await self.db.execute(
+            select(func.coalesce(func.sum(BillOccurrence.amount), 0.0))
+            .join(RecurringBill)
+            .where(
+                RecurringBill.user_id == self.user_id,
+                RecurringBill.is_active == True,  # noqa: E712
+                BillOccurrence.included_in_cashflow == True,  # noqa: E712
+                BillOccurrence.status.notin_([OccurrenceStatus.SKIPPED, OccurrenceStatus.PAID]),
+            )
+        )
+        total_included_bills = float(bills_result.scalar() or 0.0)
+
         real_available = (
             bank_balance
             + total_receivables
@@ -189,6 +203,7 @@ class PayablesService:
             - buffer
             - total_payments_out
             - total_locked_bills
+            - total_included_bills
         )
 
         return {
@@ -199,6 +214,7 @@ class PayablesService:
             "buffer": buffer,
             "total_payments_out": total_payments_out,
             "total_locked_bills": total_locked_bills,
+            "total_included_bills": total_included_bills,
             "real_available": real_available,
         }
 

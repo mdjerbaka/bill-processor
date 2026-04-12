@@ -120,6 +120,7 @@ export default function Layout() {
                 <p>Payments Out: -${parseFloat(balance.total_payments_out || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 <p>Locked Bills: -${parseFloat(balance.total_locked_bills || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 <p>Included Payables: -${parseFloat(balance.total_included_payables || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                <p>Included Bills: -${parseFloat(balance.total_included_bills || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 <p>Buffer: -${parseFloat(balance.buffer || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>

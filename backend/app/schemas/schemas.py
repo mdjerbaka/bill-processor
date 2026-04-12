@@ -253,6 +253,7 @@ class RealBalanceResponse(BaseModel):
     buffer: float = 0.0
     total_payments_out: float = 0.0
     total_locked_bills: float = 0.0
+    total_included_bills: float = 0.0
     real_available: float
 
 

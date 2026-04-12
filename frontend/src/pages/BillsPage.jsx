@@ -372,6 +372,7 @@ export default function BillsPage() {
         o.id === occurrenceId ? { ...o, status: 'skipped' } : o
       ))
       refreshCashFlow()
+      window.dispatchEvent(new Event('balance-changed'))
     } catch {
       toast.error('Failed to skip occurrence')
     }
@@ -404,6 +405,7 @@ export default function BillsPage() {
         o.id === occurrenceId ? { ...o, status: 'paid', paid_at: new Date().toISOString(), included_in_cashflow: false } : o
       ))
       refreshCashFlow()
+      window.dispatchEvent(new Event('balance-changed'))
     } catch {
       toast.error('Failed to mark as paid')
     }
@@ -417,6 +419,7 @@ export default function BillsPage() {
         o.id === occurrenceId ? { ...o, included_in_cashflow: res.data.included_in_cashflow } : o
       ))
       refreshCashFlow()
+      window.dispatchEvent(new Event('balance-changed'))
     } catch {
       toast.error('Failed to toggle cash flow inclusion')
     }
@@ -434,6 +437,7 @@ export default function BillsPage() {
           ? { ...o, included_in_cashflow: res.data.included_in_cashflow } : o
       ))
       refreshCashFlow()
+      window.dispatchEvent(new Event('balance-changed'))
       toast.success(res.data.included_in_cashflow ? 'Bill included in cash flow' : 'Bill excluded from cash flow')
     } catch {
       toast.error('Failed to toggle cash flow inclusion')

@@ -183,6 +183,7 @@ class TestPayablesService:
         assert balance["bank_balance"] == 5000.0
         assert balance["total_outstanding"] == 2000.0
         assert balance["total_included_payables"] == 2000.0
+        assert balance["total_included_bills"] == 0.0
         assert balance["buffer"] == 0.0
         assert balance["real_available"] == 3000.0
 
@@ -216,5 +217,6 @@ class TestPayablesService:
         assert balance["bank_balance"] == 10000.0
         assert balance["total_outstanding"] == 3000.0
         assert balance["total_included_payables"] == 3000.0
+        assert balance["total_included_bills"] == 0.0
         assert balance["buffer"] == 2000.0
         assert balance["real_available"] == 5000.0
