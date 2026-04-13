@@ -595,6 +595,7 @@ export default function BillsPage() {
       const newVal = !v.included_in_cashflow
       await vendorAccountsAPI.update(v.id, { included_in_cashflow: newVal })
       setVendorAccounts(prev => prev.map(a => a.id === v.id ? { ...a, included_in_cashflow: newVal } : a))
+      window.dispatchEvent(new Event('balance-changed'))
       toast.success(newVal ? 'Included in cashflow' : 'Excluded from cashflow')
     } catch (err) {
       toast.error('Failed to toggle vendor account')

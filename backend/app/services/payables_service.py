@@ -196,6 +196,17 @@ class PayablesService:
         )
         total_included_bills = float(bills_result.scalar() or 0.0)
 
+        # Get total toggled-on vendor accounts
+        from app.models.models import VendorAccount
+        vendor_result = await self.db.execute(
+            select(func.coalesce(func.sum(VendorAccount.amount), 0.0))
+            .where(
+                VendorAccount.user_id == self.user_id,
+                VendorAccount.included_in_cashflow == True,  # noqa: E712
+            )
+        )
+        total_included_vendors = float(vendor_result.scalar() or 0.0)
+
         real_available = (
             bank_balance
             + total_receivables
@@ -204,6 +215,7 @@ class PayablesService:
             - total_payments_out
             - total_locked_bills
             - total_included_bills
+            - total_included_vendors
         )
 
         return {
@@ -215,6 +227,7 @@ class PayablesService:
             "total_payments_out": total_payments_out,
             "total_locked_bills": total_locked_bills,
             "total_included_bills": total_included_bills,
+            "total_included_vendors": total_included_vendors,
             "real_available": real_available,
         }
 
