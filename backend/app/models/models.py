@@ -348,6 +348,7 @@ class MSGraphToken(Base):
     __tablename__ = "ms_graph_tokens"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     access_token: Mapped[str] = mapped_column(Text, nullable=False)
     refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
     email_address: Mapped[Optional[str]] = mapped_column(String(500))

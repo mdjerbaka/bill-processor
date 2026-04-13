@@ -136,7 +136,9 @@ class MicrosoftGraphService:
 
     async def _save_tokens(self, data: dict) -> None:
         """Save or update MS Graph tokens in the database."""
-        result = await self.db.execute(select(MSGraphToken).limit(1))
+        result = await self.db.execute(
+            select(MSGraphToken).where(MSGraphToken.user_id == self.user_id).limit(1)
+        )
         token = result.scalar_one_or_none()
 
         access_encrypted = encrypt_value(data["access_token"])
@@ -152,6 +154,7 @@ class MicrosoftGraphService:
             token.expires_at = expires_at
         else:
             token = MSGraphToken(
+                user_id=self.user_id,
                 access_token=access_encrypted,
                 refresh_token=refresh_encrypted,
                 expires_at=expires_at,
@@ -179,7 +182,9 @@ class MicrosoftGraphService:
 
     async def _get_valid_token(self) -> Optional[str]:
         """Return a valid access token, refreshing if needed."""
-        result = await self.db.execute(select(MSGraphToken).limit(1))
+        result = await self.db.execute(
+            select(MSGraphToken).where(MSGraphToken.user_id == self.user_id).limit(1)
+        )
         token = result.scalar_one_or_none()
         if not token:
             return None
@@ -190,7 +195,9 @@ class MicrosoftGraphService:
             if not ok:
                 return None
             # Re-fetch after refresh
-            result = await self.db.execute(select(MSGraphToken).limit(1))
+            result = await self.db.execute(
+                select(MSGraphToken).where(MSGraphToken.user_id == self.user_id).limit(1)
+            )
             token = result.scalar_one_or_none()
             if not token:
                 return None
@@ -206,7 +213,9 @@ class MicrosoftGraphService:
 
     async def get_connection_info(self) -> dict:
         """Return connection status and email address."""
-        result = await self.db.execute(select(MSGraphToken).limit(1))
+        result = await self.db.execute(
+            select(MSGraphToken).where(MSGraphToken.user_id == self.user_id).limit(1)
+        )
         token = result.scalar_one_or_none()
         if not token:
             return {"connected": False, "email": ""}
@@ -218,7 +227,9 @@ class MicrosoftGraphService:
 
     async def disconnect(self) -> None:
         """Remove stored MS Graph tokens."""
-        result = await self.db.execute(select(MSGraphToken).limit(1))
+        result = await self.db.execute(
+            select(MSGraphToken).where(MSGraphToken.user_id == self.user_id).limit(1)
+        )
         token = result.scalar_one_or_none()
         if token:
             await self.db.delete(token)
@@ -563,7 +574,9 @@ class MicrosoftGraphService:
 
         # Resolve recipient
         if not to_email:
-            result = await self.db.execute(select(MSGraphToken).limit(1))
+            result = await self.db.execute(
+                select(MSGraphToken).where(MSGraphToken.user_id == self.user_id).limit(1)
+            )
             token = result.scalar_one_or_none()
             to_email = token.email_address if token else None
             if not to_email:

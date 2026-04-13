@@ -35,7 +35,7 @@ async def ms_connect(
         )
 
     svc = MicrosoftGraphService(db, user.id)
-    auth_url = svc.get_auth_url()
+    auth_url = svc.get_auth_url(state=f"ms_connect:{user.id}")
     return {"auth_url": auth_url}
 
 
@@ -64,8 +64,16 @@ async def ms_callback(
     if not code:
         return RedirectResponse(url=f"{frontend_url}/settings?ms_status=error&ms_message=No+authorization+code+received")
 
+    # Extract user_id from state parameter (format: "ms_connect:{user_id}")
+    callback_user_id = None
+    if state and ":" in state:
+        try:
+            callback_user_id = int(state.split(":", 1)[1])
+        except (ValueError, IndexError):
+            pass
+
     async with async_session_factory() as db:
-        svc = MicrosoftGraphService(db)
+        svc = MicrosoftGraphService(db, callback_user_id)
         success, err_msg = await svc.exchange_code(code)
 
         if not success:
