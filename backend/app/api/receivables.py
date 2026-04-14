@@ -111,6 +111,40 @@ async def toggle_collect(
     }
 
 
+@router.post("/{check_id}/mark-paid")
+async def mark_receivable_paid(
+    check_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Manually mark a receivable as paid."""
+    svc = ReceivableChecksService(db, user.id)
+    check = await svc.get_check(check_id)
+    if not check:
+        raise HTTPException(status_code=404, detail="Receivable check not found")
+    check.status = "paid"
+    check.paid_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"detail": "Receivable marked as paid", "status": check.status}
+
+
+@router.post("/{check_id}/mark-unpaid")
+async def mark_receivable_unpaid(
+    check_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Manually mark a receivable as unpaid/outstanding."""
+    svc = ReceivableChecksService(db, user.id)
+    check = await svc.get_check(check_id)
+    if not check:
+        raise HTTPException(status_code=404, detail="Receivable check not found")
+    check.status = "outstanding"
+    check.paid_at = None
+    await db.commit()
+    return {"detail": "Receivable marked as outstanding", "status": check.status}
+
+
 @router.get("/totals")
 async def get_totals(
     db: AsyncSession = Depends(get_db),
@@ -181,8 +215,10 @@ async def sync_quickbooks_receivables(
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     await db.commit()
+    paid = result.get('paid', 0)
+    paid_msg = f", {paid} marked paid" if paid else ""
     return {
-        "detail": f"Synced from QuickBooks: {result['created']} created, {result['updated']} updated, {result['skipped']} unchanged",
+        "detail": f"Synced from QuickBooks: {result['created']} created, {result['updated']} updated, {result['skipped']} unchanged{paid_msg}",
         **result,
     }
 

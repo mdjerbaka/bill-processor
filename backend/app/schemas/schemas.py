@@ -432,6 +432,8 @@ class ReceivableCheckSchema(BaseModel):
     due_date: Optional[datetime] = None
     notes: Optional[str] = None
     qbo_invoice_id: Optional[str] = None
+    status: str = "outstanding"
+    paid_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

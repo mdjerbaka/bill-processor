@@ -94,9 +94,24 @@ class EmailService:
             client.login(config["imap_username"], config["imap_password"])
             client.select_folder("INBOX")
 
-            # Only process emails from the last 2 days to avoid old backlog
+            # Use per-user high-water mark (never older than 2 days)
             from datetime import datetime, timedelta
-            since_date = (datetime.now() - timedelta(days=2)).date()
+            floor_date = (datetime.now() - timedelta(days=2)).date()
+            hwm_result = await self.db.execute(
+                select(AppSetting).where(
+                    AppSetting.key == "last_email_poll_imap",
+                    AppSetting.user_id == self.user_id,
+                )
+            )
+            hwm_setting = hwm_result.scalar_one_or_none()
+            if hwm_setting and hwm_setting.value:
+                try:
+                    hwm_date = datetime.fromisoformat(hwm_setting.value).date()
+                    since_date = max(hwm_date, floor_date)
+                except (ValueError, TypeError):
+                    since_date = floor_date
+            else:
+                since_date = floor_date
             message_ids = client.search(["UNSEEN", "SINCE", since_date])
             if not message_ids:
                 client.logout()
@@ -168,6 +183,29 @@ class EmailService:
             client.logout()
         except Exception as e:
             logger.error(f"IMAP poll failed: {e}")
+
+        # Update per-user high-water mark
+        if created_ids:
+            try:
+                from datetime import datetime, timezone
+                now_str = datetime.now(timezone.utc).isoformat()
+                hwm_result2 = await self.db.execute(
+                    select(AppSetting).where(
+                        AppSetting.key == "last_email_poll_imap",
+                        AppSetting.user_id == self.user_id,
+                    )
+                )
+                hwm = hwm_result2.scalar_one_or_none()
+                if hwm:
+                    hwm.value = now_str
+                else:
+                    self.db.add(AppSetting(
+                        key="last_email_poll_imap",
+                        user_id=self.user_id,
+                        value=now_str,
+                    ))
+            except Exception:
+                pass
 
         return created_ids
 

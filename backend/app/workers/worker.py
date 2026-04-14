@@ -93,17 +93,21 @@ async def poll_email_inbox(ctx: dict) -> dict:
             for email_id in all_new_ids:
                 await process_email_attachments(ctx, email_id)
 
-            # Store last poll time
+            # Store last poll time (per-user)
             from app.models.models import AppSetting
-            result = await db.execute(
-                select(AppSetting).where(AppSetting.key == "last_email_poll")
-            )
-            setting = result.scalar_one_or_none()
-            now_str = datetime.now(timezone.utc).isoformat()
-            if setting:
-                setting.value = now_str
-            else:
-                db.add(AppSetting(key="last_email_poll", value=now_str))
+            for u in users:
+                result = await db.execute(
+                    select(AppSetting).where(
+                        AppSetting.key == "last_email_poll",
+                        AppSetting.user_id == u.id,
+                    )
+                )
+                setting = result.scalar_one_or_none()
+                now_str = datetime.now(timezone.utc).isoformat()
+                if setting:
+                    setting.value = now_str
+                else:
+                    db.add(AppSetting(key="last_email_poll", user_id=u.id, value=now_str))
 
             await db.commit()
 

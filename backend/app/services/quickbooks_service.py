@@ -630,7 +630,59 @@ class QuickBooksService:
                 created += 1
 
         await self.db.flush()
-        return {"created": created, "updated": updated, "skipped": skipped}
+
+        # Also check if any existing receivables have been paid in QB
+        paid_count = await self._check_paid_receivables(user_id)
+
+        return {"created": created, "updated": updated, "skipped": skipped, "paid": paid_count}
+
+    async def _check_paid_receivables(self, user_id: int) -> int:
+        """Check QB for receivables that have been paid (Balance == 0).
+
+        Returns the number of receivables marked as paid.
+        """
+        from app.models.models import ReceivableCheck
+
+        # Get all receivables with a QB link that aren't already paid
+        result = await self.db.execute(
+            select(ReceivableCheck).where(
+                ReceivableCheck.user_id == user_id,
+                ReceivableCheck.qbo_invoice_id.isnot(None),
+                ReceivableCheck.status != "paid",
+            )
+        )
+        unpaid_checks = result.scalars().all()
+        if not unpaid_checks:
+            return 0
+
+        paid_count = 0
+        for check in unpaid_checks:
+            try:
+                inv_result = await self._api_request(
+                    "GET",
+                    f"query?query=SELECT Balance FROM Invoice WHERE Id = '{check.qbo_invoice_id}'"
+                )
+                if not inv_result or "QueryResponse" not in inv_result:
+                    continue
+                invoices = inv_result["QueryResponse"].get("Invoice", [])
+                if not invoices:
+                    # Invoice deleted in QB — mark as paid
+                    check.status = "paid"
+                    check.paid_at = datetime.now(timezone.utc)
+                    paid_count += 1
+                    continue
+                balance = float(invoices[0].get("Balance", 1))
+                if balance <= 0:
+                    check.status = "paid"
+                    check.paid_at = datetime.now(timezone.utc)
+                    paid_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to check paid status for receivable {check.id}: {e}")
+                continue
+
+        if paid_count:
+            await self.db.flush()
+        return paid_count
 
     async def get_vendors(self) -> list[dict]:
         """Fetch all vendors from QuickBooks."""

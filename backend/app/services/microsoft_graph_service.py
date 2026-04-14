@@ -328,6 +328,45 @@ class MicrosoftGraphService:
             return f"{MS_GRAPH_BASE}/users/{target_mailbox}"
         return f"{MS_GRAPH_BASE}/me"
 
+    async def _get_high_water_mark(self) -> str:
+        """Get the per-user high-water mark for MS Graph polling.
+
+        Returns the 'since' timestamp string.  Uses the stored mark if
+        available, but never looks back further than 2 days.
+        """
+        floor = (datetime.now(timezone.utc) - timedelta(days=2)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        result = await self.db.execute(
+            select(AppSetting).where(
+                AppSetting.key == "last_email_poll_ms",
+                AppSetting.user_id == self.user_id,
+            )
+        )
+        setting = result.scalar_one_or_none()
+        if setting and setting.value:
+            # Use the more recent of stored mark vs 2-day floor
+            return max(setting.value, floor)
+        return floor
+
+    async def _update_high_water_mark(self, newest_received: str) -> None:
+        """Store the newest receivedDateTime as the high-water mark."""
+        result = await self.db.execute(
+            select(AppSetting).where(
+                AppSetting.key == "last_email_poll_ms",
+                AppSetting.user_id == self.user_id,
+            )
+        )
+        setting = result.scalar_one_or_none()
+        if setting:
+            setting.value = newest_received
+        else:
+            self.db.add(AppSetting(
+                key="last_email_poll_ms",
+                user_id=self.user_id,
+                value=newest_received,
+            ))
+
     async def poll_inbox(self) -> list[int]:
         """Poll Microsoft 365 inbox for unread messages with attachments."""
         access = await self._get_valid_token()
@@ -340,13 +379,12 @@ class MicrosoftGraphService:
         base = self._mailbox_base(target_mailbox)
 
         created_ids = []
+        newest_received = None
         try:
             headers = {"Authorization": f"Bearer {access}"}
             async with httpx.AsyncClient(timeout=60.0) as client:
-                # Get recent unread messages (with and without attachments)
-                since = (datetime.now(timezone.utc) - timedelta(days=2)).strftime(
-                    "%Y-%m-%dT%H:%M:%SZ"
-                )
+                # Get recent unread messages — uses per-user high-water mark
+                since = await self._get_high_water_mark()
                 params = {
                     "$filter": f"isRead eq false and receivedDateTime ge {since}",
                     "$select": "id,subject,from,receivedDateTime,body,internetMessageId,hasAttachments",
@@ -383,6 +421,11 @@ class MicrosoftGraphService:
 
                 for msg in messages:
                     try:
+                        # Track newest received for high-water mark
+                        received = msg.get("receivedDateTime", "")
+                        if received and (not newest_received or received > newest_received):
+                            newest_received = received
+
                         email_id = await self._ingest_graph_message(
                             client, headers, msg, base
                         )
@@ -415,6 +458,13 @@ class MicrosoftGraphService:
 
         except Exception as e:
             logger.error(f"MS Graph poll failed: {e}")
+
+        # Update high-water mark to newest message timestamp
+        if newest_received:
+            try:
+                await self._update_high_water_mark(newest_received)
+            except Exception:
+                pass
 
         return created_ids
 

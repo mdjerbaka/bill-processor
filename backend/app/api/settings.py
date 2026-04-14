@@ -608,6 +608,12 @@ async def reset_invoice_data(
     await db.execute(
         sa_delete(AppSetting).where(AppSetting.key == "last_email_poll", AppSetting.user_id == user.id)
     )
+    await db.execute(
+        sa_delete(AppSetting).where(AppSetting.key == "last_email_poll_ms", AppSetting.user_id == user.id)
+    )
+    await db.execute(
+        sa_delete(AppSetting).where(AppSetting.key == "last_email_poll_imap", AppSetting.user_id == user.id)
+    )
 
     await db.flush()
     logger.info(f"Reset invoice data: {inv_count} invoices, {email_count} emails deleted")

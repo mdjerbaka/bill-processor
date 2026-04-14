@@ -12,6 +12,7 @@ import {
   XCircleIcon,
   ChevronRightIcon,
   ChevronDownIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline'
 
 export default function ReceivablesPage() {
@@ -28,6 +29,7 @@ export default function ReceivablesPage() {
   const [importing, setImporting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [expandedCustomers, setExpandedCustomers] = useState(new Set())
+  const [showPaid, setShowPaid] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -129,6 +131,22 @@ export default function ReceivablesPage() {
     } catch { toast.error('Failed to toggle collect') }
   }
 
+  async function handleMarkPaid(id) {
+    try {
+      await receivablesAPI.markPaid(id)
+      toast.success('Marked as paid')
+      loadData()
+    } catch { toast.error('Failed to mark as paid') }
+  }
+
+  async function handleMarkUnpaid(id) {
+    try {
+      await receivablesAPI.markUnpaid(id)
+      toast.success('Marked as outstanding')
+      loadData()
+    } catch { toast.error('Failed to mark as outstanding') }
+  }
+
   async function handleUpdateNotes(id, notes) {
     try {
       await receivablesAPI.update(id, { notes })
@@ -164,6 +182,19 @@ export default function ReceivablesPage() {
 
   const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
+  // Filter aging data to hide/show paid items
+  const filteredAgingData = agingData ? {
+    ...agingData,
+    customers: agingData.customers.map(c => ({
+      ...c,
+      invoices: showPaid ? c.invoices : c.invoices.filter(inv => inv.status !== 'paid'),
+      total: showPaid ? c.total : c.invoices.filter(inv => inv.status !== 'paid').reduce((s, inv) => s + inv.invoiced_amount, 0),
+    })).filter(c => c.invoices.length > 0),
+    grand_total: showPaid ? agingData.grand_total : agingData.customers.reduce((s, c) => s + c.invoices.filter(inv => inv.status !== 'paid').reduce((s2, inv) => s2 + inv.invoiced_amount, 0), 0),
+  } : null
+
+  const paidCount = agingData ? agingData.customers.reduce((s, c) => s + c.invoices.filter(inv => inv.status === 'paid').length, 0) : 0
+
   // Parse invoice number from job_name (everything after #)
   function parseInvoiceNum(jobName) {
     if (!jobName || !jobName.includes('#')) return null
@@ -191,6 +222,11 @@ export default function ReceivablesPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">A/R Aging Summary</h1>
         <div className="flex gap-2">
+          {paidCount > 0 && (
+            <button onClick={() => setShowPaid(!showPaid)} className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors ${showPaid ? 'bg-green-900/50 text-green-300 hover:bg-green-800' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}>
+              <BanknotesIcon className="h-4 w-4" /> {showPaid ? 'Hide' : 'Show'} Paid ({paidCount})
+            </button>
+          )}
           {checks.length > 0 && (
             <button onClick={handleDeleteAll} className="flex items-center gap-1.5 px-3 py-2 text-sm bg-red-900/50 hover:bg-red-800 text-red-300 rounded-lg transition-colors">
               <TrashIcon className="h-4 w-4" /> Delete All
@@ -231,7 +267,7 @@ export default function ReceivablesPage() {
         <div className="p-4 border-b border-gray-700">
           <h2 className="text-lg font-semibold text-gray-100">A/R Aging Summary</h2>
         </div>
-        {!agingData?.customers?.length ? (
+        {!filteredAgingData?.customers?.length ? (
           <p className="text-gray-500 text-sm text-center py-8">No receivables yet. Sync from QuickBooks or add manually.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -242,6 +278,7 @@ export default function ReceivablesPage() {
                   <th className="px-4 py-3 font-medium">Customer / Invoice</th>
                   <th className="px-4 py-3 font-medium">Invoice #</th>
                   <th className="px-4 py-3 font-medium text-right">Amount</th>
+                  <th className="px-4 py-3 font-medium text-center">Status</th>
                   <th className="px-4 py-3 font-medium text-center">Collect</th>
                   <th className="px-4 py-3 font-medium">Sent Date</th>
                   <th className="px-4 py-3 font-medium">Due Date</th>
@@ -250,7 +287,7 @@ export default function ReceivablesPage() {
                 </tr>
               </thead>
               <tbody>
-                {agingData.customers.map((customer) => (
+                {filteredAgingData.customers.map((customer) => (
                   <CustomerGroup
                     key={customer.customer_name}
                     customer={customer}
@@ -260,6 +297,8 @@ export default function ReceivablesPage() {
                     onDelete={handleDelete}
                     onToggleCollect={handleToggleCollect}
                     onUpdateNotes={handleUpdateNotes}
+                    onMarkPaid={handleMarkPaid}
+                    onMarkUnpaid={handleMarkUnpaid}
                     fmt={fmt}
                     parseInvoiceNum={parseInvoiceNum}
                     parseJobDesc={parseJobDesc}
@@ -269,8 +308,8 @@ export default function ReceivablesPage() {
               <tfoot>
                 <tr className="border-t-2 border-gray-600 bg-gray-900/50">
                   <td colSpan={3} className="px-4 py-3 font-bold text-gray-200">Grand Total</td>
-                  <td className="px-4 py-3 text-right font-bold text-blue-400">{fmt(agingData.grand_total)}</td>
-                  <td colSpan={5}></td>
+                  <td className="px-4 py-3 text-right font-bold text-blue-400">{fmt(filteredAgingData.grand_total)}</td>
+                  <td colSpan={6}></td>
                 </tr>
               </tfoot>
             </table>
@@ -345,7 +384,7 @@ export default function ReceivablesPage() {
   )
 }
 
-function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggleCollect, onUpdateNotes, fmt, parseInvoiceNum, parseJobDesc }) {
+function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggleCollect, onUpdateNotes, onMarkPaid, onMarkUnpaid, fmt, parseInvoiceNum, parseJobDesc }) {
   const isOverdue = (dateStr) => dateStr && new Date(dateStr) < new Date()
   const [editingNotesId, setEditingNotesId] = useState(null)
   const [notesInput, setNotesInput] = useState('')
@@ -365,15 +404,28 @@ function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggl
           <span className="text-xs text-gray-500 ml-2">({customer.invoices.length} invoice{customer.invoices.length !== 1 ? 's' : ''})</span>
         </td>
         <td className="px-4 py-2.5 text-right font-semibold text-gray-200">{fmt(customer.total)}</td>
-        <td colSpan={5}></td>
+        <td colSpan={6}></td>
       </tr>
       {/* Invoice rows */}
-      {expanded && customer.invoices.map((inv) => (
-        <tr key={inv.id} className="border-b border-gray-700/30 hover:bg-gray-700/20">
+      {expanded && customer.invoices.map((inv) => {
+        const isPaid = inv.status === 'paid'
+        return (
+        <tr key={inv.id} className={`border-b border-gray-700/30 hover:bg-gray-700/20 ${isPaid ? 'opacity-60' : ''}`}>
           <td className="px-4 py-2"></td>
-          <td className="px-4 py-2 text-gray-300 pl-10">{parseJobDesc(inv.job_name)}</td>
-          <td className="px-4 py-2 text-gray-400 text-xs">{parseInvoiceNum(inv.job_name) || '—'}</td>
-          <td className="px-4 py-2 text-right text-gray-200">{fmt(inv.invoiced_amount)}</td>
+          <td className={`px-4 py-2 pl-10 ${isPaid ? 'text-gray-500 line-through' : 'text-gray-300'}`}>{parseJobDesc(inv.job_name)}</td>
+          <td className={`px-4 py-2 text-xs ${isPaid ? 'text-gray-500 line-through' : 'text-gray-400'}`}>{parseInvoiceNum(inv.job_name) || '—'}</td>
+          <td className={`px-4 py-2 text-right ${isPaid ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{fmt(inv.invoiced_amount)}</td>
+          <td className="px-4 py-2 text-center">
+            {isPaid ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/50 text-green-400">
+                <CheckIcon className="h-3 w-3" /> Paid
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-900/50 text-yellow-400">
+                Open
+              </span>
+            )}
+          </td>
           <td className="px-4 py-2 text-center">
             <button
               onClick={(e) => { e.stopPropagation(); onToggleCollect(inv.id) }}
@@ -385,7 +437,7 @@ function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggl
             </button>
           </td>
           <td className="px-4 py-2 text-gray-400 text-xs">{inv.sent_date ? new Date(inv.sent_date).toLocaleDateString() : '—'}</td>
-          <td className={`px-4 py-2 text-xs ${isOverdue(inv.due_date) ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
+          <td className={`px-4 py-2 text-xs ${!isPaid && isOverdue(inv.due_date) ? 'text-red-400 font-medium' : 'text-gray-400'}`}>
             {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'}
           </td>
           <td className="px-4 py-2 text-gray-400 text-xs max-w-[200px]">
@@ -416,12 +468,22 @@ function CustomerGroup({ customer, expanded, onToggle, onEdit, onDelete, onToggl
           </td>
           <td className="px-4 py-2 text-right">
             <div className="flex items-center justify-end gap-1.5">
+              {isPaid ? (
+                <button onClick={() => onMarkUnpaid(inv.id)} className="p-1 text-gray-400 hover:text-yellow-400" title="Mark as outstanding">
+                  <XCircleIcon className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <button onClick={() => onMarkPaid(inv.id)} className="p-1 text-gray-400 hover:text-green-400" title="Mark as paid">
+                  <BanknotesIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
               <button onClick={() => onEdit(inv)} className="p-1 text-gray-400 hover:text-blue-400"><PencilIcon className="h-3.5 w-3.5" /></button>
               <button onClick={() => onDelete(inv.id)} className="p-1 text-gray-400 hover:text-red-400"><TrashIcon className="h-3.5 w-3.5" /></button>
             </div>
           </td>
         </tr>
-      ))}
+        )
+      })}
     </>
   )
 }
