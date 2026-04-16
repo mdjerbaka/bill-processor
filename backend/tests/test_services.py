@@ -188,6 +188,7 @@ class TestPayablesService:
         assert balance["real_available"] == 3000.0
 
     async def test_real_balance_with_buffer(self, db_session: AsyncSession, test_user):
+        """Buffer is no longer used in real balance calculation (already in locked recurring bills)."""
         setting = AppSetting(key="bank_balance", value="10000.0", user_id=test_user.id)
         buf_setting = AppSetting(key="balance_buffer", value="2000.0", user_id=test_user.id)
         db_session.add(setting)
@@ -218,5 +219,6 @@ class TestPayablesService:
         assert balance["total_outstanding"] == 3000.0
         assert balance["total_included_payables"] == 3000.0
         assert balance["total_included_bills"] == 0.0
-        assert balance["buffer"] == 2000.0
-        assert balance["real_available"] == 5000.0
+        assert balance["buffer"] == 0.0
+        # Buffer no longer subtracted: 10000 - 3000 = 7000
+        assert balance["real_available"] == 7000.0

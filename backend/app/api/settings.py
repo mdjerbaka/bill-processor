@@ -645,3 +645,54 @@ async def reset_job_data(
         "deleted_jobs": job_count,
         "message": "All job data cleared.",
     }
+
+
+# ── BuilderTrend Auto-Forward Settings ─────────────────
+
+@router.get("/buildertrend")
+async def get_buildertrend_config(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get BuilderTrend auto-forward configuration."""
+    values = {}
+    for key in ("buildertrend_forward_email", "buildertrend_forward_enabled"):
+        result = await db.execute(
+            select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
+        )
+        setting = result.scalar_one_or_none()
+        if setting:
+            values[key] = setting.value
+
+    return {
+        "forward_email": values.get("buildertrend_forward_email", ""),
+        "forward_enabled": values.get("buildertrend_forward_enabled", "false") == "true",
+    }
+
+
+@router.post("/buildertrend")
+async def save_buildertrend_config(
+    req: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Save BuilderTrend auto-forward configuration."""
+    fields = {}
+    if "forward_email" in req:
+        fields["buildertrend_forward_email"] = req["forward_email"]
+    if "forward_enabled" in req:
+        fields["buildertrend_forward_enabled"] = "true" if req["forward_enabled"] else "false"
+
+    for key, value in fields.items():
+        result = await db.execute(
+            select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
+        )
+        setting = result.scalar_one_or_none()
+        if setting:
+            setting.value = value
+        else:
+            setting = AppSetting(key=key, value=value, user_id=user.id)
+            db.add(setting)
+
+    await db.flush()
+    return await get_buildertrend_config(db=db, user=user)

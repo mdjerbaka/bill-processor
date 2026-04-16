@@ -44,7 +44,7 @@ SUPPORTED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"
 # Microsoft identity platform endpoints
 MS_AUTHORITY = "https://login.microsoftonline.com"
 MS_GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-MS_SCOPES = ["Mail.ReadWrite.Shared", "User.Read", "offline_access"]
+MS_SCOPES = ["Mail.ReadWrite.Shared", "Mail.Send", "User.Read", "offline_access"]
 
 
 class MicrosoftGraphService:
@@ -610,12 +610,18 @@ class MicrosoftGraphService:
     # ── Send Mail ────────────────────────────────────────
 
     async def send_mail(
-        self, subject: str, body_html: str, to_email: Optional[str] = None
+        self, subject: str, body_html: str, to_email: Optional[str] = None,
+        attachments: Optional[list[dict]] = None,
     ) -> bool:
         """Send an email via Microsoft Graph API.
 
         If to_email is not provided, sends to the connected user's own email
         (useful for self-notifications).
+
+        attachments: optional list of dicts with keys:
+            - name: filename (e.g. "invoice.pdf")
+            - contentType: MIME type (e.g. "application/pdf")
+            - contentBytes: base64-encoded file content
         """
         access = await self._get_valid_token()
         if not access:
@@ -646,6 +652,18 @@ class MicrosoftGraphService:
             },
             "saveToSentItems": "true",
         }
+
+        # Add file attachments if provided
+        if attachments:
+            payload["message"]["attachments"] = [
+                {
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    "name": att["name"],
+                    "contentType": att.get("contentType", "application/octet-stream"),
+                    "contentBytes": att["contentBytes"],
+                }
+                for att in attachments
+            ]
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:

@@ -17,11 +17,8 @@ export default function PayablesPage() {
   const [summary, setSummary] = useState({ total_outstanding: 0, total_overdue: 0 })
   const [bankBalance, setBankBalance] = useState(0)
   const [realBalance, setRealBalance] = useState(0)
-  const [buffer, setBuffer] = useState(0)
   const [editingBalance, setEditingBalance] = useState(false)
   const [balanceInput, setBalanceInput] = useState('')
-  const [editingBuffer, setEditingBuffer] = useState(false)
-  const [bufferInput, setBufferInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingPayable, setEditingPayable] = useState(null)
@@ -46,8 +43,6 @@ export default function PayablesPage() {
       setSummary({ total_outstanding: payRes.data.total_outstanding, total_overdue: payRes.data.total_overdue })
       setBankBalance(realRes.data.bank_balance)
       setBalanceInput(realRes.data.bank_balance?.toString() || '0')
-      setBuffer(realRes.data.buffer || 0)
-      setBufferInput((realRes.data.buffer || 0).toString())
       setRealBalance(realRes.data.real_available)
     } catch {
       toast.error('Failed to load payables')
@@ -61,24 +56,11 @@ export default function PayablesPage() {
       await payablesAPI.setBankBalance(parseFloat(balanceInput))
       const res = await payablesAPI.getRealBalance()
       setBankBalance(parseFloat(balanceInput))
-      setBuffer(res.data.buffer || 0)
       setRealBalance(res.data.real_available)
       setEditingBalance(false)
       toast.success('Bank balance updated')
     } catch {
       toast.error('Failed to update')
-    }
-  }
-
-  async function handleSaveBuffer() {
-    try {
-      const res = await payablesAPI.setBuffer(parseFloat(bufferInput))
-      setBuffer(parseFloat(bufferInput))
-      setRealBalance(res.data.real_available)
-      setEditingBuffer(false)
-      toast.success('Buffer updated')
-    } catch {
-      toast.error('Failed to update buffer')
     }
   }
 
@@ -270,7 +252,7 @@ export default function PayablesPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-5">
           <p className="text-sm text-gray-400">Outstanding</p>
           <p className="text-2xl font-bold text-gray-100">
@@ -300,27 +282,6 @@ export default function PayablesPage() {
           ) : (
             <p className="text-2xl font-bold text-gray-100 cursor-pointer" onClick={() => setEditingBalance(true)}>
               ${bankBalance?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              <span className="text-xs text-blue-400 ml-2">edit</span>
-            </p>
-          )}
-        </div>
-        <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-5">
-          <p className="text-sm text-gray-400">Buffer</p>
-          {editingBuffer ? (
-            <div className="flex gap-2 mt-1">
-              <input
-                type="number"
-                step="0.01"
-                value={bufferInput}
-                onChange={(e) => setBufferInput(e.target.value)}
-                className="w-32 px-2 py-1 border border-gray-600 bg-gray-700 text-gray-200 rounded text-sm"
-              />
-              <button onClick={handleSaveBuffer} className="px-2 py-1 bg-blue-600 text-white text-xs rounded">Save</button>
-              <button onClick={() => setEditingBuffer(false)} className="px-2 py-1 text-xs text-gray-400">Cancel</button>
-            </div>
-          ) : (
-            <p className="text-2xl font-bold text-orange-400 cursor-pointer" onClick={() => setEditingBuffer(true)}>
-              ${buffer?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               <span className="text-xs text-blue-400 ml-2">edit</span>
             </p>
           )}
@@ -359,21 +320,23 @@ export default function PayablesPage() {
               return (
                 <tr key={p.id} className={`${isOverdue ? 'bg-red-900/20' : ''} ${!p.included_in_cashflow ? 'opacity-50' : ''} cursor-context-menu`} onContextMenu={(e) => contextMenu.show(e, p)}>
                   <td className="px-4 py-3 text-sm font-medium text-gray-200">
-                    <button
-                      onClick={() => handleToggleCashflow(p)}
-                      className={`inline-flex items-center mr-1.5 -mt-0.5 ${p.included_in_cashflow ? 'text-green-400 hover:text-green-300' : 'text-gray-600 hover:text-green-400'} transition-colors`}
-                      title={p.included_in_cashflow ? 'Click to exclude from cash flow' : 'Click to include in cash flow'}
-                    >
-                      {p.included_in_cashflow ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
-                    </button>
-                    <button
-                      onClick={() => handleTogglePermanent(p)}
-                      className={`inline-flex items-center mr-1 -mt-0.5 ${p.is_permanent ? 'text-orange-400 hover:text-orange-300' : 'text-gray-600 hover:text-orange-400'} transition-colors`}
-                      title={p.is_permanent ? 'Click to remove permanent flag' : 'Click to mark as permanent'}
-                    >
-                      {p.is_permanent ? <LockClosedIcon className="h-4 w-4" /> : <LockOpenIcon className="h-4 w-4" />}
-                    </button>
-                    {p.vendor_name}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleCashflow(p)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${p.included_in_cashflow ? 'bg-green-500' : 'bg-gray-600'}`}
+                        title={p.included_in_cashflow ? 'Click to exclude from cash flow' : 'Click to include in cash flow'}
+                      >
+                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${p.included_in_cashflow ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                      <button
+                        onClick={() => handleTogglePermanent(p)}
+                        className={`inline-flex items-center ${p.is_permanent ? 'text-orange-400 hover:text-orange-300' : 'text-gray-600 hover:text-orange-400'} transition-colors`}
+                        title={p.is_permanent ? 'Click to remove permanent flag' : 'Click to mark as permanent'}
+                      >
+                        {p.is_permanent ? <LockClosedIcon className="h-4 w-4" /> : <LockOpenIcon className="h-4 w-4" />}
+                      </button>
+                      {p.vendor_name}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-400">{p.invoice_number || '—'}</td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-gray-200">

@@ -248,4 +248,10 @@ export const vendorAccountsAPI = {
   delete: (id) => api.delete(`/vendor-accounts/${id}`),
 }
 
+// ── BuilderTrend ────────────────────────────────────────
+export const builderTrendAPI = {
+  getConfig: () => api.get('/settings/buildertrend'),
+  saveConfig: (data) => api.post('/settings/buildertrend', data),
+}
+
 export default api

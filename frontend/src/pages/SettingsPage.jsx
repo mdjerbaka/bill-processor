@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { settingsAPI, quickbooksAPI, healthAPI, microsoftAPI, authAPI } from '../services/api'
+import { settingsAPI, quickbooksAPI, healthAPI, microsoftAPI, authAPI, builderTrendAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
 export default function SettingsPage() {
@@ -41,6 +41,8 @@ export default function SettingsPage() {
   const [savingQBDefaults, setSavingQBDefaults] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current: '', newPw: '', confirm: '' })
   const [savingPassword, setSavingPassword] = useState(false)
+  const [btConfig, setBtConfig] = useState({ forward_email: '', forward_enabled: false })
+  const [savingBt, setSavingBt] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -134,6 +136,11 @@ export default function SettingsPage() {
         }))
         setQbEnvConfigured(qbConfigRes.data.env_configured || false)
       }
+      // Load BuilderTrend config
+      try {
+        const btRes = await builderTrendAPI.getConfig()
+        if (btRes.data) setBtConfig(btRes.data)
+      } catch {}
     } catch {}
     setLoading(false)
   }
@@ -857,6 +864,61 @@ export default function SettingsPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* BuilderTrend Auto-Forward */}
+      <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-2 text-gray-100">BuilderTrend Auto-Forward</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          When enabled, approved invoices will be automatically emailed (with attachments) to BuilderTrend via your connected Microsoft 365 account.
+        </p>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={async () => {
+                const next = !btConfig.forward_enabled
+                setBtConfig(prev => ({ ...prev, forward_enabled: next }))
+                try {
+                  await builderTrendAPI.saveConfig({ ...btConfig, forward_enabled: next })
+                  toast.success(next ? 'Auto-forward enabled' : 'Auto-forward disabled')
+                } catch {
+                  setBtConfig(prev => ({ ...prev, forward_enabled: !next }))
+                  toast.error('Failed to update')
+                }
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${btConfig.forward_enabled ? 'bg-green-500' : 'bg-gray-600'}`}
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${btConfig.forward_enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+            <span className="text-sm text-gray-300">{btConfig.forward_enabled ? 'Enabled' : 'Disabled'}</span>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">BuilderTrend Email Address</label>
+            <input
+              type="email"
+              value={btConfig.forward_email}
+              onChange={(e) => setBtConfig(prev => ({ ...prev, forward_email: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-700 text-gray-200 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              placeholder="e.g. abc123@receipts.buildertrend.net"
+            />
+          </div>
+          <button
+            onClick={async () => {
+              setSavingBt(true)
+              try {
+                await builderTrendAPI.saveConfig(btConfig)
+                toast.success('BuilderTrend settings saved')
+              } catch {
+                toast.error('Failed to save')
+              }
+              setSavingBt(false)
+            }}
+            disabled={savingBt}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+          >
+            {savingBt ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
       </div>
 
       {/* System Status */}

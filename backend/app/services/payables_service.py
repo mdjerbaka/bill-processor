@@ -131,8 +131,9 @@ class PayablesService:
     async def get_real_balance(self) -> dict:
         """Calculate real available funds.
 
-        Formula: bank + receivables - toggled payables - buffer - payments out - locked bills - toggled bills
+        Formula: bank + receivables - toggled payables - payments out - locked bills - toggled bills - vendor accounts
         Only payables/bills with included_in_cashflow=True are subtracted.
+        Buffer is already included in locked recurring bills.
         """
         # Get current bank balance from settings
         result = await self.db.execute(
@@ -140,13 +141,6 @@ class PayablesService:
         )
         setting = result.scalar_one_or_none()
         bank_balance = float(setting.value) if setting else 0.0
-
-        # Get buffer amount
-        result = await self.db.execute(
-            select(AppSetting).where(AppSetting.key == "balance_buffer", AppSetting.user_id == self.user_id)
-        )
-        buf_setting = result.scalar_one_or_none()
-        buffer = float(buf_setting.value) if buf_setting else 0.0
 
         summary = await self.get_payables_summary()
 
@@ -211,7 +205,6 @@ class PayablesService:
             bank_balance
             + total_receivables
             - summary["total_included"]
-            - buffer
             - total_payments_out
             - total_locked_bills
             - total_included_bills
@@ -223,7 +216,7 @@ class PayablesService:
             "total_outstanding": summary["total_outstanding"],
             "total_included_payables": summary["total_included"],
             "total_receivables": total_receivables,
-            "buffer": buffer,
+            "buffer": 0.0,
             "total_payments_out": total_payments_out,
             "total_locked_bills": total_locked_bills,
             "total_included_bills": total_included_bills,

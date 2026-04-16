@@ -164,10 +164,11 @@ class TestBuffer:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["buffer"] == 20000.0
-        assert data["real_available"] == 30000.0
+        # Buffer is no longer used in real balance calculation
+        assert data["buffer"] == 0.0
+        assert data["real_available"] == 50000.0
 
-    async def test_buffer_subtracts_from_real_available(
+    async def test_buffer_no_longer_affects_real_available(
         self, client: AsyncClient, auth_headers, db_session
     ):
         await _create_payable(db_session, amount=5000.0)
@@ -182,8 +183,9 @@ class TestBuffer:
         assert data["bank_balance"] == 50000.0
         assert data["total_outstanding"] == 5000.0
         assert data["total_included_payables"] == 5000.0
-        assert data["buffer"] == 20000.0
-        assert data["real_available"] == 25000.0
+        assert data["buffer"] == 0.0
+        # Buffer no longer subtracted: 50000 - 5000 = 45000
+        assert data["real_available"] == 45000.0
 
 
 class TestPermanentPayable:
