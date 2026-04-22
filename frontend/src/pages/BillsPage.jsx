@@ -15,8 +15,6 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   ArrowUpTrayIcon,
-  ForwardIcon,
-  CheckCircleIcon,
   ChevronUpDownIcon,
   InformationCircleIcon,
   CurrencyDollarIcon,
@@ -1061,7 +1059,7 @@ export default function BillsPage() {
                                 <th className="pb-1 font-medium text-right w-28">Amount</th>
                                 <th className="pb-1 font-medium text-center w-16" title="Include in cash flow">$</th>
                                 <th className="pb-1 font-medium text-center w-16">Auto</th>
-                                <th className="pb-1 font-medium text-right w-48">Actions</th>
+                                <th className="pb-1 font-medium text-right w-16">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1128,26 +1126,6 @@ export default function BillsPage() {
                                     </td>
                                     <td className="py-2 text-right">
                                       <div className="flex items-center justify-end gap-2">
-                                        {!isSkipped && !isPaid && (
-                                          <button
-                                            onClick={() => openPaymentModal(occ)}
-                                            className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800 transition-colors"
-                                            title="Mark as paid"
-                                          >
-                                            <CheckCircleIcon className="h-4 w-4 inline -mt-0.5 mr-0.5" />
-                                            Paid
-                                          </button>
-                                        )}
-                                        {!isSkipped && !isPaid && (
-                                          <button
-                                            onClick={() => handleSkip(occ.id)}
-                                            className="px-2 py-0.5 text-xs font-medium rounded bg-yellow-900/50 text-yellow-400 hover:bg-yellow-800 transition-colors"
-                                            title="Skip this occurrence"
-                                          >
-                                            <ForwardIcon className="h-4 w-4 inline -mt-0.5 mr-0.5" />
-                                            Skip
-                                          </button>
-                                        )}
                                         <button
                                           onClick={() => {
                                             const parentBill = bills.find(b => b.id === occ.recurring_bill_id)
