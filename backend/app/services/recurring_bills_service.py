@@ -457,34 +457,30 @@ class RecurringBillsService:
         return occ
 
     async def bulk_delete_occurrences(self, ids: list[int]) -> int:
-        """Delete selected occurrences AND their parent recurring bills."""
+        """Delete only the selected occurrences (leaves parent recurring bills intact).
+
+        This used to also delete the parent recurring bill and all sibling
+        occurrences, which caused the original bill to disappear when a user
+        deleted a duplicate. Now we only remove the rows the user selected.
+        """
         if not ids:
             return 0
-        # Find the parent recurring bill IDs for the selected occurrences (owned by this user)
-        result = await self.db.execute(
-            select(BillOccurrence.recurring_bill_id)
+
+        # Restrict to occurrences owned by this user
+        owned_result = await self.db.execute(
+            select(BillOccurrence.id)
             .join(RecurringBill)
             .where(BillOccurrence.id.in_(ids), RecurringBill.user_id == self.user_id)
-            .distinct()
         )
-        bill_ids = [row[0] for row in result.all()]
+        owned_ids = [row[0] for row in owned_result.all()]
+        if not owned_ids:
+            return 0
 
-        if bill_ids:
-            # Delete notifications for these recurring bills
-            await self.db.execute(
-                delete(Notification).where(Notification.related_bill_id.in_(bill_ids))
-            )
-            # Delete ALL occurrences for these recurring bills (not just selected)
-            await self.db.execute(
-                delete(BillOccurrence).where(BillOccurrence.recurring_bill_id.in_(bill_ids))
-            )
-            # Delete the recurring bills themselves
-            await self.db.execute(
-                delete(RecurringBill).where(RecurringBill.id.in_(bill_ids))
-            )
-
+        await self.db.execute(
+            delete(BillOccurrence).where(BillOccurrence.id.in_(owned_ids))
+        )
         await self.db.flush()
-        return len(bill_ids)
+        return len(owned_ids)
 
     async def auto_match_invoice(self, invoice: Invoice) -> Optional[BillOccurrence]:
         """Try to match an incoming invoice to an unpaid recurring bill occurrence.

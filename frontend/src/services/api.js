@@ -252,6 +252,7 @@ export const vendorAccountsAPI = {
 export const builderTrendAPI = {
   getConfig: () => api.get('/settings/buildertrend'),
   saveConfig: (data) => api.post('/settings/buildertrend', data),
+  test: () => api.post('/settings/buildertrend/test'),
 }
 
 export default api

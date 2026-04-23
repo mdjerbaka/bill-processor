@@ -654,9 +654,16 @@ async def get_buildertrend_config(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Get BuilderTrend auto-forward configuration."""
+    """Get BuilderTrend auto-forward configuration and last forward status."""
+    keys = (
+        "buildertrend_forward_email",
+        "buildertrend_forward_enabled",
+        "buildertrend_last_status",
+        "buildertrend_last_status_at",
+        "buildertrend_last_status_detail",
+    )
     values = {}
-    for key in ("buildertrend_forward_email", "buildertrend_forward_enabled"):
+    for key in keys:
         result = await db.execute(
             select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
         )
@@ -667,6 +674,9 @@ async def get_buildertrend_config(
     return {
         "forward_email": values.get("buildertrend_forward_email", ""),
         "forward_enabled": values.get("buildertrend_forward_enabled", "false") == "true",
+        "last_status": values.get("buildertrend_last_status", ""),
+        "last_status_at": values.get("buildertrend_last_status_at", ""),
+        "last_status_detail": values.get("buildertrend_last_status_detail", ""),
     }
 
 
@@ -696,3 +706,73 @@ async def save_buildertrend_config(
 
     await db.flush()
     return await get_buildertrend_config(db=db, user=user)
+
+
+@router.post("/buildertrend/test")
+async def test_buildertrend_forward(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Send a test email to the configured BuilderTrend address.
+
+    Verifies that Microsoft 365 is connected and the configured address accepts
+    mail from this account. No invoice attachment is sent.
+    """
+    from app.services.buildertrend_service import _set_status
+    from app.services.microsoft_graph_service import MicrosoftGraphService
+
+    # Load config
+    cfg = {}
+    for key in ("buildertrend_forward_email", "buildertrend_forward_enabled"):
+        result = await db.execute(
+            select(AppSetting).where(AppSetting.key == key, AppSetting.user_id == user.id)
+        )
+        setting = result.scalar_one_or_none()
+        if setting:
+            cfg[key] = setting.value
+
+    bt_email = (cfg.get("buildertrend_forward_email") or "").strip()
+    if not bt_email:
+        await _set_status(db, user.id, "error", "No BuilderTrend email address configured.")
+        await db.commit()
+        raise HTTPException(status_code=400, detail="No BuilderTrend email address configured.")
+
+    ms_svc = MicrosoftGraphService(db, user.id)
+    if not await ms_svc._get_valid_token():
+        await _set_status(
+            db,
+            user.id,
+            "error",
+            "Microsoft 365 not connected. Connect Microsoft in Settings to enable forwarding.",
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=400,
+            detail="Microsoft 365 is not connected. Connect Microsoft above before testing.",
+        )
+
+    sent = await ms_svc.send_mail(
+        subject="Bill Processor — BuilderTrend test",
+        body_html=(
+            "<p>This is a test message from Bill Processor.</p>"
+            "<p>If you can see this in BuilderTrend, auto-forwarding is set up correctly.</p>"
+        ),
+        to_email=bt_email,
+    )
+
+    if sent:
+        await _set_status(db, user.id, "ok", f"Test email sent to {bt_email}.")
+        await db.commit()
+        return {"ok": True, "detail": f"Test email sent to {bt_email}."}
+
+    await _set_status(
+        db,
+        user.id,
+        "error",
+        f"Microsoft Graph rejected the send to {bt_email}. Verify the address.",
+    )
+    await db.commit()
+    raise HTTPException(
+        status_code=502,
+        detail=f"Microsoft Graph rejected the send to {bt_email}. Verify the address.",
+    )

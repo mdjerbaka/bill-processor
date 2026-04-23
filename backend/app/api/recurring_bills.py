@@ -186,11 +186,11 @@ async def bulk_delete_occurrences(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Delete multiple bill occurrences by ID."""
+    """Delete the selected bill occurrences (parent recurring bills are kept)."""
     svc = RecurringBillsService(db, user.id)
     deleted = await svc.bulk_delete_occurrences(ids)
     await db.commit()
-    return {"detail": f"Deleted {deleted} recurring bills and all their occurrences", "count": deleted}
+    return {"detail": f"Deleted {deleted} occurrence(s)", "count": deleted}
 
 
 @router.post("/occurrences/{occurrence_id}/skip")

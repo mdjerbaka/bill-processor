@@ -444,7 +444,7 @@ export default function BillsPage() {
 
   async function handleDeleteSelected() {
     if (selectedOccurrences.size === 0) return
-    if (!confirm(`Delete ${selectedOccurrences.size} selected bill(s) and all their occurrences? This cannot be undone.`)) return
+    if (!confirm(`Delete ${selectedOccurrences.size} selected occurrence(s)? The recurring bill will stay and future occurrences will continue. This cannot be undone.`)) return
     try {
       const res = await recurringBillsAPI.bulkDeleteOccurrences([...selectedOccurrences])
       toast.success(res.data.detail)

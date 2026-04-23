@@ -397,62 +397,13 @@ async def approve_invoice(
             await db.flush()
 
     # Auto-forward to BuilderTrend if configured (best-effort)
-    try:
-        bt_email_result = await db.execute(
-            select(AppSetting).where(AppSetting.key == "buildertrend_forward_email", AppSetting.user_id == user.id)
-        )
-        bt_email_setting = bt_email_result.scalar_one_or_none()
-
-        bt_enabled_result = await db.execute(
-            select(AppSetting).where(AppSetting.key == "buildertrend_forward_enabled", AppSetting.user_id == user.id)
-        )
-        bt_enabled_setting = bt_enabled_result.scalar_one_or_none()
-
-        if (bt_email_setting and bt_email_setting.value
-                and bt_enabled_setting and bt_enabled_setting.value == "true"):
-            ms_svc = MicrosoftGraphService(db, user.id)
-            if await ms_svc._get_valid_token():
-                import base64
-                from pathlib import Path as _Path
-
-                bt_attachments = []
-                if attachment_path and _Path(attachment_path).is_file():
-                    with open(attachment_path, "rb") as f:
-                        file_bytes = f.read()
-                    # MS Graph inline attachments limited to ~3MB base64
-                    if len(file_bytes) <= 3_500_000:
-                        bt_attachments.append({
-                            "name": attachment_filename or "invoice.pdf",
-                            "contentType": "application/pdf",
-                            "contentBytes": base64.b64encode(file_bytes).decode(),
-                        })
-                    else:
-                        logger.warning(f"Attachment too large for BT forward ({len(file_bytes)} bytes), skipping attachment")
-
-                vendor = payable.vendor_name or "Unknown"
-                inv_num = payable.invoice_number or "N/A"
-                amount = payable.amount or 0.0
-                subject = f"Invoice: {vendor} - {inv_num}"
-                body = (
-                    f"<p>Approved invoice forwarded from Bill Processor.</p>"
-                    f"<p><strong>Vendor:</strong> {vendor}<br>"
-                    f"<strong>Invoice #:</strong> {inv_num}<br>"
-                    f"<strong>Amount:</strong> ${amount:,.2f}</p>"
-                )
-
-                sent = await ms_svc.send_mail(
-                    subject=subject,
-                    body_html=body,
-                    to_email=bt_email_setting.value,
-                    attachments=bt_attachments or None,
-                )
-                if sent:
-                    logger.info(f"Forwarded invoice {inv_num} to BuilderTrend at {bt_email_setting.value}")
-                else:
-                    logger.warning(f"Failed to forward invoice {inv_num} to BuilderTrend")
-    except Exception as e:
-        logger.error(f"BuilderTrend forwarding failed for invoice {invoice_id}: {e}")
-        # Don't fail the approval — forwarding is best-effort
+    from app.services.buildertrend_service import forward_invoice_to_buildertrend
+    await forward_invoice_to_buildertrend(
+        db=db,
+        user_id=user.id,
+        payable=payable,
+        attachment_id=invoice.attachment_id,
+    )
 
     # Hard-delete the invoice (cascades to line items)
     await db.delete(invoice)

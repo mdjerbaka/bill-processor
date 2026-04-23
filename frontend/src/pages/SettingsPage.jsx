@@ -41,7 +41,8 @@ export default function SettingsPage() {
   const [savingQBDefaults, setSavingQBDefaults] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current: '', newPw: '', confirm: '' })
   const [savingPassword, setSavingPassword] = useState(false)
-  const [btConfig, setBtConfig] = useState({ forward_email: '', forward_enabled: false })
+  const [btConfig, setBtConfig] = useState({ forward_email: '', forward_enabled: false, last_status: '', last_status_at: '', last_status_detail: '' })
+  const [testingBt, setTestingBt] = useState(false)
   const [savingBt, setSavingBt] = useState(false)
 
   useEffect(() => {
@@ -869,9 +870,25 @@ export default function SettingsPage() {
       {/* BuilderTrend Auto-Forward */}
       <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 p-6 mb-6">
         <h2 className="text-lg font-semibold mb-2 text-gray-100">BuilderTrend Auto-Forward</h2>
-        <p className="text-sm text-gray-400 mb-4">
+        <p className="text-sm text-gray-400 mb-2">
           When enabled, approved invoices will be automatically emailed (with attachments) to BuilderTrend via your connected Microsoft 365 account.
         </p>
+        <p className="text-xs text-amber-400 mb-4">
+          Requires Microsoft 365 to be connected above. IMAP-only accounts (Gmail, generic IMAP) cannot forward — only Microsoft accounts can send mail.
+        </p>
+        {btConfig.last_status && (
+          <div className={`mb-4 px-3 py-2 rounded-lg text-sm border ${btConfig.last_status === 'ok' ? 'bg-green-900/30 border-green-700 text-green-300' : 'bg-red-900/30 border-red-700 text-red-300'}`}>
+            <div className="font-medium">
+              Last forward: {btConfig.last_status === 'ok' ? 'Success' : 'Failed'}
+              {btConfig.last_status_at && (
+                <span className="ml-2 text-xs opacity-80">{new Date(btConfig.last_status_at).toLocaleString()}</span>
+              )}
+            </div>
+            {btConfig.last_status_detail && (
+              <div className="text-xs mt-1 opacity-90">{btConfig.last_status_detail}</div>
+            )}
+          </div>
+        )}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <button
@@ -902,22 +919,46 @@ export default function SettingsPage() {
               placeholder="e.g. abc123@receipts.buildertrend.net"
             />
           </div>
-          <button
-            onClick={async () => {
-              setSavingBt(true)
-              try {
-                await builderTrendAPI.saveConfig(btConfig)
-                toast.success('BuilderTrend settings saved')
-              } catch {
-                toast.error('Failed to save')
-              }
-              setSavingBt(false)
-            }}
-            disabled={savingBt}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {savingBt ? 'Saving...' : 'Save Settings'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setSavingBt(true)
+                try {
+                  const res = await builderTrendAPI.saveConfig(btConfig)
+                  if (res.data) setBtConfig(res.data)
+                  toast.success('BuilderTrend settings saved')
+                } catch {
+                  toast.error('Failed to save')
+                }
+                setSavingBt(false)
+              }}
+              disabled={savingBt}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {savingBt ? 'Saving...' : 'Save Settings'}
+            </button>
+            <button
+              onClick={async () => {
+                setTestingBt(true)
+                try {
+                  const res = await builderTrendAPI.test()
+                  toast.success(res.data?.detail || 'Test email sent')
+                } catch (err) {
+                  toast.error(err.response?.data?.detail || 'Test failed')
+                }
+                // Refresh status
+                try {
+                  const cfg = await builderTrendAPI.getConfig()
+                  if (cfg.data) setBtConfig(cfg.data)
+                } catch {}
+                setTestingBt(false)
+              }}
+              disabled={testingBt || !btConfig.forward_email}
+              className="px-4 py-2 bg-gray-700 text-gray-100 rounded-lg text-sm font-medium hover:bg-gray-600 disabled:opacity-50 border border-gray-600"
+            >
+              {testingBt ? 'Sending...' : 'Send Test Email'}
+            </button>
+          </div>
         </div>
       </div>
 
