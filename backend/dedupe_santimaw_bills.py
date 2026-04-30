@@ -49,17 +49,17 @@ async def main(dry_run: bool) -> int:
     async with async_session_factory() as db:
         # Find santimaw user(s)
         users = (await db.execute(
-            select(User).where(User.email.ilike(f"%{SANTIMAW_HINT}%"))
+            select(User).where(User.username.ilike(f"%{SANTIMAW_HINT}%"))
         )).scalars().all()
         if not users:
             print(f"No user matched '{SANTIMAW_HINT}'. Existing users:")
             all_users = (await db.execute(select(User))).scalars().all()
             for u in all_users:
-                print(f"  id={u.id} email={u.email}")
+                print(f"  id={u.id} username={u.username}")
             return 1
 
         for user in users:
-            print(f"\n=== User id={user.id} email={user.email} ===")
+            print(f"\n=== User id={user.id} username={user.username} ===")
 
             bills = (await db.execute(
                 select(RecurringBill).where(RecurringBill.user_id == user.id)
