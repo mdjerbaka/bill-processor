@@ -396,9 +396,30 @@ async def approve_invoice(
             attachment_filename = attachment.filename
             await db.flush()
 
+    # Also preserve any sibling attachments that came in on the same email
+    # (e.g. additional pages, supporting docs) so the user can view them all
+    # from the Payables row, not just the one used for OCR.
+    extra_attachments: list[dict] = []
+    if invoice.email_id:
+        sibling_result = await db.execute(
+            select(Attachment).where(Attachment.email_id == invoice.email_id)
+        )
+        siblings = sibling_result.scalars().all()
+        for att in siblings:
+            if att.id == invoice.attachment_id:
+                continue
+            extra_attachments.append({
+                "path": att.file_path,
+                "filename": att.filename,
+                "content_type": att.content_type,
+            })
+    if extra_attachments:
+        payable.extra_attachments = extra_attachments
+        await db.flush()
+
     # Auto-forward to BuilderTrend if configured (best-effort)
     from app.services.buildertrend_service import forward_invoice_to_buildertrend
-    await forward_invoice_to_buildertrend(
+    bt_result = await forward_invoice_to_buildertrend(
         db=db,
         user_id=user.id,
         payable=payable,
@@ -414,6 +435,7 @@ async def approve_invoice(
         "payable_id": payable.id,
         "vendor_name": payable.vendor_name,
         "amount": payable.amount,
+        "buildertrend_forward": bt_result,
     }
 
 

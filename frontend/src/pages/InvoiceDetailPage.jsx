@@ -80,8 +80,14 @@ export default function InvoiceDetailPage() {
 
   async function handleApprove() {
     try {
-      await invoicesAPI.approve(id)
+      const res = await invoicesAPI.approve(id)
       toast.success('Invoice approved and moved to payables')
+      const bt = res?.data?.buildertrend_forward
+      if (bt && bt.status === 'ok') {
+        toast.success(`BuilderTrend: ${bt.detail}`)
+      } else if (bt && bt.status === 'error') {
+        toast.error(`BuilderTrend forward failed: ${bt.detail}`, { duration: 8000 })
+      }
       navigate('/invoices')
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to approve')

@@ -73,6 +73,7 @@ async def list_payables(
             included_in_cashflow=p.included_in_cashflow,
             notes=p.notes,
             has_attachment=bool(p.attachment_path),
+            extra_attachment_count=len(p.extra_attachments or []),
         )
         for p, inv, job in rows
     ]
@@ -412,11 +413,82 @@ async def get_payable_attachment(
     if not os.path.exists(payable.attachment_path):
         raise HTTPException(status_code=404, detail="Attachment file not found on disk")
 
+    # Guess MIME type from filename so browsers render PDFs/images inline
+    import mimetypes
+    media_type = mimetypes.guess_type(payable.attachment_filename or payable.attachment_path)[0] \
+        or "application/octet-stream"
     return FileResponse(
         path=payable.attachment_path,
         filename=payable.attachment_filename or "attachment",
-        media_type="application/octet-stream",
+        media_type=media_type,
     )
+
+
+@router.get("/{payable_id}/attachments")
+async def list_payable_attachments(
+    payable_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """List all attachments associated with a payable (primary + extras)."""
+    result = await db.execute(
+        select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
+    )
+    payable = result.scalar_one_or_none()
+    if not payable:
+        raise HTTPException(status_code=404, detail="Payable not found")
+    items = []
+    if payable.attachment_path:
+        items.append({
+            "index": 0,
+            "filename": payable.attachment_filename or "attachment",
+            "primary": True,
+        })
+    for i, extra in enumerate(payable.extra_attachments or [], start=1):
+        items.append({
+            "index": i,
+            "filename": extra.get("filename") or f"attachment-{i}",
+            "primary": False,
+        })
+    return {"items": items}
+
+
+@router.get("/{payable_id}/attachments/{index}")
+async def get_payable_attachment_by_index(
+    payable_id: int,
+    index: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Serve a specific attachment by index (0 = primary, 1+ = extras)."""
+    import mimetypes
+    import os
+
+    result = await db.execute(
+        select(Payable).where(Payable.id == payable_id, Payable.user_id == user.id)
+    )
+    payable = result.scalar_one_or_none()
+    if not payable:
+        raise HTTPException(status_code=404, detail="Payable not found")
+
+    if index == 0:
+        path = payable.attachment_path
+        filename = payable.attachment_filename or "attachment"
+        content_type = None
+    else:
+        extras = payable.extra_attachments or []
+        if index - 1 >= len(extras):
+            raise HTTPException(status_code=404, detail="Attachment not found")
+        extra = extras[index - 1]
+        path = extra.get("path")
+        filename = extra.get("filename") or f"attachment-{index}"
+        content_type = extra.get("content_type")
+
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Attachment file not found on disk")
+
+    media_type = content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return FileResponse(path=path, filename=filename, media_type=media_type)
 
 
 @router.get("/export")

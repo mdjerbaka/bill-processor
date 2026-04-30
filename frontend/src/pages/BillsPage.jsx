@@ -235,9 +235,17 @@ export default function BillsPage() {
 
   const loadData = useCallback(async () => {
     try {
+      // Restrict occurrences to the current calendar month so monthly bills
+      // don't show up multiple times (one per generated future month).
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const fmt = (d) => d.toISOString().slice(0, 10)
       const [cfRes, occRes, billsRes, payablesRes, vendorRes] = await Promise.allSettled([
         recurringBillsAPI.getCashFlow(),
         recurringBillsAPI.listOccurrences({
+          start_date: fmt(monthStart),
+          end_date: fmt(monthEnd),
           ...(filterStatus && { status: filterStatus }),
           ...(filterCategory && { category: filterCategory }),
         }),

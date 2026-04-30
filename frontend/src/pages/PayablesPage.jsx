@@ -367,18 +367,37 @@ export default function PayablesPage() {
                         <button
                           onClick={async () => {
                             try {
-                              const res = await payablesAPI.getAttachment(p.id)
-                              const blob = new Blob([res.data])
-                              const url = URL.createObjectURL(blob)
-                              window.open(url, '_blank')
+                              const total = 1 + (p.extra_attachment_count || 0)
+                              if (total <= 1) {
+                                const res = await payablesAPI.getAttachment(p.id)
+                                const type = res.headers?.['content-type'] || 'application/octet-stream'
+                                const blob = new Blob([res.data], { type })
+                                window.open(URL.createObjectURL(blob), '_blank')
+                                return
+                              }
+                              // Multiple attachments — open each in a new tab
+                              const list = await payablesAPI.listAttachments(p.id)
+                              for (const item of (list.data?.items || [])) {
+                                const res = await payablesAPI.getAttachmentByIndex(p.id, item.index)
+                                const type = res.headers?.['content-type'] || 'application/octet-stream'
+                                const blob = new Blob([res.data], { type })
+                                window.open(URL.createObjectURL(blob), '_blank')
+                              }
                             } catch {
                               toast.error('Failed to load attachment')
                             }
                           }}
-                          className="p-1.5 text-gray-400 hover:text-cyan-400 transition-colors"
-                          title="View invoice attachment"
+                          className="p-1.5 text-gray-400 hover:text-cyan-400 transition-colors relative"
+                          title={p.extra_attachment_count
+                            ? `View ${1 + p.extra_attachment_count} attachments`
+                            : 'View invoice attachment'}
                         >
                           <DocumentIcon className="h-4 w-4" />
+                          {p.extra_attachment_count > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-cyan-500 text-white text-[9px] rounded-full h-3.5 min-w-3.5 px-0.5 flex items-center justify-center font-bold">
+                              {1 + p.extra_attachment_count}
+                            </span>
+                          )}
                         </button>
                       )}
                       {p.status !== 'paid' && !p.is_permanent && (

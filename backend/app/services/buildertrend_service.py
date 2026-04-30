@@ -86,11 +86,11 @@ async def forward_invoice_to_buildertrend(
     user_id: int,
     payable: Payable,
     attachment_id: Optional[int],
-) -> bool:
+) -> dict:
     """Forward an approved invoice to BuilderTrend if configured.
 
     Best-effort: never raises. Records last status to AppSettings for UI display.
-    Returns True only if the email was successfully sent.
+    Returns a dict: {"status": "ok"|"error"|"skipped", "detail": str}
     """
     try:
         # Load BT config
@@ -107,24 +107,22 @@ async def forward_invoice_to_buildertrend(
         bt_enabled = cfg.get("buildertrend_forward_enabled") == "true"
 
         if not bt_enabled:
-            return False
+            return {"status": "skipped", "detail": "Auto-forward disabled"}
         if not bt_email:
-            await _set_status(
-                db, user_id, "error", "Auto-forward enabled but no BuilderTrend email configured."
-            )
+            detail = "Auto-forward enabled but no BuilderTrend email configured."
+            await _set_status(db, user_id, "error", detail)
             logger.warning("BT forward: enabled but no email address set")
-            return False
+            return {"status": "error", "detail": detail}
 
         ms_svc = MicrosoftGraphService(db, user_id)
         if not await ms_svc._get_valid_token():
-            await _set_status(
-                db,
-                user_id,
-                "error",
-                "Microsoft 365 not connected. Connect Microsoft in Settings to enable forwarding.",
+            detail = (
+                "Microsoft 365 token expired or not connected. Go to Settings → "
+                "Microsoft 365 and click Connect to re-authenticate."
             )
+            await _set_status(db, user_id, "error", detail)
             logger.warning("BT forward: MS Graph not connected for user %s", user_id)
-            return False
+            return {"status": "error", "detail": detail}
 
         # Build subject and body
         vendor = payable.vendor_name or "Unknown"
@@ -163,6 +161,31 @@ async def forward_invoice_to_buildertrend(
         elif attachment_id:
             attachment_warning = " Attachment file was missing on disk and was not included."
 
+        # Include any extra sibling attachments preserved on the payable
+        for extra in (payable.extra_attachments or []):
+            extra_path = extra.get("path")
+            extra_name = extra.get("filename") or "attachment"
+            extra_type = extra.get("content_type") or (
+                mimetypes.guess_type(extra_name)[0] or "application/octet-stream"
+            )
+            try:
+                p = Path(extra_path) if extra_path else None
+                if not p or not p.is_file():
+                    attachment_warning += f" Extra attachment '{extra_name}' missing on disk."
+                    continue
+                data = p.read_bytes()
+                if len(data) > MAX_ATTACHMENT_BYTES:
+                    attachment_warning += f" Extra attachment '{extra_name}' too large, skipped."
+                    continue
+                bt_attachments.append({
+                    "name": extra_name,
+                    "contentType": extra_type,
+                    "contentBytes": base64.b64encode(data).decode(),
+                })
+            except Exception as e:  # noqa: BLE001
+                logger.warning("BT forward: failed to attach extra %s: %s", extra_name, e)
+                attachment_warning += f" Failed to read extra attachment '{extra_name}'."
+
         sent = await ms_svc.send_mail(
             subject=subject,
             body_html=body_html,
@@ -174,20 +197,20 @@ async def forward_invoice_to_buildertrend(
             detail = f"Forwarded '{subject}' to {bt_email}." + attachment_warning
             await _set_status(db, user_id, "ok", detail)
             logger.info("BT forward: %s", detail)
-            return True
+            return {"status": "ok", "detail": detail}
 
-        await _set_status(
-            db,
-            user_id,
-            "error",
-            f"Microsoft Graph rejected the send to {bt_email}. Check the email address and that your Microsoft account can send mail.",
+        detail = (
+            f"Microsoft Graph rejected the send to {bt_email}. "
+            "Check the email address and that your Microsoft account can send mail."
         )
-        return False
+        await _set_status(db, user_id, "error", detail)
+        return {"status": "error", "detail": detail}
 
     except Exception as e:  # noqa: BLE001
         logger.exception("BT forward: unexpected failure")
+        detail = f"Unexpected error: {e}"
         try:
-            await _set_status(db, user_id, "error", f"Unexpected error: {e}")
+            await _set_status(db, user_id, "error", detail)
         except Exception:
             pass
-        return False
+        return {"status": "error", "detail": detail}

@@ -309,6 +309,9 @@ class Payable(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     attachment_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     attachment_filename: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Additional attachments preserved from the source email at approval time.
+    # Each entry: {"path": str, "filename": str, "content_type": str}
+    extra_attachments: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
 
     invoice: Mapped["Invoice"] = relationship(back_populates="payable")
 

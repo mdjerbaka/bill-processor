@@ -188,6 +188,7 @@ class PayableSchema(BaseModel):
     included_in_cashflow: bool = True
     notes: Optional[str] = None
     has_attachment: bool = False
+    extra_attachment_count: int = 0
 
     class Config:
         from_attributes = True
