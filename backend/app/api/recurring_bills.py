@@ -20,6 +20,8 @@ from app.schemas.schemas import (
     BillOccurrenceListResponse,
     BillOccurrenceSchema,
     CashFlowSummary,
+    MasterListItem,
+    MasterListResponse,
     RecurringBillCreate,
     RecurringBillListResponse,
     RecurringBillSchema,
@@ -267,6 +269,72 @@ async def toggle_occurrence_cashflow(
     return {
         "detail": f"Occurrence {'included in' if occ.included_in_cashflow else 'excluded from'} cash flow",
         "included_in_cashflow": occ.included_in_cashflow,
+    }
+
+
+@router.get("/master-list", response_model=MasterListResponse)
+async def get_master_list(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return one row per active recurring bill for the Master List view."""
+    svc = RecurringBillsService(db, user.id)
+    # Make sure occurrences exist for the current period before deriving
+    # status — guards against an empty DB or a freshly-added bill.
+    await svc.generate_occurrences()
+    await svc.check_overdue()
+    await svc.check_due_soon()
+    await db.commit()
+    items = await svc.get_master_list()
+    schemas = [MasterListItem(**item) for item in items]
+    return MasterListResponse(items=schemas, total=len(schemas))
+
+
+@router.post("/{bill_id}/mark-current-paid")
+async def mark_bill_current_paid(
+    bill_id: int,
+    body: dict = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Mark the current-period occurrence of a recurring bill as paid.
+
+    Used by the Master List "Mark Paid" button so the client doesn't have
+    to drill into per-period rows. Optionally creates a Payment Out record.
+    """
+    svc = RecurringBillsService(db, user.id)
+    occ = await svc.mark_bill_current_paid(bill_id)
+    if not occ:
+        raise HTTPException(
+            status_code=404,
+            detail="No unpaid occurrence found for this bill",
+        )
+    # Generate next cycle's occurrence so the row reappears as upcoming
+    await svc.generate_occurrences()
+
+    payment_out_id = None
+    if body and body.get("payment_method"):
+        from app.services.payments_out_service import PaymentsOutService
+        po_svc = PaymentsOutService(db, user.id)
+        po = await po_svc.create({
+            "vendor_name": occ.recurring_bill.vendor_name if occ.recurring_bill else "Unknown",
+            "amount": occ.amount,
+            "payment_date": datetime.now(timezone.utc),
+            "payment_method": body.get("payment_method", "other"),
+            "check_number": body.get("check_number"),
+            "job_name": body.get("job_name"),
+            "notes": body.get("notes"),
+        })
+        payment_out_id = po.id
+        await db.flush()
+
+    await db.commit()
+    next_due = occ.recurring_bill.next_due_date if occ.recurring_bill else None
+    return {
+        "detail": "Current-period occurrence marked as paid",
+        "occurrence_id": occ.id,
+        "next_due_date": next_due.isoformat() if next_due else None,
+        "payment_out_id": payment_out_id,
     }
 
 

@@ -137,12 +137,14 @@ export default function BillsPage() {
   const [cashFlow, setCashFlow] = useState(null)
   const [occurrences, setOccurrences] = useState([])
   const [bills, setBills] = useState([])
+  const [masterList, setMasterList] = useState([])
+  const [masterListOpen, setMasterListOpen] = useState(true)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingBill, setEditingBill] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [managementOpen, setManagementOpen] = useState(false)
-  const [upcomingOpen, setUpcomingOpen] = useState(true)
+  const [upcomingOpen, setUpcomingOpen] = useState(false)
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [showImport, setShowImport] = useState(false)
@@ -241,7 +243,7 @@ export default function BillsPage() {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
       const fmt = (d) => d.toISOString().slice(0, 10)
-      const [cfRes, occRes, billsRes, payablesRes, vendorRes] = await Promise.allSettled([
+      const [cfRes, occRes, billsRes, mlRes, payablesRes, vendorRes] = await Promise.allSettled([
         recurringBillsAPI.getCashFlow(),
         recurringBillsAPI.listOccurrences({
           start_date: fmt(monthStart),
@@ -250,6 +252,7 @@ export default function BillsPage() {
           ...(filterCategory && { category: filterCategory }),
         }),
         recurringBillsAPI.list(),
+        recurringBillsAPI.getMasterList(),
         payablesAPI.list(),
         vendorAccountsAPI.list(),
       ])
@@ -259,6 +262,7 @@ export default function BillsPage() {
       }
       if (occRes.status === 'fulfilled') setOccurrences(occRes.value.data.items || [])
       if (billsRes.status === 'fulfilled') setBills(billsRes.value.data.items || [])
+      if (mlRes.status === 'fulfilled') setMasterList(mlRes.value.data.items || [])
       if (payablesRes.status === 'fulfilled') {
         const allPayables = payablesRes.value.data.items || []
         setLockedBills(allPayables.filter(p => p.is_permanent))
@@ -387,6 +391,35 @@ export default function BillsPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentTarget, setPaymentTarget] = useState(null)
   const [paymentForm, setPaymentForm] = useState({ payment_method: 'check', check_number: '', job_name: '', notes: '' })
+
+  // Master List "Mark Paid" target — billId or null
+  const [masterPaidTarget, setMasterPaidTarget] = useState(null)
+
+  function openMasterPaidModal(item) {
+    setMasterPaidTarget(item)
+    setPaymentForm({ payment_method: 'check', check_number: '', job_name: '', notes: '' })
+    setShowPaymentModal(true)
+  }
+
+  async function handleMasterMarkPaid(billId, paymentBody) {
+    try {
+      const res = await recurringBillsAPI.markCurrentPaid(billId, paymentBody)
+      const nextDate = res.data?.next_due_date
+      if (nextDate) {
+        const formatted = new Date(nextDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        toast.success(paymentBody ? `Marked as paid & recorded payment! Next due: ${formatted}` : `Marked as paid! Next due: ${formatted}`)
+      } else {
+        toast.success('Marked as paid')
+      }
+      setShowPaymentModal(false)
+      setMasterPaidTarget(null)
+      setPaymentTarget(null)
+      loadData()
+      window.dispatchEvent(new Event('balance-changed'))
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to mark as paid')
+    }
+  }
 
   function openPaymentModal(occurrence) {
     setPaymentTarget(occurrence)
@@ -754,6 +787,155 @@ export default function BillsPage() {
         </div>
       )}
 
+      {/* Recurring Bills — Master List */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 mb-6">
+        <button
+          onClick={() => setMasterListOpen(!masterListOpen)}
+          className="w-full flex items-center justify-between p-6 text-left"
+        >
+          <div>
+            <h2 className="text-lg font-semibold text-gray-100">Recurring Bills — Master List</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              One row per recurring bill. Late bills are flagged so none get lost.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {masterList.some(m => m.late_tier === 'red') && (
+              <span className="text-xs font-bold text-red-500 uppercase animate-pulse">Credit Danger</span>
+            )}
+            {masterListOpen ? <ChevronUpIcon className="h-5 w-5 text-gray-400" /> : <ChevronDownIcon className="h-5 w-5 text-gray-400" />}
+          </div>
+        </button>
+
+        {masterListOpen && (
+          <div className="px-6 pb-6">
+            {masterList.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-8">
+                No recurring bills yet. Click "Add Bill" to get started.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-400 border-b border-gray-700">
+                      <th className="px-3 py-2 font-medium w-8"></th>
+                      <th className="px-3 py-2 font-medium">Bill / Vendor</th>
+                      <th className="px-3 py-2 font-medium">Frequency</th>
+                      <th className="px-3 py-2 font-medium text-right">Amount</th>
+                      <th className="px-3 py-2 font-medium">Next Due</th>
+                      <th className="px-3 py-2 font-medium">Last Paid</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {masterList.map((m) => {
+                      const tier = m.late_tier
+                      const isPaid = m.current_period_status === 'paid'
+                      const flagDot = tier === 'red'
+                        ? 'bg-red-500 animate-pulse'
+                        : tier === 'orange'
+                        ? 'bg-orange-500'
+                        : tier === 'yellow'
+                        ? 'bg-yellow-400'
+                        : isPaid
+                        ? 'bg-emerald-500'
+                        : m.current_period_status === 'due_soon'
+                        ? 'bg-yellow-300'
+                        : 'bg-gray-600'
+                      const rowTint = tier === 'red'
+                        ? 'bg-red-900/20'
+                        : tier === 'orange'
+                        ? 'bg-orange-900/10'
+                        : tier === 'yellow'
+                        ? 'bg-yellow-900/10'
+                        : ''
+                      let statusLabel
+                      let statusClass
+                      if (isPaid) {
+                        statusLabel = 'Paid this period'
+                        statusClass = 'bg-emerald-900/50 text-emerald-400'
+                      } else if (tier === 'red') {
+                        statusLabel = `Credit Danger — ${m.days_overdue}d late`
+                        statusClass = 'bg-red-900/50 text-red-400 font-bold'
+                      } else if (tier === 'orange') {
+                        statusLabel = `Late — ${m.days_overdue}d`
+                        statusClass = 'bg-orange-900/50 text-orange-400 font-medium'
+                      } else if (tier === 'yellow') {
+                        statusLabel = `Late — ${m.days_overdue}d`
+                        statusClass = 'bg-yellow-900/50 text-yellow-400'
+                      } else if (m.current_period_status === 'due_soon') {
+                        statusLabel = m.days_until_due === 0 ? 'Due today' : `Due in ${m.days_until_due}d`
+                        statusClass = 'bg-yellow-900/40 text-yellow-300'
+                      } else {
+                        statusLabel = m.days_until_due != null ? `Due in ${m.days_until_due}d` : 'Upcoming'
+                        statusClass = 'bg-gray-700 text-gray-300'
+                      }
+                      const bill = bills.find(b => b.id === m.id)
+                      return (
+                        <tr key={m.id} className={`border-b border-gray-700/30 hover:bg-gray-700/20 ${rowTint}`}>
+                          <td className="px-3 py-2.5">
+                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${flagDot}`} title={`Late tier: ${tier}`}></span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <p className="font-medium text-gray-200">{m.name}</p>
+                            <p className="text-xs text-gray-500">{m.vendor_name}</p>
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-400 text-xs capitalize">{m.frequency.replace(/_/g, ' ')}</td>
+                          <td className="px-3 py-2.5 text-right font-medium text-gray-200">{fmt(m.amount)}</td>
+                          <td className="px-3 py-2.5 text-gray-300 text-xs">
+                            {m.next_due_date ? new Date(m.next_due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-400 text-xs">
+                            {m.last_paid_at ? new Date(m.last_paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Never'}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${statusClass}`}>
+                              {statusLabel}
+                            </span>
+                            {m.is_auto_pay && (
+                              <span className="ml-1 inline-block px-1.5 py-0.5 rounded text-[10px] bg-blue-900/40 text-blue-400">AUTO</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {!isPaid && (
+                                <button
+                                  onClick={() => openMasterPaidModal(m)}
+                                  className="px-2.5 py-1 text-xs bg-emerald-700 hover:bg-emerald-600 text-white rounded transition-colors"
+                                  title="Mark this period as paid"
+                                >
+                                  Mark Paid
+                                </button>
+                              )}
+                              {bill && (
+                                <button onClick={() => openEditForm(bill)} className="p-1 text-gray-400 hover:text-blue-400" title="Edit">
+                                  <PencilIcon className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              <button onClick={() => handleDelete(m.id)} className="p-1 text-gray-400 hover:text-red-400" title="Delete">
+                                <TrashIcon className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> Paid</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-gray-600"></span> Upcoming</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400"></span> 1–7 days late</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-orange-500"></span> 8–24 days late</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-red-500"></span> 25+ days (Credit Danger)</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Locked Bills (Permanent Payables) */}
       {lockedBills.length > 0 && (
         <div className="bg-gray-800 rounded-xl border border-gray-700 mb-6">
@@ -958,7 +1140,10 @@ export default function BillsPage() {
           onClick={() => setUpcomingOpen(!upcomingOpen)}
           className="w-full flex items-center justify-between p-6 text-left"
         >
-          <h2 className="text-lg font-semibold text-gray-100">Upcoming Bills</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-100">Cash Flow Forecast by Week</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Per-period occurrences grouped by week of the month — used for cash-flow planning.</p>
+          </div>
           <div className="flex items-center gap-2">
             {upcomingOpen ? (
               <ChevronUpIcon className="h-5 w-5 text-gray-400" />
@@ -1427,20 +1612,35 @@ export default function BillsPage() {
       )}
 
       {/* Mark Paid Modal */}
-      {showPaymentModal && paymentTarget && (
+      {showPaymentModal && (paymentTarget || masterPaidTarget) && (() => {
+        const target = paymentTarget || masterPaidTarget
+        const isMaster = !!masterPaidTarget && !paymentTarget
+        const closeModal = () => {
+          setShowPaymentModal(false)
+          setPaymentTarget(null)
+          setMasterPaidTarget(null)
+        }
+        const submit = (body) => {
+          if (isMaster) handleMasterMarkPaid(target.id, body)
+          else handleMarkPaid(target.id, body)
+        }
+        const billLabel = target.bill_name || target.name
+        const vendorLabel = target.vendor_name
+        const amountLabel = target.amount
+        return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-100">Mark as Paid</h3>
-              <button onClick={() => setShowPaymentModal(false)} className="text-gray-400 hover:text-white">
+              <button onClick={closeModal} className="text-gray-400 hover:text-white">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
             <p className="text-sm text-gray-400 mb-1">
-              <span className="text-gray-200 font-medium">{paymentTarget.bill_name}</span>
+              <span className="text-gray-200 font-medium">{billLabel}</span>
             </p>
             <p className="text-sm text-gray-400 mb-4">
-              <span className="text-gray-300">{paymentTarget.vendor_name}</span> &mdash; ${paymentTarget.amount?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              <span className="text-gray-300">{vendorLabel}</span> &mdash; ${amountLabel?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-xs text-gray-500 mb-4">
               Optionally record this as a payment to track in Payments Out (outstanding checks/ACH).
@@ -1493,19 +1693,19 @@ export default function BillsPage() {
             </div>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setShowPaymentModal(false)}
+                onClick={closeModal}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleMarkPaid(paymentTarget.id)}
+                onClick={() => submit(null)}
                 className="px-4 py-2 text-sm bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors"
               >
                 Mark Paid Only
               </button>
               <button
-                onClick={() => handleMarkPaid(paymentTarget.id, {
+                onClick={() => submit({
                   payment_method: paymentForm.payment_method,
                   check_number: paymentForm.check_number || null,
                   job_name: paymentForm.job_name || null,
@@ -1518,7 +1718,8 @@ export default function BillsPage() {
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* Import Modal */}
       {showImport && (

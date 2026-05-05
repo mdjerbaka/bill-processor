@@ -392,6 +392,34 @@ class NotificationListResponse(BaseModel):
     total: int
 
 
+class MasterListItem(BaseModel):
+    """One row per recurring bill — derived view for the Master List UI."""
+    id: int
+    name: str
+    vendor_name: str
+    amount: float
+    frequency: str
+    category: str
+    is_auto_pay: bool
+    is_active: bool
+    alert_days_before: int
+    next_due_date: Optional[datetime] = None
+    last_paid_at: Optional[datetime] = None
+    current_occurrence_id: Optional[int] = None
+    current_period_status: str  # paid | upcoming | due_soon | overdue
+    days_overdue: Optional[int] = None
+    days_until_due: Optional[int] = None
+    late_tier: str  # none | yellow | orange | red
+
+    class Config:
+        from_attributes = True
+
+
+class MasterListResponse(BaseModel):
+    items: List[MasterListItem]
+    total: int
+
+
 class CashFlowSummary(BaseModel):
     bank_balance: float
     outstanding_checks: float

@@ -129,6 +129,29 @@ def _generate_dates_in_range(
         max_day = calendar.monthrange(year, month)[1]
         return date(year, month, min(day, max_day))
 
+    # Per-frequency anchor for "this period". We look backward to the
+    # start of the current period so a bill whose due-day already passed
+    # in the current period still gets an occurrence row generated (and
+    # can therefore be flagged OVERDUE). Without this, a monthly bill
+    # due on the 5th would be skipped if today is the 6th, vanishing
+    # from the current-month view.
+    if frequency == BillFrequency.MONTHLY:
+        period_start = date(start.year, start.month, 1)
+    elif frequency == BillFrequency.QUARTERLY:
+        # First month of the current calendar quarter
+        q_first = ((start.month - 1) // 3) * 3 + 1
+        period_start = date(start.year, q_first, 1)
+    elif frequency == BillFrequency.SEMI_ANNUAL:
+        period_start = date(start.year, 1 if start.month <= 6 else 7, 1)
+    elif frequency == BillFrequency.ANNUAL:
+        period_start = date(start.year, 1, 1)
+    elif frequency == BillFrequency.BIENNIAL:
+        period_start = date(start.year - (start.year % 2), 1, 1)
+    elif frequency == BillFrequency.CUSTOM:
+        period_start = date(start.year, 1, 1)
+    else:
+        period_start = start
+
     if frequency == BillFrequency.WEEKLY:
         # Generate one occurrence per week starting from start
         current = start
@@ -138,10 +161,10 @@ def _generate_dates_in_range(
         return dates
 
     if frequency == BillFrequency.MONTHLY:
-        current = date(start.year, start.month, 1)
+        current = period_start
         while current <= end:
             candidate = _safe_date(current.year, current.month, due_day)
-            if start <= candidate <= end:
+            if period_start <= candidate <= end:
                 dates.append(candidate)
             # advance month
             if current.month == 12:
@@ -152,41 +175,41 @@ def _generate_dates_in_range(
     elif frequency == BillFrequency.QUARTERLY:
         base_month = due_month or 1
         quarter_months = sorted(set((base_month + i * 3 - 1) % 12 + 1 for i in range(4)))
-        for year in range(start.year, end.year + 1):
+        for year in range(period_start.year, end.year + 1):
             for m in quarter_months:
                 candidate = _safe_date(year, m, due_day)
-                if start <= candidate <= end:
+                if period_start <= candidate <= end:
                     dates.append(candidate)
 
     elif frequency == BillFrequency.SEMI_ANNUAL:
         base_month = due_month or 1
         semi_months = sorted(set((base_month + i * 6 - 1) % 12 + 1 for i in range(2)))
-        for year in range(start.year, end.year + 1):
+        for year in range(period_start.year, end.year + 1):
             for m in semi_months:
                 candidate = _safe_date(year, m, due_day)
-                if start <= candidate <= end:
+                if period_start <= candidate <= end:
                     dates.append(candidate)
 
     elif frequency == BillFrequency.ANNUAL:
         month = due_month or 1
-        for year in range(start.year, end.year + 1):
+        for year in range(period_start.year, end.year + 1):
             candidate = _safe_date(year, month, due_day)
-            if start <= candidate <= end:
+            if period_start <= candidate <= end:
                 dates.append(candidate)
 
     elif frequency == BillFrequency.BIENNIAL:
         month = due_month or 1
-        for year in range(start.year, end.year + 2, 2):
+        for year in range(period_start.year, end.year + 2, 2):
             candidate = _safe_date(year, month, due_day)
-            if start <= candidate <= end:
+            if period_start <= candidate <= end:
                 dates.append(candidate)
 
     elif frequency == BillFrequency.CUSTOM:
         months = sorted(custom_months or [])
-        for year in range(start.year, end.year + 1):
+        for year in range(period_start.year, end.year + 1):
             for m in months:
                 candidate = _safe_date(year, m, due_day or 1)
-                if start <= candidate <= end:
+                if period_start <= candidate <= end:
                     dates.append(candidate)
 
     return dates
@@ -616,6 +639,140 @@ class RecurringBillsService:
                 "created_at": occ.created_at,
             })
         return enriched
+
+    # ── Master List (derived per-bill view) ──────────────
+
+    async def get_master_list(self) -> list[dict]:
+        """Return one row per active recurring bill with derived status.
+
+        Used by the "Master List" UI so the client never has to think in
+        terms of per-period occurrence rows: each bill shows its
+        next due date, last paid date, and a tiered late flag.
+        """
+        bills = await self.list_bills()
+        if not bills:
+            return []
+
+        now = datetime.now(timezone.utc)
+        today = now.date()
+
+        # Pull all occurrences for these bills in one query
+        bill_ids = [b.id for b in bills]
+        occ_result = await self.db.execute(
+            select(BillOccurrence)
+            .where(BillOccurrence.recurring_bill_id.in_(bill_ids))
+            .order_by(BillOccurrence.due_date.asc())
+        )
+        all_occs = list(occ_result.scalars().all())
+
+        # Index by bill
+        by_bill: dict[int, list[BillOccurrence]] = {}
+        for occ in all_occs:
+            by_bill.setdefault(occ.recurring_bill_id, []).append(occ)
+
+        items: list[dict] = []
+        for bill in bills:
+            occs = by_bill.get(bill.id, [])
+
+            # Last paid: max paid_at across PAID occurrences
+            paid_occs = [o for o in occs if o.status == OccurrenceStatus.PAID and o.paid_at]
+            last_paid_at = max((o.paid_at for o in paid_occs), default=None)
+
+            # Pick the "current" occurrence: prefer the earliest unpaid
+            # (overdue/due_soon/upcoming). If none exists, fall back to
+            # the most recent paid one (so the row still shows "paid").
+            unpaid = [
+                o for o in occs
+                if o.status in (
+                    OccurrenceStatus.OVERDUE,
+                    OccurrenceStatus.DUE_SOON,
+                    OccurrenceStatus.UPCOMING,
+                )
+            ]
+            current = unpaid[0] if unpaid else (paid_occs[-1] if paid_occs else None)
+
+            current_status = "upcoming"
+            current_occ_id: Optional[int] = None
+            days_overdue: Optional[int] = None
+            days_until_due: Optional[int] = None
+            late_tier = "none"
+
+            if current is not None:
+                current_occ_id = current.id
+                current_status = current.status.value
+                if current.status == OccurrenceStatus.OVERDUE:
+                    days_overdue = (today - current.due_date.date()).days
+                    if days_overdue >= 25:
+                        late_tier = "red"
+                    elif days_overdue >= 8:
+                        late_tier = "orange"
+                    elif days_overdue >= 1:
+                        late_tier = "yellow"
+                elif current.status in (OccurrenceStatus.UPCOMING, OccurrenceStatus.DUE_SOON):
+                    days_until_due = (current.due_date.date() - today).days
+
+            items.append({
+                "id": bill.id,
+                "name": bill.name,
+                "vendor_name": bill.vendor_name,
+                "amount": bill.amount,
+                "frequency": bill.frequency.value,
+                "category": bill.category.value,
+                "is_auto_pay": bill.is_auto_pay,
+                "is_active": bill.is_active,
+                "alert_days_before": bill.alert_days_before,
+                "next_due_date": bill.next_due_date,
+                "last_paid_at": last_paid_at,
+                "current_occurrence_id": current_occ_id,
+                "current_period_status": current_status,
+                "days_overdue": days_overdue,
+                "days_until_due": days_until_due,
+                "late_tier": late_tier,
+            })
+
+        # Sort: red → orange → yellow → none, then by next_due_date asc
+        tier_order = {"red": 0, "orange": 1, "yellow": 2, "none": 3}
+        items.sort(key=lambda r: (
+            tier_order.get(r["late_tier"], 3),
+            r["next_due_date"] or datetime.max.replace(tzinfo=timezone.utc),
+        ))
+        return items
+
+    async def mark_bill_current_paid(self, bill_id: int) -> Optional[BillOccurrence]:
+        """Mark the current-period occurrence of a bill as paid.
+
+        Resolves the same "current" occurrence used by the Master List
+        (earliest unpaid). If none exists, generates occurrences first
+        and tries again. Returns the paid `BillOccurrence` or None.
+        """
+        bill = await self.get_bill(bill_id)
+        if not bill:
+            return None
+
+        async def _find_current() -> Optional[BillOccurrence]:
+            r = await self.db.execute(
+                select(BillOccurrence)
+                .where(
+                    BillOccurrence.recurring_bill_id == bill_id,
+                    BillOccurrence.status.in_([
+                        OccurrenceStatus.OVERDUE,
+                        OccurrenceStatus.DUE_SOON,
+                        OccurrenceStatus.UPCOMING,
+                    ]),
+                )
+                .order_by(BillOccurrence.due_date.asc())
+                .limit(1)
+            )
+            return r.scalar_one_or_none()
+
+        occ = await _find_current()
+        if occ is None:
+            await self.generate_occurrences()
+            occ = await _find_current()
+        if occ is None:
+            return None
+
+        return await self.mark_paid(occ.id)
 
     async def get_cash_flow_summary(self) -> dict:
         """Get aggregated cash flow summary."""
