@@ -17,7 +17,6 @@ import {
   ArrowUpTrayIcon,
   ChevronUpDownIcon,
   InformationCircleIcon,
-  CurrencyDollarIcon,
   LockOpenIcon,
   EyeIcon,
   EyeSlashIcon,
@@ -1000,11 +999,17 @@ export default function BillsPage() {
                               </button>
                               {!isPaused && (
                                 <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={m.included_in_cashflow !== false}
                                   onClick={() => handleToggleBillCashflow(m.id)}
-                                  className={`p-1 transition-colors ${m.included_in_cashflow === false ? 'text-yellow-400 hover:text-green-400' : 'text-green-400 hover:text-yellow-400'}`}
                                   title={m.included_in_cashflow === false ? 'Click to INCLUDE in cash flow totals' : 'Click to EXCLUDE from cash flow totals'}
+                                  className="inline-flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-gray-700/50 transition-colors"
                                 >
-                                  <CurrencyDollarIcon className="h-4 w-4" />
+                                  <span className={`relative inline-block w-8 h-4 rounded-full transition-colors ${m.included_in_cashflow === false ? 'bg-gray-600' : 'bg-emerald-600'}`}>
+                                    <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${m.included_in_cashflow === false ? '' : 'translate-x-4'}`}></span>
+                                  </span>
+                                  <span className={`text-[10px] uppercase tracking-wide ${m.included_in_cashflow === false ? 'text-gray-500' : 'text-emerald-400'}`}>Cash flow</span>
                                 </button>
                               )}
                               {bill && (
