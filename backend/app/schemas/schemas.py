@@ -403,7 +403,11 @@ class MasterListItem(BaseModel):
     is_auto_pay: bool
     is_active: bool
     alert_days_before: int
+    due_day_of_month: Optional[int] = None
+    due_month: Optional[int] = None
+    custom_months: Optional[List[int]] = None
     next_due_date: Optional[datetime] = None
+    display_due_date: Optional[datetime] = None
     last_paid_at: Optional[datetime] = None
     current_occurrence_id: Optional[int] = None
     current_period_status: str  # paid | upcoming | due_soon | overdue

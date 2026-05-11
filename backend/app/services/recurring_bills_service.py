@@ -324,6 +324,15 @@ class RecurringBillsService:
         result = await self.db.execute(q)
         return list(result.scalars().all())
 
+    async def toggle_active(self, bill_id: int) -> Optional[RecurringBill]:
+        """Flip is_active on a recurring bill (pause/resume)."""
+        bill = await self.get_bill(bill_id)
+        if not bill:
+            return None
+        bill.is_active = not bool(bill.is_active)
+        await self.db.flush()
+        return bill
+
     # ── Occurrence Generation ────────────────────────────
 
     async def generate_occurrences(self, days_ahead: int = 60) -> int:
@@ -642,14 +651,17 @@ class RecurringBillsService:
 
     # ── Master List (derived per-bill view) ──────────────
 
-    async def get_master_list(self) -> list[dict]:
-        """Return one row per active recurring bill with derived status.
+    async def get_master_list(self, include_inactive: bool = False) -> list[dict]:
+        """Return one row per recurring bill with derived status.
 
         Used by the "Master List" UI so the client never has to think in
         terms of per-period occurrence rows: each bill shows its
         next due date, last paid date, and a tiered late flag.
+
+        If `include_inactive` is True, paused bills are included with
+        their `is_active` flag set to False (so the UI can grey them out).
         """
-        bills = await self.list_bills()
+        bills = await self.list_bills(include_inactive=include_inactive)
         if not bills:
             return []
 
@@ -721,7 +733,16 @@ class RecurringBillsService:
                 "is_auto_pay": bill.is_auto_pay,
                 "is_active": bill.is_active,
                 "alert_days_before": bill.alert_days_before,
+                "due_day_of_month": bill.due_day_of_month,
+                "due_month": bill.due_month,
+                "custom_months": bill.custom_months,
                 "next_due_date": bill.next_due_date,
+                "display_due_date": (
+                    current.due_date if (
+                        current is not None
+                        and current.status == OccurrenceStatus.OVERDUE
+                    ) else bill.next_due_date
+                ),
                 "last_paid_at": last_paid_at,
                 "current_occurrence_id": current_occ_id,
                 "current_period_status": current_status,

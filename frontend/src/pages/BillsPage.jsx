@@ -73,6 +73,40 @@ const STATUS_COLORS = {
   paid: 'bg-emerald-900/50 text-emerald-400',
 }
 
+function ordinal(n) {
+  if (n == null) return ''
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] || s[v] || s[0])
+}
+
+function describeFrequency(m) {
+  // Human-readable label that surfaces the calendar-day anchor so the
+  // client can see the bill is anchored to a real day-of-month, not "+30 days".
+  const day = m.due_day_of_month
+  const month = m.due_month
+  switch (m.frequency) {
+    case 'monthly':
+      return day ? `Monthly · ${ordinal(day)}` : 'Monthly'
+    case 'quarterly':
+      return month && day ? `Quarterly · ${MONTH_NAMES[month - 1]} ${ordinal(day)}` : 'Quarterly'
+    case 'semi_annual':
+      return month && day ? `Semi-Annual · ${MONTH_NAMES[month - 1]} ${ordinal(day)}` : 'Semi-Annual'
+    case 'annual':
+      return month && day ? `Annual · ${MONTH_NAMES[month - 1]} ${ordinal(day)}` : 'Annual'
+    case 'biennial':
+      return month && day ? `Biennial · ${MONTH_NAMES[month - 1]} ${ordinal(day)}` : 'Biennial'
+    case 'custom': {
+      const months = (m.custom_months || []).map(x => MONTH_NAMES[x - 1]).join(', ')
+      return months ? `Custom · ${months}${day ? ` · ${ordinal(day)}` : ''}` : 'Custom'
+    }
+    case 'weekly':
+      return 'Weekly'
+    default:
+      return (m.frequency || '').replace(/_/g, ' ')
+  }
+}
+
 function StatusBadge({ status }) {
   if (status === 'upcoming') return null
   return (
@@ -139,6 +173,7 @@ export default function BillsPage() {
   const [bills, setBills] = useState([])
   const [masterList, setMasterList] = useState([])
   const [masterListOpen, setMasterListOpen] = useState(true)
+  const [showInactive, setShowInactive] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingBill, setEditingBill] = useState(null)
@@ -251,8 +286,8 @@ export default function BillsPage() {
           ...(filterStatus && { status: filterStatus }),
           ...(filterCategory && { category: filterCategory }),
         }),
-        recurringBillsAPI.list(),
-        recurringBillsAPI.getMasterList(),
+        recurringBillsAPI.list(showInactive),
+        recurringBillsAPI.getMasterList(showInactive),
         payablesAPI.list(),
         vendorAccountsAPI.list(),
       ])
@@ -273,7 +308,7 @@ export default function BillsPage() {
     } finally {
       setLoading(false)
     }
-  }, [filterStatus, filterCategory])
+  }, [filterStatus, filterCategory, showInactive])
 
   useEffect(() => {
     loadData()
@@ -343,13 +378,24 @@ export default function BillsPage() {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Deactivate this recurring bill?')) return
+    if (!confirm('Permanently delete this recurring bill?\n\nThis removes the bill, ALL its occurrences, and any related notifications. This cannot be undone.\n\nIf you just want to pause this bill (and keep history), use the on/off toggle instead.')) return
     try {
       await recurringBillsAPI.delete(id)
-      toast.success('Bill deactivated')
+      toast.success('Bill deleted')
       loadData()
     } catch {
-      toast.error('Failed to deactivate bill')
+      toast.error('Failed to delete bill')
+    }
+  }
+
+  async function handleToggleActive(id) {
+    try {
+      const res = await recurringBillsAPI.toggleActive(id)
+      const nowActive = res.data?.is_active
+      toast.success(nowActive ? 'Bill resumed' : 'Bill paused')
+      loadData()
+    } catch {
+      toast.error('Failed to toggle bill')
     }
   }
 
@@ -803,6 +849,15 @@ export default function BillsPage() {
             {masterList.some(m => m.late_tier === 'red') && (
               <span className="text-xs font-bold text-red-500 uppercase animate-pulse">Credit Danger</span>
             )}
+            <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => { e.stopPropagation(); setShowInactive(e.target.checked) }}
+                className="rounded bg-gray-700 border-gray-600"
+              />
+              Show paused
+            </label>
             {masterListOpen ? <ChevronUpIcon className="h-5 w-5 text-gray-400" /> : <ChevronDownIcon className="h-5 w-5 text-gray-400" />}
           </div>
         </button>
@@ -832,7 +887,11 @@ export default function BillsPage() {
                     {masterList.map((m) => {
                       const tier = m.late_tier
                       const isPaid = m.current_period_status === 'paid'
-                      const flagDot = tier === 'red'
+                      const isOverdue = tier !== 'none'
+                      const isPaused = m.is_active === false
+                      const flagDot = isPaused
+                        ? 'bg-gray-500'
+                        : tier === 'red'
                         ? 'bg-red-500 animate-pulse'
                         : tier === 'orange'
                         ? 'bg-orange-500'
@@ -843,7 +902,9 @@ export default function BillsPage() {
                         : m.current_period_status === 'due_soon'
                         ? 'bg-yellow-300'
                         : 'bg-gray-600'
-                      const rowTint = tier === 'red'
+                      const rowTint = isPaused
+                        ? 'bg-gray-900/40 opacity-60'
+                        : tier === 'red'
                         ? 'bg-red-900/20'
                         : tier === 'orange'
                         ? 'bg-orange-900/10'
@@ -852,7 +913,10 @@ export default function BillsPage() {
                         : ''
                       let statusLabel
                       let statusClass
-                      if (isPaid) {
+                      if (isPaused) {
+                        statusLabel = 'Paused'
+                        statusClass = 'bg-gray-700 text-gray-400'
+                      } else if (isPaid) {
                         statusLabel = 'Paid this period'
                         statusClass = 'bg-emerald-900/50 text-emerald-400'
                       } else if (tier === 'red') {
@@ -871,20 +935,35 @@ export default function BillsPage() {
                         statusLabel = m.days_until_due != null ? `Due in ${m.days_until_due}d` : 'Upcoming'
                         statusClass = 'bg-gray-700 text-gray-300'
                       }
+                      // For overdue bills, show the actual past-due date in red
+                      // (instead of the misleading future next_due_date).
+                      const dueDateRaw = isOverdue
+                        ? (m.display_due_date || m.next_due_date)
+                        : m.next_due_date
+                      const dueDateLabel = dueDateRaw
+                        ? new Date(dueDateRaw).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—'
+                      const dueDatePrefix = isOverdue ? 'Overdue: ' : ''
+                      const dueDateClass = isOverdue
+                        ? (tier === 'red' ? 'text-red-400 font-semibold' : tier === 'orange' ? 'text-orange-400 font-medium' : 'text-yellow-400')
+                        : 'text-gray-300'
                       const bill = bills.find(b => b.id === m.id)
                       return (
                         <tr key={m.id} className={`border-b border-gray-700/30 hover:bg-gray-700/20 ${rowTint}`}>
                           <td className="px-3 py-2.5">
-                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${flagDot}`} title={`Late tier: ${tier}`}></span>
+                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${flagDot}`} title={isPaused ? 'Paused' : `Late tier: ${tier}`}></span>
                           </td>
                           <td className="px-3 py-2.5">
-                            <p className="font-medium text-gray-200">{m.name}</p>
+                            <p className="font-medium text-gray-200">
+                              {m.name}
+                              {isPaused && <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] bg-gray-700 text-gray-400 uppercase tracking-wide">Paused</span>}
+                            </p>
                             <p className="text-xs text-gray-500">{m.vendor_name}</p>
                           </td>
-                          <td className="px-3 py-2.5 text-gray-400 text-xs capitalize">{m.frequency.replace(/_/g, ' ')}</td>
+                          <td className="px-3 py-2.5 text-gray-400 text-xs">{describeFrequency(m)}</td>
                           <td className="px-3 py-2.5 text-right font-medium text-gray-200">{fmt(m.amount)}</td>
-                          <td className="px-3 py-2.5 text-gray-300 text-xs">
-                            {m.next_due_date ? new Date(m.next_due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          <td className={`px-3 py-2.5 text-xs ${dueDateClass}`}>
+                            {dueDatePrefix}{dueDateLabel}
                           </td>
                           <td className="px-3 py-2.5 text-gray-400 text-xs">
                             {m.last_paid_at ? new Date(m.last_paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Never'}
@@ -893,13 +972,13 @@ export default function BillsPage() {
                             <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${statusClass}`}>
                               {statusLabel}
                             </span>
-                            {m.is_auto_pay && (
+                            {m.is_auto_pay && !isPaused && (
                               <span className="ml-1 inline-block px-1.5 py-0.5 rounded text-[10px] bg-blue-900/40 text-blue-400">AUTO</span>
                             )}
                           </td>
                           <td className="px-3 py-2.5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {!isPaid && (
+                              {!isPaid && !isPaused && (
                                 <button
                                   onClick={() => openMasterPaidModal(m)}
                                   className="px-2.5 py-1 text-xs bg-emerald-700 hover:bg-emerald-600 text-white rounded transition-colors"
@@ -908,12 +987,19 @@ export default function BillsPage() {
                                   Mark Paid
                                 </button>
                               )}
+                              <button
+                                onClick={() => handleToggleActive(m.id)}
+                                className={`px-2 py-1 text-xs rounded transition-colors ${isPaused ? 'bg-blue-700 hover:bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}
+                                title={isPaused ? 'Resume this bill' : 'Pause this bill (keeps history; can be resumed anytime)'}
+                              >
+                                {isPaused ? 'Resume' : 'Pause'}
+                              </button>
                               {bill && (
                                 <button onClick={() => openEditForm(bill)} className="p-1 text-gray-400 hover:text-blue-400" title="Edit">
                                   <PencilIcon className="h-3.5 w-3.5" />
                                 </button>
                               )}
-                              <button onClick={() => handleDelete(m.id)} className="p-1 text-gray-400 hover:text-red-400" title="Delete">
+                              <button onClick={() => handleDelete(m.id)} className="p-1 text-gray-400 hover:text-red-400" title="Delete permanently (cannot be undone)">
                                 <TrashIcon className="h-3.5 w-3.5" />
                               </button>
                             </div>

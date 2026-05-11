@@ -135,6 +135,43 @@ async def update_recurring_bill(
     )
 
 
+@router.patch("/{bill_id}/toggle-active", response_model=RecurringBillSchema)
+async def toggle_recurring_bill_active(
+    bill_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Pause or resume a recurring bill (flips is_active)."""
+    svc = RecurringBillsService(db, user.id)
+    bill = await svc.toggle_active(bill_id)
+    if not bill:
+        raise HTTPException(status_code=404, detail="Recurring bill not found")
+    # When un-pausing, regenerate occurrences so the bill resumes cleanly
+    if bill.is_active:
+        await svc.generate_occurrences()
+        await svc.check_overdue()
+        await svc.check_due_soon()
+    await db.commit()
+    return RecurringBillSchema(
+        id=bill.id,
+        name=bill.name,
+        vendor_name=bill.vendor_name,
+        amount=bill.amount,
+        frequency=bill.frequency.value,
+        due_day_of_month=bill.due_day_of_month,
+        due_month=bill.due_month,
+        category=bill.category.value,
+        notes=bill.notes,
+        is_auto_pay=bill.is_auto_pay,
+        is_active=bill.is_active,
+        included_in_cashflow=bill.included_in_cashflow,
+        next_due_date=bill.next_due_date,
+        alert_days_before=bill.alert_days_before,
+        created_at=bill.created_at,
+        updated_at=bill.updated_at,
+    )
+
+
 @router.delete("/all")
 async def delete_all_recurring_bills(
     db: AsyncSession = Depends(get_db),
@@ -274,10 +311,11 @@ async def toggle_occurrence_cashflow(
 
 @router.get("/master-list", response_model=MasterListResponse)
 async def get_master_list(
+    include_inactive: bool = False,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Return one row per active recurring bill for the Master List view."""
+    """Return one row per recurring bill for the Master List view."""
     svc = RecurringBillsService(db, user.id)
     # Make sure occurrences exist for the current period before deriving
     # status — guards against an empty DB or a freshly-added bill.
@@ -285,7 +323,7 @@ async def get_master_list(
     await svc.check_overdue()
     await svc.check_due_soon()
     await db.commit()
-    items = await svc.get_master_list()
+    items = await svc.get_master_list(include_inactive=include_inactive)
     schemas = [MasterListItem(**item) for item in items]
     return MasterListResponse(items=schemas, total=len(schemas))
 
