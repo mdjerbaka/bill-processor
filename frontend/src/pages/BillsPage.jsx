@@ -178,7 +178,6 @@ export default function BillsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingBill, setEditingBill] = useState(null)
   const [form, setForm] = useState(emptyForm)
-  const [managementOpen, setManagementOpen] = useState(false)
   const [upcomingOpen, setUpcomingOpen] = useState(false)
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
@@ -513,9 +512,11 @@ export default function BillsPage() {
   async function handleToggleBillCashflow(billId) {
     try {
       const bill = bills.find(b => b.id === billId)
-      if (!bill) return
-      const res = await recurringBillsAPI.update(billId, { included_in_cashflow: !bill.included_in_cashflow })
+      const masterRow = masterList.find(m => m.id === billId)
+      const currentlyIncluded = bill?.included_in_cashflow ?? masterRow?.included_in_cashflow ?? true
+      const res = await recurringBillsAPI.update(billId, { included_in_cashflow: !currentlyIncluded })
       setBills(prev => prev.map(b => b.id === billId ? { ...b, included_in_cashflow: res.data.included_in_cashflow } : b))
+      setMasterList(prev => prev.map(m => m.id === billId ? { ...m, included_in_cashflow: res.data.included_in_cashflow } : m))
       // Also update occurrences in-place
       setOccurrences(prev => prev.map(o =>
         o.recurring_bill_id === billId && (o.status === 'upcoming' || o.status === 'due_soon')
@@ -957,6 +958,9 @@ export default function BillsPage() {
                             <p className="font-medium text-gray-200">
                               {m.name}
                               {isPaused && <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] bg-gray-700 text-gray-400 uppercase tracking-wide">Paused</span>}
+                              {!isPaused && m.included_in_cashflow === false && (
+                                <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] bg-yellow-900/50 text-yellow-400 uppercase tracking-wide" title="This bill is excluded from your cash flow totals">Off cash flow</span>
+                              )}
                             </p>
                             <p className="text-xs text-gray-500">{m.vendor_name}</p>
                           </td>
@@ -994,6 +998,15 @@ export default function BillsPage() {
                               >
                                 {isPaused ? 'Resume' : 'Pause'}
                               </button>
+                              {!isPaused && (
+                                <button
+                                  onClick={() => handleToggleBillCashflow(m.id)}
+                                  className={`p-1 transition-colors ${m.included_in_cashflow === false ? 'text-yellow-400 hover:text-green-400' : 'text-green-400 hover:text-yellow-400'}`}
+                                  title={m.included_in_cashflow === false ? 'Click to INCLUDE in cash flow totals' : 'Click to EXCLUDE from cash flow totals'}
+                                >
+                                  <CurrencyDollarIcon className="h-4 w-4" />
+                                </button>
+                              )}
                               {bill && (
                                 <button onClick={() => openEditForm(bill)} className="p-1 text-gray-400 hover:text-blue-400" title="Edit">
                                   <PencilIcon className="h-3.5 w-3.5" />
@@ -1437,72 +1450,6 @@ export default function BillsPage() {
           </div>
         )}
         </div>
-        )}
-      </div>
-
-      {/* Recurring Bills Management */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
-        <button
-          onClick={() => setManagementOpen(!managementOpen)}
-          className="w-full flex items-center justify-between p-6 text-left"
-        >
-          <h2 className="text-lg font-semibold text-gray-100">Manage Recurring Bills ({bills.length})</h2>
-          {managementOpen ? (
-            <ChevronUpIcon className="h-5 w-5 text-gray-400" />
-          ) : (
-            <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-          )}
-        </button>
-
-        {managementOpen && (
-          <div className="px-6 pb-6">
-            {bills.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-4">No recurring bills yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {bills.map((bill) => (
-                  <div key={bill.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-700/30 hover:bg-gray-700/50">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-200">{bill.name}</p>
-                        {bill.is_auto_pay && (
-                          <span className="text-xs bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded">auto</span>
-                        )}
-                        {!bill.included_in_cashflow && (
-                          <span className="text-xs bg-yellow-900/50 text-yellow-400 px-1.5 py-0.5 rounded">excluded from cash flow</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {bill.vendor_name} · {fmt(bill.amount)} · {bill.frequency.replace(/_/g, ' ')} · Day {bill.due_day_of_month}
-                        {bill.due_month ? ` · Month ${bill.due_month}` : ''}
-                        {' · '}<span className="capitalize">{bill.category.replace(/_/g, ' ')}</span>
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {bill.next_due_date && (
-                        <span className="text-xs text-gray-400">
-                          Next: {new Date(bill.next_due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleToggleBillCashflow(bill.id)}
-                        title={bill.included_in_cashflow ? 'Exclude from cash flow' : 'Include in cash flow'}
-                        className={`p-1.5 transition-colors ${bill.included_in_cashflow ? 'text-green-400 hover:text-yellow-400' : 'text-yellow-400 hover:text-green-400'}`}
-                      >
-                        <CurrencyDollarIcon className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => openEditForm(bill)} className="p-1.5 text-gray-400 hover:text-blue-400 transition-colors">
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => handleDelete(bill.id)} className="p-1.5 text-gray-400 hover:text-red-400 transition-colors">
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         )}
       </div>
 

@@ -402,6 +402,7 @@ class MasterListItem(BaseModel):
     category: str
     is_auto_pay: bool
     is_active: bool
+    included_in_cashflow: bool = True
     alert_days_before: int
     due_day_of_month: Optional[int] = None
     due_month: Optional[int] = None

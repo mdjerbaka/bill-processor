@@ -732,6 +732,7 @@ class RecurringBillsService:
                 "category": bill.category.value,
                 "is_auto_pay": bill.is_auto_pay,
                 "is_active": bill.is_active,
+                "included_in_cashflow": bill.included_in_cashflow,
                 "alert_days_before": bill.alert_days_before,
                 "due_day_of_month": bill.due_day_of_month,
                 "due_month": bill.due_month,
