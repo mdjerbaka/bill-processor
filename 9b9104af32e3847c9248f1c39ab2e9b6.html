@@ -111,7 +111,7 @@ a{color:var(--gold);}
 /* ------------ data ------------ */
 const JOBS=["— pick the job —","Makor — 47 Weare Rd","Makor — 55 Cedar St TRIM","Makor — 55 Cedar St VENTS","Makor — Derry NH Gym","Makor — 147 Washington St Lynn","Makor — 29 Bersani Cir Quincy","Makor — 86 Winding River Needham","Makor — 10 Ferrar St Lynn","Makor — 12 First St Salem","Makor — 125 Eastgate Manchester","Makor — 170 Parker Hill Roxbury","Makor — Chelsea Flood","Makor — 1 Merrimack Plaza Lowell","Makor — Roxbury #2","Makor — Springfield","Makor — Washington Crossing Trim","Makor — Rockingham Seabrook","Makor — Misc","Highland — 50 Outlook FINISH","Highland — 50 Outlook Underlayment","Highland — 50-54 Outlook Dr","Highland — 50 Outlook Siding","Highland — 78 Outlook","Highland — Stairs","NOW — Devens Multi-Plex","NOW — Emerson Green","NOW — 14 Kays Walk Carlisle","BPL Construction (Ramshorn)","Nick Derby / Grey Hill","Pinecrest Builders","1 Exchange St","11 Cardinal Rd","13 Gables (83 Northside)","14 Marble Rd","165 Pierce Street LLC","Benoit (205 Fairbanks)","28 Hunter Circle","Panarelli (3 Brookway)","Brady (Hinsdale)","Camolli","Casa (Auburn Frame)","Chapin","Chavoor","Clark","Clinton Mill","Congor (39 Lincoln St Webster)","Delaney","Donaghy","Evangelista (Highland + Shrine)","French","Hadley","Kellry","Lapage","Leahy (Corea / Joel / Dad)","Mark Wilde Frame","Molinari","Poulan","Suchocki","Xarras (Abby Road)","Roof — 13 Larch St","Roof — Howley 90 Valley Hill","Roof — Ramian","Roof — Windward","Dave's basement (owner — Dave, 60 Barnard Hill Rd)","Overhead / not job-related"];
 const JOB_PLACEHOLDER=JOBS[0];
-function jobList(){return (S.jobs&&S.jobs.length)?S.jobs:JOBS.slice(1);}
+function jobList(){const base=(S.jobs&&S.jobs.length)?S.jobs:JOBS.slice(1);return base.filter(j=>!(S.jobClosed&&S.jobClosed[j]));}
 
 const OWAQ=p=>`https://outlook.office365.com/owa/?ItemID=AAMkAGEwMmY1YTFhLTk1ODMtNGYyOC05MTA2LTdjMDQ2MDhiMjUzZgBGAAAAAAD3I4eoBwQSTqE0maIONyM9BwA3wyvDAJlTQIlrHcTvEeHEAAAAAAEJAAA3wyvDAJlTQIlrHcTvEeHE${p}%3D&exvsurl=1&viewmodel=ReadMessageItem`;
 
@@ -224,6 +224,18 @@ const INV_ATTACH=id=>(id&&Number(id)>0)?(API+"/invoices/"+id+"/attachment"):null
 const MAT_VENDORS=["eig","horizon","kimball","united rental","clean restroom","koopman","maki","heritage","home depot","lowe","service plus","sunbelt","white cap"];
 const guessType=v=>{const s=(v||"").toLowerCase();return MAT_VENDORS.some(m=>s.includes(m))?"mat":"sub";};
 function authHeaders(){return S.token?{"Authorization":"Bearer "+S.token}:{};}
+async function apiPut(path,body){
+  const r=await fetch(API+path,{method:"PUT",headers:{...authHeaders(),"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(r.status===401){S.token="";save();showLogin("Session expired — please sign in again.");throw new Error("auth");}
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  return r.json();
+}
+async function apiPost(path,body){
+  const r=await fetch(API+path,{method:"POST",headers:{...authHeaders(),"Content-Type":"application/json"},body:body?JSON.stringify(body):"{}"});
+  if(r.status===401){S.token="";save();showLogin("Session expired — please sign in again.");throw new Error("auth");}
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  return r.json();
+}
 function mapPayables(items){
   PAY.length=0;
   (items||[]).forEach(it=>{
@@ -261,6 +273,10 @@ async function boot(){
     if(r.status===401){S.token="";save();showLogin("Session expired — please sign in again.");return;}
     if(r.ok){const j=await r.json();mapPayables(j.items);}
   }catch(e){}
+  if(S.token&&!S.pjMigrated&&S.pj){
+    for(const p of PAY){const id=p[0];const picked=S.pj[id];if(picked&&!p[9]&&typeof id==="number"&&id>0){try{await apiPut("/payables/"+id,{job_name:picked});p[9]=picked;}catch(e){}}}
+    S.pjMigrated=1;save();
+  }
   applyEdits();
   render();
 }
@@ -281,7 +297,7 @@ function sw(on,fn){const b=el(`<button class="sw ${on?"on":""}" role="switch" ar
 function money(val,fn){const i=el(`<input class="in" inputmode="decimal">`);i.value=val==null?"":"$"+Number(val).toLocaleString("en-US",{minimumFractionDigits:2});i.onfocus=()=>{i.value=val==null?"":String(val);};i.onblur=()=>{const t=parseFloat(i.value.replace(/[^0-9.]/g,""));fn(isNaN(t)?null:t);};return i;}
 
 /* ------------ tabs ------------ */
-const TABS=[["dash","Dashboard"],["recvt","Receivables"],["rec","Recurring"],["sub","Subcontractors"],["mat","Materials & Store"],["vend","Vendor Accounts"],["appr","Approvals"],["jobs","Manage Jobs"],["paid","Payments"]];
+const TABS=[["dash","Dashboard"],["recvt","Receivables"],["rec","Recurring"],["sub","Subcontractors"],["mat","Materials"],["vend","Vendor Accounts"],["appr","Approvals"],["jobs","Manage Jobs"],["paid","Payments"]];
 function nav(){const n=document.getElementById("nav");n.innerHTML="";TABS.forEach(([k,l])=>{const b=el(`<button class="${S.tab===k?"on":""}">${l}</button>`);b.onclick=()=>{S.tab=k;save();render();};n.appendChild(b);});}
 
 /* ------------ views ------------ */
@@ -469,10 +485,14 @@ function payRow(p,dups,showVendor){
   if(showVendor){first.appendChild(el(`<span class="name">${p[1]}</span>`));}
   else{
     if(!S.pj)S.pj={};
-    const cur=S.pj[p[0]]!==undefined?S.pj[p[0]]:(p[9]||"");
+    const cur=(p[9]&&p[9]!=="")?p[9]:(S.pj[p[0]]||"");
     const opts=[JOB_PLACEHOLDER,...jobList()];if(cur&&!opts.includes(cur))opts.splice(1,0,cur);
     const sel=el(`<select class="${cur?"":"unset"}" style="max-width:230px;width:100%">${opts.map(j=>`<option ${j===cur?"selected":""}>${j}</option>`).join("")}</select>`);
-    sel.onchange=()=>{S.pj[p[0]]=sel.value.startsWith("—")?"":sel.value;sel.className=S.pj[p[0]]?"":"unset";save();};
+    sel.onchange=async()=>{
+      const val=sel.value.startsWith("—")?"":sel.value;
+      p[9]=val;S.pj[p[0]]=val;sel.className=val?"":"unset";save();
+      if(typeof p[0]==="number"&&p[0]>0){try{await apiPut("/payables/"+p[0],{job_name:val});}catch(e){if(String(e.message)!=="auth")alert("Couldn't save the job to the database — check your connection. It's saved locally and will need re-saving.");}}
+    };
     first.appendChild(sel);
   }
   row.appendChild(first);
@@ -684,7 +704,10 @@ function vPaid(v){
 
 function vJobs(v){
   if(!S.jobs)S.jobs=JOBS.slice(1);
-  v.appendChild(el(`<div class="stats"><div class="stat hi"><div class="v">${S.jobs.length}</div><div class="l">Jobs on the list</div></div></div>`));
+  if(!S.jobClosed)S.jobClosed={};
+  const openJobs=S.jobs.filter(j=>!S.jobClosed[j]);
+  const closedJobs=S.jobs.filter(j=>S.jobClosed[j]);
+  v.appendChild(el(`<div class="stats"><div class="stat hi"><div class="v">${openJobs.length}</div><div class="l">Open jobs</div></div><div class="stat"><div class="v">${closedJobs.length}</div><div class="l">Closed jobs</div></div></div>`));
   const add=el(`<div class="card"><div class="lab">Add a job</div><div class="row" style="border-top:none;align-items:center;gap:8px"></div></div>`);
   const ar=add.querySelector(".row");
   const f=el(`<input class="in" style="flex:1;min-width:200px;text-align:left;font-weight:600" placeholder="New job name (e.g. Makor — 12 Main St)">`);
@@ -694,23 +717,48 @@ function vJobs(v){
   ar.appendChild(f);ar.appendChild(el(`<div class="sp"></div>`));ar.appendChild(b);
   v.appendChild(add);
   const c=el(`<div class="card"></div>`);
-  S.jobs.forEach((job,i)=>{
+  openJobs.forEach(job=>{
+    const i=S.jobs.indexOf(job);
     const row=el(`<div class="row"></div>`);
-    const inp=el(`<input class="in" style="flex:1;min-width:200px;text-align:left;font-weight:500">`);
+    const inp=el(`<input class="in" style="flex:1;min-width:180px;text-align:left;font-weight:500">`);
     inp.value=job;
     inp.onblur=()=>{const nv=(inp.value||"").trim();if(!nv){inp.value=job;return;}if(nv===job)return;if(S.jobs.some((j,k)=>k!==i&&j.toLowerCase()===nv.toLowerCase())){alert("Another job already has that name.");inp.value=job;return;}renameJob(job,nv,i);};
     row.appendChild(inp);
+    const cl=el(`<button class="btn ghost" style="font-size:9.5px;padding:6px 10px;margin-left:6px" title="Mark this job closed — hides it from the lists and dropdowns">Close</button>`);
+    cl.onclick=()=>{S.jobClosed[job]=true;save();render();};
+    row.appendChild(cl);
     const x=el(`<button class="btn ghost" style="width:30px;padding:6px 0;color:var(--alert);border-color:rgba(229,115,106,.4);margin-left:6px" title="Remove this job">✕</button>`);
-    x.onclick=()=>{if(confirm(`Remove "${job}" from the jobs list?\n\nBills already assigned to it keep their label.`)){S.jobs.splice(i,1);save();render();}};
+    x.onclick=()=>{if(confirm(`Remove "${job}" from the jobs list?\n\nBills already assigned to it keep their label.`)){const k=S.jobs.indexOf(job);if(k>=0)S.jobs.splice(k,1);delete S.jobClosed[job];save();render();}};
     row.appendChild(x);
     c.appendChild(row);
   });
-  if(!S.jobs.length)c.appendChild(el(`<div class="row"><span class="sm">No jobs yet — add one above.</span></div>`));
+  if(!openJobs.length)c.appendChild(el(`<div class="row"><span class="sm">No open jobs — add one above.</span></div>`));
   v.appendChild(c);
-  v.appendChild(el(`<div class="note">This is the master jobs list. Every job dropdown in the app reads from it, and it syncs to all devices. Renaming a job here updates it everywhere — including bills already assigned to it. When Dan's dashboard is connected, this becomes the shared official list.</div>`));
+  if(closedJobs.length){
+    const tg=el(`<button class="btn ghost" style="margin-top:12px">${S.showClosedJobs?"Hide":"Show"} closed jobs (${closedJobs.length})</button>`);
+    tg.onclick=()=>{S.showClosedJobs=!S.showClosedJobs;save();render();};
+    v.appendChild(tg);
+    if(S.showClosedJobs){
+      const cc=el(`<div class="card" style="margin-top:8px"><div class="lab">Closed jobs</div></div>`);
+      closedJobs.forEach(job=>{
+        const row=el(`<div class="row"></div>`);
+        row.appendChild(el(`<span class="name" style="flex:1;min-width:180px;opacity:.65">${job}</span>`));
+        const ro=el(`<button class="btn gold" style="font-size:9.5px;padding:6px 10px;margin-left:6px">Reopen</button>`);
+        ro.onclick=()=>{delete S.jobClosed[job];save();render();};
+        row.appendChild(ro);
+        const x=el(`<button class="btn ghost" style="width:30px;padding:6px 0;color:var(--alert);border-color:rgba(229,115,106,.4);margin-left:6px" title="Remove this job">✕</button>`);
+        x.onclick=()=>{if(confirm(`Remove "${job}" entirely?`)){const k=S.jobs.indexOf(job);if(k>=0)S.jobs.splice(k,1);delete S.jobClosed[job];save();render();}};
+        row.appendChild(x);
+        cc.appendChild(row);
+      });
+      v.appendChild(cc);
+    }
+  }
+  v.appendChild(el(`<div class="note">Open jobs show by default; closed ones tuck away under "Show closed jobs" and stay out of every dropdown. Renaming updates a job everywhere — including bills already assigned to it. When Dan's dashboard is connected, this becomes the shared official list.</div>`));
 }
 function renameJob(oldN,newN,i){
   S.jobs[i]=newN;
+  if(S.jobClosed&&S.jobClosed[oldN]){S.jobClosed[newN]=true;delete S.jobClosed[oldN];}
   if(S.pj)Object.keys(S.pj).forEach(k=>{if(S.pj[k]===oldN)S.pj[k]=newN;});
   if(S.q)Object.keys(S.q).forEach(k=>{if(S.q[k]&&S.q[k].job===oldN)S.q[k].job=newN;});
   if(S.qc)S.qc.forEach(c=>{if(c.job===oldN)c.job=newN;});
