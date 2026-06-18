@@ -110,6 +110,8 @@ a{color:var(--gold);}
 <script>
 /* ------------ data ------------ */
 const JOBS=["— pick the job —","Makor — 47 Weare Rd","Makor — 55 Cedar St TRIM","Makor — 55 Cedar St VENTS","Makor — Derry NH Gym","Makor — 147 Washington St Lynn","Makor — 29 Bersani Cir Quincy","Makor — 86 Winding River Needham","Makor — 10 Ferrar St Lynn","Makor — 12 First St Salem","Makor — 125 Eastgate Manchester","Makor — 170 Parker Hill Roxbury","Makor — Chelsea Flood","Makor — 1 Merrimack Plaza Lowell","Makor — Roxbury #2","Makor — Springfield","Makor — Washington Crossing Trim","Makor — Rockingham Seabrook","Makor — Misc","Highland — 50 Outlook FINISH","Highland — 50 Outlook Underlayment","Highland — 50-54 Outlook Dr","Highland — 50 Outlook Siding","Highland — 78 Outlook","Highland — Stairs","NOW — Devens Multi-Plex","NOW — Emerson Green","NOW — 14 Kays Walk Carlisle","BPL Construction (Ramshorn)","Nick Derby / Grey Hill","Pinecrest Builders","1 Exchange St","11 Cardinal Rd","13 Gables (83 Northside)","14 Marble Rd","165 Pierce Street LLC","Benoit (205 Fairbanks)","28 Hunter Circle","Panarelli (3 Brookway)","Brady (Hinsdale)","Camolli","Casa (Auburn Frame)","Chapin","Chavoor","Clark","Clinton Mill","Congor (39 Lincoln St Webster)","Delaney","Donaghy","Evangelista (Highland + Shrine)","French","Hadley","Kellry","Lapage","Leahy (Corea / Joel / Dad)","Mark Wilde Frame","Molinari","Poulan","Suchocki","Xarras (Abby Road)","Roof — 13 Larch St","Roof — Howley 90 Valley Hill","Roof — Ramian","Roof — Windward","Dave's basement (owner — Dave, 60 Barnard Hill Rd)","Overhead / not job-related"];
+const JOB_PLACEHOLDER=JOBS[0];
+function jobList(){return (S.jobs&&S.jobs.length)?S.jobs:JOBS.slice(1);}
 
 const OWAQ=p=>`https://outlook.office365.com/owa/?ItemID=AAMkAGEwMmY1YTFhLTk1ODMtNGYyOC05MTA2LTdjMDQ2MDhiMjUzZgBGAAAAAAD3I4eoBwQSTqE0maIONyM9BwA3wyvDAJlTQIlrHcTvEeHEAAAAAAEJAAA3wyvDAJlTQIlrHcTvEeHE${p}%3D&exvsurl=1&viewmodel=ReadMessageItem`;
 
@@ -194,6 +196,7 @@ REC.forEach((r,i)=>{if(!S.rec[i]||S.rec[i].inc===undefined){S.rec[i]={amt:(S.rec
 if(S.bufOn===undefined)S.bufOn=true;
 if(!S.pj)S.pj={};
 if(!S.paid)S.paid={};
+if(!S.jobs)S.jobs=JOBS.slice(1);
 applyEdits();
 if(!S.payV){PAY.forEach(p=>{if(S.pay[p[0]])S.pay[p[0]].on=false;});S.payV=1;}
 // seed/migrate receivables: real list replaces old staged examples; user-added rows survive
@@ -278,7 +281,7 @@ function sw(on,fn){const b=el(`<button class="sw ${on?"on":""}" role="switch" ar
 function money(val,fn){const i=el(`<input class="in" inputmode="decimal">`);i.value=val==null?"":"$"+Number(val).toLocaleString("en-US",{minimumFractionDigits:2});i.onfocus=()=>{i.value=val==null?"":String(val);};i.onblur=()=>{const t=parseFloat(i.value.replace(/[^0-9.]/g,""));fn(isNaN(t)?null:t);};return i;}
 
 /* ------------ tabs ------------ */
-const TABS=[["dash","Dashboard"],["recvt","Receivables"],["rec","Recurring"],["sub","Subcontractors"],["mat","Materials & Store"],["vend","Vendor Accounts"],["appr","Approvals"],["paid","Payments"]];
+const TABS=[["dash","Dashboard"],["recvt","Receivables"],["rec","Recurring"],["sub","Subcontractors"],["mat","Materials & Store"],["vend","Vendor Accounts"],["appr","Approvals"],["jobs","Manage Jobs"],["paid","Payments"]];
 function nav(){const n=document.getElementById("nav");n.innerHTML="";TABS.forEach(([k,l])=>{const b=el(`<button class="${S.tab===k?"on":""}">${l}</button>`);b.onclick=()=>{S.tab=k;save();render();};n.appendChild(b);});}
 
 /* ------------ views ------------ */
@@ -467,7 +470,7 @@ function payRow(p,dups,showVendor){
   else{
     if(!S.pj)S.pj={};
     const cur=S.pj[p[0]]!==undefined?S.pj[p[0]]:(p[9]||"");
-    const opts=[...JOBS];if(cur&&!opts.includes(cur))opts.splice(1,0,cur);
+    const opts=[JOB_PLACEHOLDER,...jobList()];if(cur&&!opts.includes(cur))opts.splice(1,0,cur);
     const sel=el(`<select class="${cur?"":"unset"}" style="max-width:230px;width:100%">${opts.map(j=>`<option ${j===cur?"selected":""}>${j}</option>`).join("")}</select>`);
     sel.onchange=()=>{S.pj[p[0]]=sel.value.startsWith("—")?"":sel.value;sel.className=S.pj[p[0]]?"":"unset";save();};
     first.appendChild(sel);
@@ -509,7 +512,7 @@ function vMat(v){
   v.appendChild(el(`<div class="stats"><div class="stat"><div class="v">${usd(PAY.filter(p=>p[6]==="mat"&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]])).reduce((s,p)=>s+p[3],0))}</div><div class="l">Open material bills</div></div><div class="stat hi"><div class="v">${usd(payOn("mat"))}</div><div class="l">Toggled into real balance</div></div></div>`));
   v.appendChild(el(`<h3>On account — pay against statements</h3>`));
   v.appendChild(el(`<div class="banner">No <b>Koopman, Maki, or Heritage</b> charges are in the system yet — their balances live on the <b>Vendor Accounts</b> tab and fill in the moment you drop a statement. <b>Amex</b> charges arrive via store-run receipts below. The vendors listed here are the ones with actual invoices on file.</div>`));
-  paySection(v,"mat",false);
+  paySection(v,"mat",true);
   v.appendChild(el(`<h3>Store runs — paid on the Amex at the register</h3>`));
   v.appendChild(el(`<div class="card"><div class="row"><div style="flex:1"><span class="name">Home Depot — Worcester</span> <span class="sm">Teddy · Jun 10 · example</span></div><span class="amt">$187.52</span><span class="tag t-on">paid · Amex</span></div><div class="row"><div style="flex:1"><span class="name">Lowe's — Auburn</span> <span class="sm">Dan · Jun 9 · example</span></div><span class="amt">$64.18</span><span class="tag t-on">paid · Amex</span></div></div>`));
   v.appendChild(el(`<div class="note">Store receipts never toggle — they're already spent. Each files into its job as paid and adds to the Amex balance. The Field Crew app feeds this: crew picks job → snaps receipt → lands here.</div>`));
@@ -557,7 +560,8 @@ function vAppr(v){
     const row=el(`<div class="row" style="flex-direction:column;align-items:stretch;gap:6px"></div>`);
     row.appendChild(el(`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="name">${it.vend} · #${it.inv}</span><span class="sm">${it.date}</span>${it.warn?`<span class="tag t-warn">${it.warn}</span>`:""}${!it.url?'<span class="tag t-nosrc" title="No source attachment on file — verify before approving">⚠ no source</span>':""}<div class="sp"></div><span class="amt">${usd(it.amt||null)}</span></div>`));
     const ctl=el(`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="lab">Job</span></div>`);
-    const sel=el(`<select class="${it.st.job?"":"unset"}">${JOBS.map(j=>`<option ${j===it.st.job?"selected":""}>${j}</option>`).join("")}</select>`);
+    const jopts=[JOB_PLACEHOLDER,...jobList()];if(it.st.job&&!jopts.includes(it.st.job))jopts.splice(1,0,it.st.job);
+    const sel=el(`<select class="${it.st.job?"":"unset"}">${jopts.map(j=>`<option ${j===it.st.job?"selected":""}>${j}</option>`).join("")}</select>`);
     sel.onchange=()=>{it.st.job=sel.value.startsWith("—")?"":sel.value;sel.className=it.st.job?"":"unset";save();};
     ctl.appendChild(sel);
     if(it.src)ctl.appendChild(el(`<span class="sm" style="color:var(--champdk);font-weight:700">${it.src.toUpperCase()}</span>`));
@@ -678,12 +682,47 @@ function vPaid(v){
   v.appendChild(el(`<div class="note">Your running record of paid bills. Each entry stores the date, method, and your notes. Use the &#8617; button to undo if something was marked by mistake. When the live bank and Amex feeds are built, matching payments will land here automatically.</div>`));
 }
 
+function vJobs(v){
+  if(!S.jobs)S.jobs=JOBS.slice(1);
+  v.appendChild(el(`<div class="stats"><div class="stat hi"><div class="v">${S.jobs.length}</div><div class="l">Jobs on the list</div></div></div>`));
+  const add=el(`<div class="card"><div class="lab">Add a job</div><div class="row" style="border-top:none;align-items:center;gap:8px"></div></div>`);
+  const ar=add.querySelector(".row");
+  const f=el(`<input class="in" style="flex:1;min-width:200px;text-align:left;font-weight:600" placeholder="New job name (e.g. Makor — 12 Main St)">`);
+  const b=el(`<button class="btn gold">Add job</button>`);
+  const addJob=()=>{const n=(f.value||"").trim();if(!n)return;if(S.jobs.some(j=>j.toLowerCase()===n.toLowerCase())){alert("That job is already on the list.");return;}S.jobs.push(n);S.jobs.sort((a,b)=>a.localeCompare(b));save();render();};
+  b.onclick=addJob;f.onkeydown=e=>{if(e.key==="Enter")addJob();};
+  ar.appendChild(f);ar.appendChild(el(`<div class="sp"></div>`));ar.appendChild(b);
+  v.appendChild(add);
+  const c=el(`<div class="card"></div>`);
+  S.jobs.forEach((job,i)=>{
+    const row=el(`<div class="row"></div>`);
+    const inp=el(`<input class="in" style="flex:1;min-width:200px;text-align:left;font-weight:500">`);
+    inp.value=job;
+    inp.onblur=()=>{const nv=(inp.value||"").trim();if(!nv){inp.value=job;return;}if(nv===job)return;if(S.jobs.some((j,k)=>k!==i&&j.toLowerCase()===nv.toLowerCase())){alert("Another job already has that name.");inp.value=job;return;}renameJob(job,nv,i);};
+    row.appendChild(inp);
+    const x=el(`<button class="btn ghost" style="width:30px;padding:6px 0;color:var(--alert);border-color:rgba(229,115,106,.4);margin-left:6px" title="Remove this job">✕</button>`);
+    x.onclick=()=>{if(confirm(`Remove "${job}" from the jobs list?\n\nBills already assigned to it keep their label.`)){S.jobs.splice(i,1);save();render();}};
+    row.appendChild(x);
+    c.appendChild(row);
+  });
+  if(!S.jobs.length)c.appendChild(el(`<div class="row"><span class="sm">No jobs yet — add one above.</span></div>`));
+  v.appendChild(c);
+  v.appendChild(el(`<div class="note">This is the master jobs list. Every job dropdown in the app reads from it, and it syncs to all devices. Renaming a job here updates it everywhere — including bills already assigned to it. When Dan's dashboard is connected, this becomes the shared official list.</div>`));
+}
+function renameJob(oldN,newN,i){
+  S.jobs[i]=newN;
+  if(S.pj)Object.keys(S.pj).forEach(k=>{if(S.pj[k]===oldN)S.pj[k]=newN;});
+  if(S.q)Object.keys(S.q).forEach(k=>{if(S.q[k]&&S.q[k].job===oldN)S.q[k].job=newN;});
+  if(S.qc)S.qc.forEach(c=>{if(c.job===oldN)c.job=newN;});
+  S.jobs.sort((a,b)=>a.localeCompare(b));
+  save();render();
+}
 function render(){
   nav();
   const rb=real();
   const tb=document.getElementById("topbal");tb.textContent=usd(rb);tb.className="bal"+(rb<0?" neg":"");
   const v=document.getElementById("view");v.innerHTML="";
-  ({dash:vDash,recvt:vRecvT,rec:vRec,sub:vSub,mat:vMat,vend:vVend,appr:vAppr,paid:vPaid})[S.tab](v);
+  ({dash:vDash,recvt:vRecvT,rec:vRec,sub:vSub,mat:vMat,vend:vVend,appr:vAppr,jobs:vJobs,paid:vPaid})[S.tab](v);
 }
 load();
 </script>
