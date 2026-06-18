@@ -198,7 +198,7 @@ applyEdits();
 if(!S.payV){PAY.forEach(p=>{if(S.pay[p[0]])S.pay[p[0]].on=false;});S.payV=1;}
 // seed/migrate receivables: real list replaces old staged examples; user-added rows survive
 if(!S.rl||!S.rl.some(x=>x.real)){const userRows=(S.rl||[]).filter(x=>!x.ex&&!x.real);S.rl=[...RECVD.map(r=>({name:r[0],date:r[1],amt:r[2],on:false,real:1})),...userRows];}
-render();}
+boot();}
 let savT;function save(){clearTimeout(savT);savT=setTimeout(async()=>{const body=JSON.stringify(S);try{await fetch(STATE_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({value:body})});lastSeen=body;}catch(e){}},500);}
 // Step 3: auto-refresh — pick up changes others make, without clobbering what you are doing
 async function poll(){
@@ -214,6 +214,53 @@ async function poll(){
   }catch(e){}
 }
 setInterval(poll,4000);
+
+/* ------------ live data: sign-in + real payables from the database ------------ */
+const API="https://mcp.santimawcontracting.com/9b9104af32e3847c9248f1c39ab2e9b6/api/v1";
+const INV_ATTACH=id=>(id&&Number(id)>0)?(API+"/invoices/"+id+"/attachment"):null;
+const MAT_VENDORS=["eig","horizon","kimball","united rental","clean restroom","koopman","maki","heritage","home depot","lowe","service plus","sunbelt","white cap"];
+const guessType=v=>{const s=(v||"").toLowerCase();return MAT_VENDORS.some(m=>s.includes(m))?"mat":"sub";};
+function authHeaders(){return S.token?{"Authorization":"Bearer "+S.token}:{};}
+function mapPayables(items){
+  PAY.length=0;
+  (items||[]).forEach(it=>{
+    const due=it.due_date?new Date(it.due_date).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—";
+    const viewUrl=(it.has_attachment&&it.invoice_id)?INV_ATTACH(it.invoice_id):null;
+    PAY.push([it.id,it.vendor_name||"(no vendor)",it.invoice_number||"—",it.amount||0,due,(it.status==="overdue")?1:0,guessType(it.vendor_name),0,0,it.job_name||"",viewUrl]);
+    if(!S.pay[it.id])S.pay[it.id]={on:false};
+  });
+}
+function showLogin(msg){
+  const nv=document.getElementById("nav");if(nv)nv.innerHTML="";
+  const tb=document.getElementById("topbal");if(tb)tb.textContent="—";
+  const v=document.getElementById("view");v.innerHTML="";
+  const c=el(`<div class="card" style="max-width:360px;margin:36px auto"><div class="lab">Sign in to the Bill Processor</div></div>`);
+  const u=el(`<input class="in" style="width:100%;text-align:left;margin-top:12px;font-weight:500" placeholder="Username" autocomplete="username">`);
+  const p=el(`<input class="in" type="password" style="width:100%;text-align:left;margin-top:8px;font-weight:500" placeholder="Password" autocomplete="current-password">`);
+  const b=el(`<button class="btn gold" style="margin-top:12px;width:100%">Sign in</button>`);
+  const st=el(`<div class="sm" style="margin-top:8px;min-height:16px">${msg||"One-time sign in — this device stays signed in."}</div>`);
+  const go=async()=>{
+    b.disabled=true;st.textContent="Signing in…";
+    try{
+      const r=await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"username="+encodeURIComponent(u.value)+"&password="+encodeURIComponent(p.value)});
+      const j=await r.json();
+      if(j&&j.access_token){S.token=j.access_token;save();boot();}
+      else{st.innerHTML='<span class="bad">'+((j&&j.detail)||"Incorrect username or password")+'</span>';b.disabled=false;}
+    }catch(e){st.innerHTML='<span class="bad">Network error — try again</span>';b.disabled=false;}
+  };
+  b.onclick=go;p.onkeydown=e=>{if(e.key==="Enter")go();};
+  [u,p,b,st].forEach(x=>c.appendChild(x));v.appendChild(c);
+}
+async function boot(){
+  if(!S.token){showLogin();return;}
+  try{
+    const r=await fetch(API+"/payables",{headers:authHeaders()});
+    if(r.status===401){S.token="";save();showLogin("Session expired — please sign in again.");return;}
+    if(r.ok){const j=await r.json();mapPayables(j.items);}
+  }catch(e){}
+  applyEdits();
+  render();
+}
 
 /* ------------ math ------------ */
 const usd=n=>n==null?"—":"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -427,7 +474,7 @@ function payRow(p,dups,showVendor){
   }
   row.appendChild(first);
   row.appendChild(el(`<span style="width:108px;font-weight:600;font-size:12px;font-variant-numeric:tabular-nums">#${p[2]}</span>`));
-  const url=S.pa[p[0]]||dropletUrl(p[0])||p[10];
+  const url=S.pa[p[0]]||p[10];
   const mid=el(`<span style="width:200px;display:flex;gap:5px;flex-wrap:wrap;align-items:center"><span class="sm">due ${p[4]}</span>${p[5]?'<span class="tag t-od">overdue</span>':""}${isDup?'<span class="tag t-dup">⚠ dup #</span>':""}${!url?'<span class="tag t-nosrc" title="No source attachment on file — verify before paying">⚠ no source</span>':S.pa[p[0]]?'<span class="tag t-on">attachment uploaded</span>':""}</span>`);
   if(url){const vb=el(`<button class="btn ghost" style="padding:4px 9px;font-size:10px">View ↗</button>`);vb.onclick=()=>openInvoice(url);mid.appendChild(vb);}
   else{
