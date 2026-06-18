@@ -677,7 +677,7 @@ function openPaidModal(p){
   saveb.onclick=async()=>{
     if(!S.paid)S.paid={};S.paid[p[0]]={date:dt.value||today,method:me.value,notes:nt.value||"",ts:Date.now()};
     save();ov.remove();render();
-    if(typeof p[0]==="number"&&p[0]>0){try{await apiPost("/payables/"+p[0]+"/mark-paid",{payment_method:(me.value||"other").toLowerCase(),notes:nt.value||"",job_name:p[9]||null});}catch(e){if(String(e.message)!=="auth")alert("Marked paid here, but couldn't record it in the database — check your connection.");}}
+    if(typeof p[0]==="number"&&p[0]>0){const PM={"check":"check","bank transfer":"ach","amex":"other"};const pm=PM[(me.value||"").toLowerCase()]||"other";try{await apiPost("/payables/"+p[0]+"/mark-paid",{payment_method:pm,notes:(me.value?me.value+" — ":"")+(nt.value||""),job_name:p[9]||null});}catch(e){if(String(e.message)!=="auth")alert("Marked paid here, but couldn't record it in the database — check your connection.");}}
   };
   btns.appendChild(cancel);btns.appendChild(saveb);box.appendChild(btns);
   ov.appendChild(box);safeBackdropClose(ov);
