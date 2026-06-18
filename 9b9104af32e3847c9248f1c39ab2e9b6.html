@@ -517,7 +517,7 @@ function payRow(p,dups,showVendor){
   const mp=el(`<button class="btn gold" style="padding:6px 10px;font-size:9.5px;margin-left:6px" title="Record this as paid">Mark paid</button>`);mp.onclick=()=>openPaidModal(p);row.appendChild(mp);
   const ed=el(`<button class="btn ghost" style="width:30px;padding:6px 0;margin-left:6px" title="Correct vendor, invoice #, amount, or category">✎</button>`);ed.onclick=()=>openEditModal(p);row.appendChild(ed);
   const del=el(`<button class="btn ghost" style="width:30px;padding:6px 0;color:var(--alert);border-color:rgba(229,115,106,.4);margin-left:6px" title="Delete this payable">✕</button>`);
-  del.onclick=()=>{if(confirm(`Delete ${p[1]} #${p[2]} (${usd(p[3])})?\n\nIt will be hidden here and junked in the backend once the delete endpoint (work order #20) lands. Toggling off Subcontractors and reopening restores nothing — use this only when you're sure.`)){S.pd[p[0]]=true;save();render();}};
+  del.onclick=async()=>{if(confirm(`Delete ${p[1]} #${p[2]} (${usd(p[3])})?\n\nThis removes it from your bills and sends it to the backend junk bin (not destroyed).`)){S.pd[p[0]]=true;save();render();if(typeof p[0]==="number"&&p[0]>0){try{await apiPost("/payables/"+p[0]+"/junk",{});}catch(e){if(String(e.message)!=="auth")alert("Hidden here, but couldn't junk it in the database — check your connection.");}}}};
   row.appendChild(del);
   return row;
 }
@@ -646,12 +646,13 @@ function openEditModal(p){
   const btns=el(`<div style="display:flex;gap:8px;justify-content:flex-end"></div>`);
   const cancel=el(`<button class="btn ghost">Cancel</button>`);const saveb=el(`<button class="btn gold">Save changes</button>`);
   cancel.onclick=()=>ov.remove();
-  saveb.onclick=()=>{
+  saveb.onclick=async()=>{
     const id=p[0];const nv=(vIn.value||"").trim()||p[1];const ni=(iIn.value||"").trim()||p[2];
     const na=parseFloat((aIn.value||"").replace(/[^0-9.]/g,""));const amt=isNaN(na)?p[3]:na;const nt=tSel.value||p[6];
     if(!S.edit)S.edit={};S.edit[id]={vendor:nv,inv:ni,amount:amt,type:nt};
     p[1]=nv;p[2]=ni;p[3]=amt;p[6]=nt;
     save();ov.remove();render();
+    if(typeof id==="number"&&id>0){try{await apiPut("/payables/"+id,{vendor_name:nv,amount:amt});}catch(e){if(String(e.message)!=="auth")alert("Saved here, but couldn't update the database — check your connection.");}}
   };
   btns.appendChild(cancel);btns.appendChild(saveb);box.appendChild(btns);
   ov.appendChild(box);safeBackdropClose(ov);
@@ -673,7 +674,11 @@ function openPaidModal(p){
   const btns=el(`<div style="display:flex;gap:8px;justify-content:flex-end"></div>`);
   const cancel=el(`<button class="btn ghost">Cancel</button>`);const saveb=el(`<button class="btn gold">Save payment</button>`);
   cancel.onclick=()=>ov.remove();
-  saveb.onclick=()=>{if(!S.paid)S.paid={};S.paid[p[0]]={date:dt.value||today,method:me.value,notes:nt.value||"",ts:Date.now()};save();ov.remove();render();};
+  saveb.onclick=async()=>{
+    if(!S.paid)S.paid={};S.paid[p[0]]={date:dt.value||today,method:me.value,notes:nt.value||"",ts:Date.now()};
+    save();ov.remove();render();
+    if(typeof p[0]==="number"&&p[0]>0){try{await apiPost("/payables/"+p[0]+"/mark-paid",{payment_method:(me.value||"other").toLowerCase(),notes:nt.value||"",job_name:p[9]||null});}catch(e){if(String(e.message)!=="auth")alert("Marked paid here, but couldn't record it in the database — check your connection.");}}
+  };
   btns.appendChild(cancel);btns.appendChild(saveb);box.appendChild(btns);
   ov.appendChild(box);safeBackdropClose(ov);
   document.body.appendChild(ov);
