@@ -83,7 +83,7 @@ select option{background:#0B0F13;color:var(--cream);}
 .stat.hi .v{background:linear-gradient(110deg,var(--goldd),var(--gold) 35%,#FFFDF2 50%,var(--gold) 65%,var(--goldd));-webkit-background-clip:text;background-clip:text;color:transparent;}
 .stat.al .v{color:var(--alert);}
 .stat .l{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-top:3px;color:var(--dim);}
-.stat.click{cursor:pointer;} .stat.click:hover{border-color:rgba(237,224,180,.4);} .stat.click .l::after{content:" A";color:var(--gold);}
+.stat.click{cursor:pointer;} .stat.click:hover{border-color:rgba(237,224,180,.4);}
 .grp{border-radius:14px 14px 0 0;padding:10px 14px;display:flex;align-items:center;gap:8px;margin-top:13px;font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:.04em;flex-wrap:wrap;color:var(--cream);
   background:linear-gradient(172deg,rgba(74,92,112,.55),rgba(11,15,20,.72));border:1px solid var(--line);border-bottom:none;}
 .grp .gt{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--gold);font-variant-numeric:tabular-nums;}
@@ -97,7 +97,7 @@ select option{background:#0B0F13;color:var(--cream);}
 .daybox.win{background:linear-gradient(180deg,var(--goldb),var(--gold) 60%,var(--goldd));border-color:transparent;color:#1A1208;}
 h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin:18px 0 4px;}
 /* ===== tile grid (mirrors Dan's dashboard) ===== */
-.top{display:flex;align-items:baseline;justify-content:flex-end;gap:0;margin:15px 4px 2px;}
+.top{display:flex;align-items:center;gap:12px;margin:15px 4px 2px;}
 .date{font-family:var(--mono);font-size:12px;color:#C0CAD4;letter-spacing:.14em;}
 .clock{font-family:var(--mono);font-size:17px;color:#F0F4F8;letter-spacing:.08em;border-left:1px solid rgba(215,198,142,.4);padding-left:14px;margin-left:14px;}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;align-items:start;margin-top:14px;}
@@ -131,6 +131,25 @@ h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;t
 .openhint{font-family:var(--mono);font-size:7.5px;letter-spacing:.14em;color:var(--dim);opacity:.6;text-transform:uppercase;margin-top:11px;}
 .tbody{margin-top:8px;}
 .tbody>.stats:first-child,.tbody>.card:first-child{margin-top:11px;}
+.span2{grid-column:span 2;}
+.t.tile{min-height:150px;display:flex;flex-direction:column;cursor:pointer;}
+.t.tile:hover{transform:scale(1.013);border-color:rgba(237,224,180,.34);box-shadow:0 0 0 1.5px rgba(214,224,234,.4),0 20px 38px -16px rgba(0,0,0,.86),inset 0 1px 0 rgba(246,250,253,.22);}
+.t.tile:active{transform:scale(.996);}
+.t.tile .tmeta{margin-top:auto;}
+.fmgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px;}
+.fm{padding:11px 13px;border-radius:11px;background:rgba(8,12,17,.28);border-left:1.5px solid var(--gold);}
+.fm.alt{border-left-color:#C8D2DC;}
+.fm .mlab{margin-bottom:4px;}
+.fm .tnum{font-size:17px;}
+.homebtn{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#1A1208;background:linear-gradient(180deg,var(--goldb),var(--gold) 55%,var(--goldd));border:none;border-radius:11px;padding:8px 15px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 1px 4px rgba(0,0,0,.4);transition:transform .12s,box-shadow .12s;}
+.homebtn:hover{transform:scale(1.04);box-shadow:0 0 14px -3px rgba(215,198,142,.55);}
+.secview{margin-top:14px;}
+.secbar{display:flex;align-items:center;gap:13px;margin-bottom:6px;flex-wrap:wrap;}
+.secbar .ic{width:38px;height:38px;margin-bottom:0;}
+.secbar .ic svg{width:20px;height:20px;}
+.secbar .ttl{font-size:22px;}
+.backpill{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--goldb);border:1px solid rgba(237,224,180,.4);border-radius:11px;padding:8px 14px;cursor:pointer;background:rgba(8,12,17,.4);transition:all .15s;}
+.backpill:hover{color:#FFFBEC;border-color:var(--goldb);box-shadow:0 0 14px -4px rgba(215,198,142,.5);}
 a{color:var(--gold);}
 </style></head><body><div class="wrap">
 
@@ -140,7 +159,7 @@ a{color:var(--gold);}
     <div style="text-align:right"><div class="brand" style="color:var(--dim)">Real bank balance</div><div class="bal" id="topbal">—</div></div>
   </div>
 </div>
-<div class="top"><span class="date" id="dstr"></span><span class="clock" id="clk"></span></div>
+<div class="top"><button class="homebtn" id="homebtn" onclick="goHome()">⌂ Home</button><span style="flex:1"></span><span class="date" id="dstr"></span><span class="clock" id="clk"></span></div>
 <div id="view"></div>
 
 <script>
@@ -706,23 +725,51 @@ function secBadge(k){
   if(k==="sub"||k==="mat"){const od=PAY.filter(p=>p[6]===k&&p[5]&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]])).length;return od?`<span class="tbadge">${od} overdue</span>`:"";}
   return "";
 }
-function openSec(k){if(!S.open)S.open={};S.open[k]=true;save();render();setTimeout(()=>{const e=document.getElementById("sec-"+k);if(e)e.scrollIntoView({behavior:"smooth",block:"start"});},70);}
+function openSec(k){S.view=k;save();render();window.scrollTo({top:0,behavior:"smooth"});}
+function goHome(){S.view="home";save();render();window.scrollTo({top:0,behavior:"smooth"});}
+function renderHomeTile(k,label){
+  const span=(k==="dash");
+  const t=el(`<div class="t tile ${span?"span2":""}" id="home-${k}"></div>`);
+  if(k==="dash"){
+    const totRecv=(S.rl||[]).reduce((s,r)=>s+(r.amt||0),0);
+    const owe=liveT("sub")+liveT("mat")+vendOn();
+    t.innerHTML=`<span class="klass">instrument</span><div class="ic"><svg viewBox="0 0 24 24">${ICONS.dash}</svg></div><div class="ttl">Overview</div>
+      <div class="fmgrid">
+        <div class="fm"><div class="mlab">Bank cash</div><div class="tnum tgold">${usd(S.bank)}</div></div>
+        <div class="fm alt"><div class="mlab">Owed to us</div><div class="tnum">${usd(totRecv)}</div></div>
+        <div class="fm alt"><div class="mlab">We owe (open)</div><div class="tnum">${usd(owe)}</div></div>
+        <div class="fm"><div class="mlab">Real balance</div><div class="tnum tgold">${usd(real())}</div></div>
+      </div>`;
+  } else {
+    t.innerHTML=`<span class="klass">tap to open</span><div class="ic"><svg viewBox="0 0 24 24">${ICONS[k]||""}</svg></div><div class="ttl">${label}</div><div class="tmeta"><span class="tnum tgold">${secValue(k)}</span><span class="mlab">${metaLabel(k)}</span>${secBadge(k)}</div>`;
+  }
+  t.onclick=()=>openSec(k);
+  return t;
+}
 function render(){
   const rb=real();
   const tb=document.getElementById("topbal");if(tb){tb.textContent=usd(rb);tb.className="bal"+(rb<0?" neg":"");}
-  if(!S.open)S.open={dash:true};
+  if(!S.view)S.view="home";
+  const hb=document.getElementById("homebtn");if(hb)hb.style.display=(S.view==="home")?"none":"inline-block";
   const v=document.getElementById("view");v.innerHTML="";
-  const grid=el(`<div class="grid"></div>`);
-  SECTIONS.forEach(([k,label,fn])=>{
-    const open=!!S.open[k];
-    const t=el(`<div class="t wb ${open?"open":""}" id="sec-${k}"></div>`);
-    const head=el(`<div class="thead"><span class="klass">${open?"tap title to close":"section"}</span><div class="ic"><svg viewBox="0 0 24 24">${ICONS[k]||""}</svg></div><div class="ttl">${label}</div><div class="tmeta"><span class="tnum tgold">${secValue(k)}</span><span class="mlab">${metaLabel(k)}</span>${secBadge(k)}</div>${open?"":'<div class="openhint">Tap to open</div>'}</div>`);
-    head.onclick=()=>{if(!S.open)S.open={};S.open[k]=!S.open[k];save();render();};
-    t.appendChild(head);
-    if(open){const body=el(`<div class="tbody"></div>`);fn(body);t.appendChild(body);}
-    grid.appendChild(t);
-  });
-  v.appendChild(grid);
+  if(S.view==="home"){
+    const grid=el(`<div class="grid"></div>`);
+    SECTIONS.forEach(([k,label])=>grid.appendChild(renderHomeTile(k,label)));
+    v.appendChild(grid);
+    return;
+  }
+  const def=SECTIONS.find(s=>s[0]===S.view)||SECTIONS[0];
+  const k=def[0],label=def[1],fn=def[2];
+  const wrap=el(`<div class="secview"></div>`);
+  const bar=el(`<div class="secbar"></div>`);
+  const back=el(`<button class="backpill">⌂ Home</button>`);
+  back.onclick=goHome;
+  bar.appendChild(back);
+  bar.appendChild(el(`<div class="ic"><svg viewBox="0 0 24 24">${ICONS[k]||""}</svg></div>`));
+  bar.appendChild(el(`<div class="ttl">${label}</div>`));
+  wrap.appendChild(bar);
+  const body=el(`<div class="tbody"></div>`);fn(body);wrap.appendChild(body);
+  v.appendChild(wrap);
 }
 function tick(){const n=new Date();const ds=document.getElementById("dstr"),ck=document.getElementById("clk");
   if(ds)ds.textContent=n.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase().replace(",","");
