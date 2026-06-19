@@ -144,6 +144,12 @@ h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;t
 .fm.alt{border-left-color:#C8D2DC;}
 .fm .mlab{margin-bottom:4px;}
 .fm .tnum{font-size:17px;}
+.t.tile.spanfull{min-height:0;height:auto;margin-bottom:16px;}
+.t.tile:not(.spanfull){height:130px;min-height:0;}
+.ovrow{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.ovhead{display:flex;align-items:center;gap:13px;flex:none;}
+.ovmetrics{display:flex;gap:10px;flex:1;flex-wrap:wrap;min-width:0;}
+.ovmetrics .fm{flex:1;min-width:148px;}
 .homebtn{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#1A1208;background:linear-gradient(180deg,var(--goldb),var(--gold) 55%,var(--goldd));border:none;border-radius:11px;padding:8px 15px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 1px 4px rgba(0,0,0,.4);transition:transform .12s,box-shadow .12s;}
 .homebtn:hover{transform:scale(1.04);box-shadow:0 0 14px -3px rgba(215,198,142,.55);}
 .secview{margin-top:14px;}
@@ -926,8 +932,8 @@ function renderHomeTile(k,label){
   if(k==="dash"){
     const totRecv=(S.rl||[]).reduce((s,r)=>s+(r.amt||0),0);
     const owe=payOn("sub")+payOn("mat");
-    t.innerHTML=`<span class="klass">instrument</span><div class="ic"><svg viewBox="0 0 24 24">${ICONS.dash}</svg></div><div class="ttl">Overview</div><div class="fmgrid wide"></div>`;
-    const fg=t.querySelector(".fmgrid");
+    t.innerHTML=`<span class="klass">instrument</span><div class="ovrow"><div class="ovhead"><div class="ic"><svg viewBox="0 0 24 24">${ICONS.dash}</svg></div><div class="ttl">Overview</div></div><div class="ovmetrics"></div></div>`;
+    const fg=t.querySelector(".ovmetrics");
     const mkfm=(lab,val,alt,fn)=>{const f=el(`<div class="fm ${alt?"alt":""}"><div class="mlab">${lab}</div><div class="tnum ${alt?"":"tgold"}">${val}</div></div>`);if(fn){f.style.cursor="pointer";f.onclick=(e)=>{e.stopPropagation();fn();};}return f;};
     fg.appendChild(mkfm("Bank cash",usd(S.bank),false,()=>{const w=S.bankUpdated?new Date(S.bankUpdated).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"not updated yet";alert("Bank cash last updated: "+w);}));
     fg.appendChild(mkfm("Owed to us",usd(totRecv),true,()=>openSec("recvt")));
