@@ -99,7 +99,7 @@ h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;t
 /* ===== tile grid (mirrors Dan's dashboard) ===== */
 .top{display:flex;align-items:center;gap:12px;margin:15px 4px 2px;}
 .date{font-family:var(--mono);font-size:12px;color:#C0CAD4;letter-spacing:.14em;}
-.clock{font-family:var(--mono);font-size:17px;color:#F0F4F8;letter-spacing:.08em;border-left:1px solid rgba(215,198,142,.4);padding-left:14px;margin-left:14px;}
+.clock{font-family:var(--mono);font-size:12px;color:#C0CAD4;letter-spacing:.14em;border-left:1px solid rgba(215,198,142,.4);padding-left:14px;margin-left:14px;}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;align-items:start;margin-top:14px;}
 .t{position:relative;border-radius:19px;padding:19px 20px;overflow:hidden;
   background:linear-gradient(172deg,rgba(74,92,112,.54),rgba(11,15,20,.68));border:1px solid var(--line);
@@ -132,6 +132,9 @@ h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;t
 .tbody{margin-top:8px;}
 .tbody>.stats:first-child,.tbody>.card:first-child{margin-top:11px;}
 .span2{grid-column:span 2;}
+.spanfull{grid-column:1/-1;}
+.fmgrid.wide{grid-template-columns:repeat(4,1fr);}
+@media(max-width:760px){.fmgrid.wide{grid-template-columns:repeat(2,1fr);}}
 .t.tile{min-height:150px;display:flex;flex-direction:column;cursor:pointer;}
 .t.tile:hover{transform:scale(1.013);border-color:rgba(237,224,180,.34);box-shadow:0 0 0 1.5px rgba(214,224,234,.4),0 20px 38px -16px rgba(0,0,0,.86),inset 0 1px 0 rgba(246,250,253,.22);}
 .t.tile:active{transform:scale(.996);}
@@ -251,6 +254,7 @@ REC.forEach((r,i)=>{if(!S.rec[i]||S.rec[i].inc===undefined){S.rec[i]={amt:(S.rec
 if(S.bufOn===undefined)S.bufOn=true;
 if(!S.pj)S.pj={};
 if(!S.paid)S.paid={};
+if(!S.payClearMig){Object.keys(S.paid).forEach(id=>{const x=S.paid[id];if(x===true)S.paid[id]={cleared:true};else if(x&&typeof x==="object"&&x.cleared===undefined)x.cleared=true;});S.payClearMig=1;}
 if(!S.jobs)S.jobs=JOBS.slice(1);
 applyEdits();
 if(!S.payV){PAY.forEach(p=>{if(S.pay[p[0]])S.pay[p[0]].on=false;});S.payV=1;}
@@ -343,7 +347,8 @@ const recvOn=()=>(S.rl||[]).reduce((s,r)=>s+(r.on?(r.amt||0):0),0);
 const payOn=t=>PAY.reduce((s,p)=>s+((!t||p[6]===t)&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]])&&S.pay[p[0]].on?p[3]:0),0);
 const auto10=()=>auto10E();
 const vendOn=()=>VEND.reduce((s,v,i)=>s+(S.vend[i].on?(S.vend[i].bal||0):0),0);
-const real=()=>S.bank+recvOn()-(S.bufOn?S.buffer:0)-auto10()-payOn("sub")-payOn("mat")-vendOn();
+const paidNotCleared=()=>PAY.reduce((s,p)=>s+((S.paid&&S.paid[p[0]]&&!S.paid[p[0]].cleared&&!(S.pd&&S.pd[p[0]]))?p[3]:0),0);
+const real=()=>S.bank+recvOn()-(S.bufOn?S.buffer:0)-auto10()-payOn("sub")-payOn("mat")-vendOn()-paidNotCleared();
 function dupSet(){const seen={},d=new Set();PAY.forEach(p=>{if(p[2]==="—")return;const k=p[1]+"|"+p[2];if(seen[k])d.add(k);seen[k]=1;});return d;}
 
 /* ------------ ui helpers ------------ */
@@ -428,6 +433,7 @@ function vDash(v){
   c.appendChild(line("−","Subcontractors toggled on","Subcontractors card",el(`<span class="amt">${usd(payOn("sub"))}</span>`)));
   c.appendChild(line("−","Materials toggled on","Materials card",el(`<span class="amt">${usd(payOn("mat"))}</span>`)));
   c.appendChild(line("−","Vendor accounts toggled on","Vendor Accounts card",el(`<span class="amt">${usd(vendOn())}</span>`)));
+  c.appendChild(line("−","Paid · not yet cleared","in flight — drops off when it posts at the bank",el(`<span class="amt">${usd(paidNotCleared())}</span>`)));
   const rb=real();
   c.appendChild(el(`<div class="row" style="background:var(--paper);border-radius:9px;padding:10px;margin-top:6px;border:1px solid var(--rule)"><span class="name" style="text-transform:uppercase;letter-spacing:.06em">Real bank balance</span><div class="sp"></div><span class="amt" style="font-size:19px;color:${rb<0?"var(--alert)":"var(--steel)"}">${usd(rb)}</span></div>`));
   v.appendChild(c);
@@ -667,7 +673,7 @@ function openPaidModal(p){
   const cancel=el(`<button class="btn ghost">Cancel</button>`);const saveb=el(`<button class="btn gold">Save payment</button>`);
   cancel.onclick=()=>ov.remove();
   saveb.onclick=async()=>{
-    if(!S.paid)S.paid={};S.paid[p[0]]={date:dt.value||today,method:me.value,notes:nt.value||"",ts:Date.now()};
+    if(!S.paid)S.paid={};S.paid[p[0]]={date:dt.value||today,method:me.value,notes:nt.value||"",ts:Date.now(),cleared:false};
     save();ov.remove();render();
     if(typeof p[0]==="number"&&p[0]>0){const PM={"check":"check","bank transfer":"ach","amex":"other"};const pm=PM[(me.value||"").toLowerCase()]||"other";try{await apiPost("/payables/"+p[0]+"/mark-paid",{payment_method:pm,notes:(me.value?me.value+" — ":"")+(nt.value||""),job_name:p[9]||null});}catch(e){if(String(e.message)!=="auth")alert("Marked paid here, but couldn't record it in the database — check your connection.");}}
   };
@@ -676,30 +682,52 @@ function openPaidModal(p){
   document.body.appendChild(ov);
 }
 
+function vNotCleared(v){
+  if(!S.paid)S.paid={};
+  const items=PAY.filter(p=>S.paid[p[0]]&&!S.paid[p[0]].cleared).map(p=>({p,info:S.paid[p[0]]})).sort((a,b)=>(b.info.ts||0)-(a.info.ts||0));
+  const tot=items.reduce((s,it)=>s+it.p[3],0);
+  v.appendChild(el(`<div class="stats"><div class="stat al"><div class="v">${usd(tot)}</div><div class="l">In flight &middot; still counts against the balance</div></div><div class="stat"><div class="v">${items.length}</div><div class="l">Awaiting clearance</div></div></div>`));
+  v.appendChild(el(`<div class="banner">Paid, but not yet posted at the bank — so still subtracted from your real balance. When one clears in <b>Main Street Bank</b>, tap <b>Cleared</b>, and update <b>Bank cash</b> on Overview to the bank's live figure.</div>`));
+  if(!items.length){v.appendChild(el(`<div class="card"><div class="row" style="border-top:none"><span class="sm">Nothing in flight. When you mark a bill paid, it lands here until it clears the bank.</span></div></div>`));return;}
+  const c=el(`<div class="card"><div class="row" style="border-top:none"><span class="lab" style="flex:1">Vendor / Invoice</span><span class="lab" style="width:120px">Paid</span><span class="lab" style="width:90px;text-align:right">Amount</span><span style="width:150px"></span></div></div>`);
+  items.forEach(({p,info})=>{
+    const d=info.date?new Date(info.date+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—";
+    const row=el(`<div class="row" style="align-items:flex-start"></div>`);
+    row.appendChild(el(`<div style="flex:1;min-width:150px"><div class="name">${p[1]} &middot; #${p[2]}</div>${info.notes?`<div class="sm" style="margin-top:2px">${info.notes}</div>`:""}</div>`));
+    row.appendChild(el(`<div style="width:120px"><div class="sm" style="color:var(--cream)">${d}</div><span class="tag t-on" style="margin-top:3px;display:inline-block">${info.method||""}</span></div>`));
+    row.appendChild(el(`<span class="amt" style="width:90px;text-align:right">${usd(p[3])}</span>`));
+    const acts=el(`<div style="width:150px;display:flex;gap:6px;justify-content:flex-end"></div>`);
+    const clr=el(`<button class="btn gold" style="padding:6px 12px">Cleared</button>`);
+    clr.onclick=()=>{S.paid[p[0]].cleared=true;S.paid[p[0]].clearedTs=Date.now();save();render();};
+    const undo=el(`<button class="btn ghost" style="width:34px;padding:6px 0" title="Undo \u2014 back to open/unpaid">\u21A9</button>`);
+    undo.onclick=()=>{if(confirm(`Move ${p[1]} #${p[2]} (${usd(p[3])}) back to open/unpaid? This removes the payment record.`)){delete S.paid[p[0]];save();render();}};
+    acts.appendChild(clr);acts.appendChild(undo);
+    row.appendChild(acts);
+    c.appendChild(row);
+  });
+  v.appendChild(c);
+}
 function vPaid(v){
   if(!S.paid)S.paid={};
-  const items=PAY.filter(p=>S.paid[p[0]]).map(p=>({p,info:S.paid[p[0]]})).sort((a,b)=>(b.info.ts||0)-(a.info.ts||0));
-  const tot=items.reduce((s,it)=>s+it.p[3],0);
-  v.appendChild(el(`<div class="stats"><div class="stat hi"><div class="v">${usd(tot)}</div><div class="l">Total paid &middot; ${items.length} invoice${items.length===1?"":"s"}</div></div></div>`));
-  if(!items.length){v.appendChild(el(`<div class="card"><div class="row" style="border-top:none"><span class="sm">Nothing marked paid yet. Use the <b style="color:var(--gold)">Mark paid</b> button on a bill in Subcontractors or Materials, and it lands here.</span></div></div>`));return;}
-  const c=el(`<div class="card"><div class="row" style="border-top:none"><span class="lab" style="flex:1">Vendor / Invoice</span><span class="lab" style="width:150px">Paid</span><span class="lab" style="width:90px;text-align:right">Amount</span><span style="width:34px"></span></div></div>`);
+  const items=PAY.filter(p=>S.paid[p[0]]&&S.paid[p[0]].cleared).map(p=>({p,info:S.paid[p[0]]})).sort((a,b)=>((b.info.clearedTs||b.info.ts)||0)-((a.info.clearedTs||a.info.ts)||0));
+  if(!items.length){v.appendChild(el(`<div class="card"><div class="row" style="border-top:none"><span class="sm">No cleared payments yet. When a payment posts at the bank, tap <b style="color:var(--gold)">Cleared</b> on the Not Yet Cleared card and it lands here.</span></div></div>`));return;}
+  const c=el(`<div class="card"><div class="row" style="border-top:none"><span class="lab" style="flex:1">Vendor / Invoice</span><span class="lab" style="width:150px">Cleared</span><span class="lab" style="width:90px;text-align:right">Amount</span><span style="width:34px"></span></div></div>`);
   items.forEach(({p,info})=>{
     const d=info.date?new Date(info.date+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"—";
     const row=el(`<div class="row" style="align-items:flex-start"></div>`);
-    const left=el(`<div style="flex:1;min-width:150px"><div class="name">${p[1]} &middot; #${p[2]}</div>${info.notes?`<div class="sm" style="margin-top:2px">${info.notes}</div>`:""}</div>`);
-    row.appendChild(left);
-    row.appendChild(el(`<div style="width:150px"><div class="sm" style="color:var(--cream)">${d}</div><span class="tag t-on" style="margin-top:3px;display:inline-block">${info.method}</span></div>`));
+    row.appendChild(el(`<div style="flex:1;min-width:150px"><div class="name">${p[1]} &middot; #${p[2]}</div>${info.notes?`<div class="sm" style="margin-top:2px">${info.notes}</div>`:""}</div>`));
+    row.appendChild(el(`<div style="width:150px"><div class="sm" style="color:var(--cream)">${d}</div><span class="tag t-on" style="margin-top:3px;display:inline-block">${info.method||""} &middot; cleared</span></div>`));
     row.appendChild(el(`<span class="amt" style="width:90px;text-align:right">${usd(p[3])}</span>`));
-    const undo=el(`<button class="btn ghost" style="width:34px;padding:6px 0" title="Undo \u2014 move back to open">\u21A9</button>`);
-    undo.onclick=()=>{if(confirm(`Move ${p[1]} #${p[2]} (${usd(p[3])}) back to the open list? This removes the payment record.`)){delete S.paid[p[0]];save();render();}};
+    const undo=el(`<button class="btn ghost" style="width:34px;padding:6px 0" title="Not cleared after all \u2014 move back">\u21A9</button>`);
+    undo.onclick=()=>{if(confirm(`Move ${p[1]} #${p[2]} (${usd(p[3])}) back to Not Yet Cleared? It will count against the balance again.`)){S.paid[p[0]].cleared=false;save();render();}};
     row.appendChild(undo);
     c.appendChild(row);
   });
   v.appendChild(c);
-  v.appendChild(el(`<div class="note">Your running record of paid bills. Each entry stores the date, method, and your notes. Use the &#8617; button to undo if something was marked by mistake. When the live bank and Amex feeds are built, matching payments will land here automatically.</div>`));
+  v.appendChild(el(`<div class="note">Your running record of payments that have posted at the bank. These no longer affect the real balance — your live Bank cash figure already reflects them. Use &#8617; if one was marked cleared by mistake.</div>`));
 }
 
-const SECTIONS=[["dash","Overview",vDash],["recvt","Receivables",vRecvT],["rec","Recurring",vRec],["sub","Subcontractors",vSub],["mat","Materials",vMat],["vend","Vendor Accounts",vVend],["paid","Payments",vPaid]];
+const SECTIONS=[["dash","Overview",vDash],["recvt","Receivables",vRecvT],["rec","Recurring",vRec],["sub","Subcontractors",vSub],["mat","Materials",vMat],["vend","Vendor Accounts",vVend],["clr","Not Yet Cleared",vNotCleared],["paid","Running Payments",vPaid]];
 const ICONS={
   dash:'<rect x="4" y="13" width="4" height="7" rx="1"></rect><rect x="10" y="9" width="4" height="11" rx="1"></rect><rect x="16" y="4" width="4" height="16" rx="1"></rect>',
   recvt:'<path d="M12 3v9"></path><path d="M8.5 9.5L12 13l3.5-3.5"></path><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path>',
@@ -707,7 +735,8 @@ const ICONS={
   sub:'<circle cx="12" cy="8" r="3.4"></circle><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"></path>',
   mat:'<path d="M4 7l8-3.5L20 7v10l-8 3.5L4 17z"></path><path d="M4 7l8 3.5L20 7M12 10.5V20"></path>',
   vend:'<path d="M4 9.5l8-5 8 5"></path><path d="M5 9.5V19M9.5 9.5V19M14.5 9.5V19M19 9.5V19"></path><path d="M3.5 19.5h17"></path>',
-  paid:'<path d="M5 4h14v16l-2.5-1.6L14 20l-2-1.6L10 20l-2.5-1.6L5 20z"></path><path d="M9 9.5l2 2 4-4.5"></path>'
+  paid:'<path d="M5 4h14v16l-2.5-1.6L14 20l-2-1.6L10 20l-2.5-1.6L5 20z"></path><path d="M9 9.5l2 2 4-4.5"></path>',
+  clr:'<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 1.7"></path>'
 };
 function liveT(t){return PAY.filter(p=>p[6]===t&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]])).reduce((s,p)=>s+p[3],0);}
 function secValue(k){
@@ -717,10 +746,11 @@ function secValue(k){
   if(k==="sub")return usd(liveT("sub"));
   if(k==="mat")return usd(liveT("mat"));
   if(k==="vend")return usd(vendOn());
-  if(k==="paid")return String(Object.keys(S.paid||{}).length);
+  if(k==="clr")return usd(paidNotCleared());
+  if(k==="paid")return "";
   return "";
 }
-function metaLabel(k){return {dash:"REAL BALANCE",recvt:"TOGGLED IN",rec:"AUTO-PAY IN",sub:"OPEN",mat:"OPEN",vend:"TOGGLED IN",paid:"LOGGED"}[k]||"";}
+function metaLabel(k){return {dash:"REAL BALANCE",recvt:"TOGGLED ON",rec:"TOGGLED ON",sub:"OPEN",mat:"OPEN",vend:"TOGGLED ON",clr:"IN FLIGHT",paid:""}[k]||"";}
 function secBadge(k){
   if(k==="sub"||k==="mat"){const od=PAY.filter(p=>p[6]===k&&p[5]&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]])).length;return od?`<span class="tbadge">${od} overdue</span>`:"";}
   return "";
@@ -729,12 +759,12 @@ function openSec(k){S.view=k;save();render();window.scrollTo({top:0,behavior:"sm
 function goHome(){S.view="home";save();render();window.scrollTo({top:0,behavior:"smooth"});}
 function renderHomeTile(k,label){
   const span=(k==="dash");
-  const t=el(`<div class="t tile ${span?"span2":""}" id="home-${k}"></div>`);
+  const t=el(`<div class="t tile ${span?"spanfull":""}" id="home-${k}"></div>`);
   if(k==="dash"){
     const totRecv=(S.rl||[]).reduce((s,r)=>s+(r.amt||0),0);
     const owe=liveT("sub")+liveT("mat")+vendOn();
     t.innerHTML=`<span class="klass">instrument</span><div class="ic"><svg viewBox="0 0 24 24">${ICONS.dash}</svg></div><div class="ttl">Overview</div>
-      <div class="fmgrid">
+      <div class="fmgrid wide">
         <div class="fm"><div class="mlab">Bank cash</div><div class="tnum tgold">${usd(S.bank)}</div></div>
         <div class="fm alt"><div class="mlab">Owed to us</div><div class="tnum">${usd(totRecv)}</div></div>
         <div class="fm alt"><div class="mlab">We owe (open)</div><div class="tnum">${usd(owe)}</div></div>
@@ -762,9 +792,6 @@ function render(){
   const k=def[0],label=def[1],fn=def[2];
   const wrap=el(`<div class="secview"></div>`);
   const bar=el(`<div class="secbar"></div>`);
-  const back=el(`<button class="backpill">⌂ Home</button>`);
-  back.onclick=goHome;
-  bar.appendChild(back);
   bar.appendChild(el(`<div class="ic"><svg viewBox="0 0 24 24">${ICONS[k]||""}</svg></div>`));
   bar.appendChild(el(`<div class="ttl">${label}</div>`));
   wrap.appendChild(bar);
