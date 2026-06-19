@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Santimaw Financials</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>Santimaw Financial Hub</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
   /* Dan's tokens */
@@ -19,7 +19,7 @@ body{color:var(--cream);padding:14px 10px 40px;min-height:100vh;
     radial-gradient(1200px 700px at 6% -12%,rgba(150,175,200,.10),transparent 55%),
     radial-gradient(950px 600px at 102% 6%,rgba(110,140,170,.14),transparent 50%),
     linear-gradient(160deg,#0B0F13,#070A0D);background-attachment:fixed;}
-.wrap{max-width:1120px;margin:0 auto;}
+.wrap{max-width:1320px;margin:0 auto;}
 .hdr{border-radius:18px;padding:15px 20px;position:sticky;top:6px;z-index:60;overflow:hidden;
   background:linear-gradient(172deg,#26333F,#0C1016);border:1px solid var(--line);
   box-shadow:0 0 0 1px rgba(4,7,10,.6),0 18px 36px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(246,250,253,.16);}
@@ -27,10 +27,10 @@ body{color:var(--cream);padding:14px 10px 40px;min-height:100vh;
 .h1{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:.06em;margin-top:1px;
   background:linear-gradient(108deg,#DEE6EC 0%,#F4F8FB 38%,#FFFFFF 50%,#F4F8FB 62%,#DEE6EC 100%);
   -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 1px 0 rgba(0,0,0,.4));}
-.bal{font-family:var(--mono);font-size:25px;font-weight:600;font-variant-numeric:tabular-nums;
+.bal{font-family:var(--mono);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;
   background:linear-gradient(110deg,var(--goldd),var(--gold) 35%,#FFFDF2 50%,var(--gold) 65%,var(--goldd));
   -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 8px rgba(243,231,194,.3));}
-.bal.neg{background:none;color:var(--alert);-webkit-text-fill-color:var(--alert);filter:none;}
+.bal.neg{background:none;color:#FF4D44;-webkit-text-fill-color:#FF4D44;filter:none;}
 .nav{display:flex;gap:6px;flex-wrap:wrap;margin-top:13px;}
 .nav button{font-family:var(--mono);border:1px solid rgba(232,238,244,.12);border-radius:99px;padding:6px 13px;font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;background:rgba(8,12,17,.4);color:var(--dim);transition:all .15s;}
 .nav button:hover{color:var(--cream);border-color:rgba(237,224,180,.3);}
@@ -100,8 +100,8 @@ h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;t
 .top{display:flex;align-items:center;gap:12px;margin:15px 4px 2px;}
 .date{font-family:var(--mono);font-size:12px;color:#C0CAD4;letter-spacing:.14em;}
 .clock{font-family:var(--mono);font-size:12px;color:#C0CAD4;letter-spacing:.14em;border-left:1px solid rgba(215,198,142,.4);padding-left:14px;margin-left:14px;}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:15px;align-items:start;margin-top:14px;}
-.t{position:relative;border-radius:19px;padding:19px 20px;overflow:hidden;
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(188px,1fr));gap:11px;align-items:start;margin-top:13px;}
+.t{position:relative;border-radius:16px;padding:14px 15px;overflow:hidden;
   background:linear-gradient(172deg,rgba(74,92,112,.54),rgba(11,15,20,.68));border:1px solid var(--line);
   box-shadow:0 0 0 1px rgba(4,7,10,.6),0 14px 28px -16px rgba(0,0,0,.78),inset 0 1px 0 rgba(246,250,253,.18),inset 0 -1px 0 rgba(246,250,253,.08);
   transition:border-color .25s,box-shadow .25s,transform .14s;}
@@ -115,17 +115,17 @@ h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;t
 .lk-spec{position:absolute;inset:1px;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s;background:linear-gradient(90deg,rgba(215,198,142,.085),rgba(215,198,142,.025) 45%,transparent 78%);}
 .t.wb:hover .lk-spec{opacity:1;}
 .t.wb.open .lk-spec{opacity:0;}
-.ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:11px;position:relative;
+.ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;position:relative;
   background:radial-gradient(120% 120% at 30% 18%,#566C84,#3A4C62 58%,#222C3A 100%);
   box-shadow:inset 0 1.5px 1px rgba(246,250,253,.22),inset 0 -10px 16px -8px rgba(0,0,0,.85),inset 0 0 0 1px rgba(243,231,194,.13),0 6px 18px -6px rgba(0,0,0,.8),0 0 26px -8px rgba(215,198,142,.5);}
-.ic svg{width:23px;height:23px;stroke:var(--goldb);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55)) drop-shadow(0 0 8px rgba(243,231,194,.3));}
+.ic svg{width:18px;height:18px;stroke:var(--goldb);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55)) drop-shadow(0 0 8px rgba(243,231,194,.3));}
 .klass{position:absolute;top:11px;right:13px;font-family:var(--mono);font-size:7px;letter-spacing:.16em;color:var(--dim);opacity:.6;text-transform:uppercase;}
-.ttl{font-family:var(--serif);font-weight:600;font-size:20px;letter-spacing:.08em;text-transform:uppercase;
+.ttl{font-family:var(--serif);font-weight:600;font-size:16px;letter-spacing:.08em;text-transform:uppercase;
   background:linear-gradient(108deg,#DEE6EC,#F4F8FB 38%,#FFFFFF 50%,#F4F8FB 62%,#DEE6EC);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 1px 0 rgba(0,0,0,.4));}
 .t.wb.open .ttl{font-size:18px;}
 .tmeta{margin-top:10px;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
 .mlab{font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);}
-.tnum{font-family:var(--mono);font-weight:600;font-size:18px;font-variant-numeric:tabular-nums;color:var(--cream);}
+.tnum{font-family:var(--mono);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums;color:var(--cream);}
 .tgold{background:linear-gradient(110deg,var(--goldd),var(--gold) 35%,#FFFDF2 50%,var(--gold) 65%,var(--goldd));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 8px rgba(243,231,194,.3));}
 .tbadge{font-family:var(--mono);font-size:8px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;border-radius:12px;padding:2px 8px;background:rgba(229,115,106,.16);color:#F0938A;border:1px solid rgba(229,115,106,.35);white-space:nowrap;}
 .openhint{font-family:var(--mono);font-size:7.5px;letter-spacing:.14em;color:var(--dim);opacity:.6;text-transform:uppercase;margin-top:11px;}
@@ -135,12 +135,12 @@ h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;t
 .spanfull{grid-column:1/-1;}
 .fmgrid.wide{grid-template-columns:repeat(4,1fr);}
 @media(max-width:760px){.fmgrid.wide{grid-template-columns:repeat(2,1fr);}}
-.t.tile{min-height:150px;display:flex;flex-direction:column;cursor:pointer;}
+.t.tile{min-height:116px;display:flex;flex-direction:column;cursor:pointer;}
 .t.tile:hover{transform:scale(1.013);border-color:rgba(237,224,180,.34);box-shadow:0 0 0 1.5px rgba(214,224,234,.4),0 20px 38px -16px rgba(0,0,0,.86),inset 0 1px 0 rgba(246,250,253,.22);}
 .t.tile:active{transform:scale(.996);}
 .t.tile .tmeta{margin-top:auto;}
 .fmgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px;}
-.fm{padding:11px 13px;border-radius:11px;background:rgba(8,12,17,.28);border-left:1.5px solid var(--gold);}
+.fm{padding:9px 11px;border-radius:10px;background:rgba(8,12,17,.28);border-left:1.5px solid var(--gold);}
 .fm.alt{border-left-color:#C8D2DC;}
 .fm .mlab{margin-bottom:4px;}
 .fm .tnum{font-size:17px;}
@@ -153,12 +153,25 @@ h3{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;t
 .secbar .ttl{font-size:22px;}
 .backpill{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--goldb);border:1px solid rgba(237,224,180,.4);border-radius:11px;padding:8px 14px;cursor:pointer;background:rgba(8,12,17,.4);transition:all .15s;}
 .backpill:hover{color:#FFFBEC;border-color:var(--goldb);box-shadow:0 0 14px -4px rgba(215,198,142,.5);}
+.owegrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+.vendgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;align-items:start;}
+@media(max-width:760px){.owegrid{grid-template-columns:1fr;}}
+.scrollface{max-height:320px;overflow-y:auto;padding-right:5px;margin-top:4px;scrollbar-width:thin;}
+.scrollface::-webkit-scrollbar{width:5px;}
+.scrollface::-webkit-scrollbar-thumb{background:rgba(232,238,244,.18);border-radius:3px;}
+.alertbox{border-radius:12px;padding:12px 14px;margin-top:12px;background:rgba(8,12,17,.4);border:1px solid var(--line);}
+.alertbox.flash{border-color:#FF6B6B;background:rgba(255,77,68,.08);animation:flashred 1.1s ease-in-out infinite;}
+@keyframes flashred{0%,100%{box-shadow:0 0 0 1px rgba(255,77,68,.5),0 0 18px -4px rgba(255,77,68,.55);}50%{box-shadow:0 0 0 1px rgba(255,77,68,.12),0 0 5px -4px rgba(255,77,68,.2);}}
+.t[draggable="true"]{cursor:grab;}
+.t.dragging{opacity:.4;cursor:grabbing;}
+.t.dragover{outline:2px dashed var(--gold);outline-offset:3px;}
+.costrow.nojob{border-left:3px solid #FF4D44;background:rgba(255,77,68,.06);padding-left:9px;border-radius:8px;}
 a{color:var(--gold);}
 </style></head><body><div class="wrap">
 
 <div class="hdr">
   <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
-    <div><div class="brand">Santimaw Contracting</div><div class="h1">Financials</div></div>
+    <div><div class="brand">Santimaw Contracting</div><div class="h1">Financial Hub</div></div>
     <div style="text-align:right"><div class="brand" style="color:var(--dim)">Real bank balance</div><div class="bal" id="topbal">—</div></div>
   </div>
 </div>
@@ -238,6 +251,10 @@ const MCP="https://mcp.santimawcontracting.com/e94dca0f4923928fdd1909f39199e5116
 const ATTACH_BASE="https://mcp.santimawcontracting.com/9b9104af32e3847c9248f1c39ab2e9b6/api/v1/invoices/";
 const dropletUrl=id=>(typeof id==="number"&&id>0)?ATTACH_BASE+id+"/attachment":null;
 function openInvoice(u){window.open(u,"_blank");}
+// store-run / field receipts [id,vendor,who+date,method,amount,job]
+const RECEIPTS=[
+[9001,"Home Depot — Worcester","Teddy · Jun 10","amex",187.52,""],
+[9002,"Lowe's — Auburn","Dan · Jun 9","amex",64.18,""]];
 
 /* ------------ state + persistence ------------ */
 let S={bank:5557.60,buffer:20000,bufOn:true,pay:{},rec:{},recv:{},vend:{},q:{},tab:"dash"};
@@ -423,7 +440,7 @@ function vDash(v){
 
   const c=el(`<div class="card"><div class="lab">How the real balance is built</div></div>`);
   const line=(sign,name,hint,node)=>{const r=el(`<div class="row"><div><div class="name">${name}</div><div class="sm">${hint}</div></div><div class="sp"></div><span class="dim">${sign}</span></div>`);r.appendChild(node);return r;};
-  c.appendChild(line("","Bank cash","maintained figure — yours, today",money(S.bank,t=>{S.bank=t||0;save();render();})));
+  c.appendChild(line("","Bank cash","maintained figure — yours, today",money(S.bank,t=>{S.bank=t||0;S.bankUpdated=Date.now();save();render();})));
   c.appendChild(line("+","Receivables toggled on","Receivables card",el(`<span class="amt">${usd(recvOn())}</span>`)));
   const bufRow=line("−","Buffer","safety floor — switch off to spend into it",money(S.buffer,t=>{S.buffer=t||0;save();render();}));
   bufRow.appendChild(sw(S.bufOn,()=>{S.bufOn=!S.bufOn;save();render();}));
@@ -450,9 +467,21 @@ function vRec(v){
   const man=all.filter(r=>inWinR(r.day)&&!r.auto);
   const manT=man.reduce((s,r)=>s+(r.amt||0),0);
   const tot=all.reduce((s,r)=>s+(r.amt||0),0);
-  const st=el(`<div class="stats"><div class="stat hi"><div class="v">${usd(incT)}</div><div class="l">Toggled into real balance</div></div><div class="stat al"><div class="v">${usd(manT)}</div><div class="l">Manual due Jun 12–21 — you push these</div></div><div class="stat"><div class="v">${usd(tot)}</div><div class="l">Total monthly recurring</div></div></div>`);
-  v.appendChild(st);
-  if(man.length)v.appendChild(el(`<div class="banner"><b>Your manual queue:</b> ${man.map(r=>`${r.name} (${r.day}th · ${usd(r.amt)})`).join(" · ")}</div>`));
+  v.appendChild(el(`<div class="stats"><div class="stat hi"><div class="v">${usd(incT)}</div><div class="l">Toggled into real balance</div></div></div>`));
+  const curDay=new Date().getDate();const mKey=new Date().getFullYear()+"-"+(new Date().getMonth()+1);
+  if(!S.recPaid)S.recPaid={};
+  const odue=all.filter(r=>!r.auto&&r.day<=curDay&&(curDay-r.day)>21&&!S.recPaid[r.key+"|"+mKey]);
+  const ob=el(`<div class="alertbox ${odue.length?"flash":""}"></div>`);
+  if(odue.length){
+    ob.appendChild(el(`<div class="mlab" style="color:#FF6B6B;margin-bottom:7px">⚠ Manual · 21+ days past due — pay these</div>`));
+    odue.forEach(r=>{
+      const row=el(`<div class="row" style="border-top:none;padding:6px 0"><div style="flex:1"><span class="name">${r.name}</span> <span class="sm">due the ${r.day}th · ${curDay-r.day} days past</span></div><span class="amt">${usd(r.amt)}</span></div>`);
+      const mp=el(`<button class="btn ghost" style="margin-left:8px">Mark paid</button>`);
+      mp.onclick=()=>{S.recPaid[r.key+"|"+mKey]=1;save();render();};
+      row.appendChild(mp);ob.appendChild(row);
+    });
+  } else { ob.appendChild(el(`<div class="sm">No manual bills 21+ days past due.</div>`)); }
+  v.appendChild(ob);
 
   // add form
   const add=el(`<div class="card"><div class="lab">Add a recurring bill</div><div class="row" style="border-top:none;align-items:center;gap:8px"></div></div>`);
@@ -514,6 +543,7 @@ function auto10E(){
   return s;
 }
 
+function recTotal(){if(!S.recX)S.recX={};let s=0;REC.forEach((r,i)=>{const ed=S.recX["b"+i]||{};if(ed.del)return;s+=(S.rec[i].amt||0);});(S.recU||[]).forEach(u=>{if(!u.del)s+=(u.amt||0);});return s;}
 function paySection(v,type,grouped){
   const dups=dupSet();
   const rows=PAY.filter(p=>p[6]===type&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]]));
@@ -591,21 +621,32 @@ function vMat(v){
   v.appendChild(el(`<h3>On account — pay against statements</h3>`));
   v.appendChild(el(`<div class="banner">No <b>Koopman, Maki, or Heritage</b> charges are in the system yet — their balances live on the <b>Vendor Accounts</b> tab and fill in the moment you drop a statement. <b>Amex</b> charges arrive via store-run receipts below. The vendors listed here are the ones with actual invoices on file.</div>`));
   paySection(v,"mat",true);
-  v.appendChild(el(`<h3>Store runs — paid on the Amex at the register</h3>`));
-  v.appendChild(el(`<div class="card"><div class="row"><div style="flex:1"><span class="name">Home Depot — Worcester</span> <span class="sm">Teddy · Jun 10 · example</span></div><span class="amt">$187.52</span><span class="tag t-on">paid · Amex</span></div><div class="row"><div style="flex:1"><span class="name">Lowe's — Auburn</span> <span class="sm">Dan · Jun 9 · example</span></div><span class="amt">$64.18</span><span class="tag t-on">paid · Amex</span></div></div>`));
-  v.appendChild(el(`<div class="note">Store receipts never toggle — they're already spent. Each files into its job as paid and adds to the Amex balance. The Field Crew app feeds this: crew picks job → snaps receipt → lands here.</div>`));
+  v.appendChild(el(`<div class="note">Store-run receipts (Amex at the register) and every other receipt now live in the <b>Cost Inbox</b>, where each gets a job and a payment method. The Field Crew app will feed them straight in.</div>`));
 }
 function vVend(v){
+  const grid=el(`<div class="vendgrid"></div>`);
   VEND.forEach((vd,i)=>{
-    v.appendChild(el(`<div class="grp">${vd[0]} <span class="tag" style="background:rgba(215,198,142,.14);color:var(--gold);border:1px solid rgba(215,198,142,.3)">${vd[1]}</span><div class="sp"></div><span class="gt" id="vb-${i}">${usd(S.vend[i].bal)}</span></div>`));
-    const body=el(`<div class="grpbody"><div class="row"><div style="flex:1"><div class="sm">${vd[4]}</div></div><span class="sm">in real balance</span></div></div>`);
-    const row=body.querySelector(".row");
-    row.appendChild(sw(S.vend[i].on,()=>{S.vend[i].on=!S.vend[i].on;save();render();}));
-    const bal=money(S.vend[i].bal,t=>{S.vend[i].bal=t;save();render();});
-    const br=el(`<div class="row"><span class="sm">Balance (editable until live feed)</span><div class="sp"></div></div>`);br.appendChild(bal);body.appendChild(br);
-    v.appendChild(body);
+    const col=el(`<div class="t" style="cursor:default;display:flex;flex-direction:column"></div>`);
+    col.appendChild(el(`<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><div class="ttl" style="font-size:16px">${vd[0]}</div><div class="sp"></div><span class="tnum tgold">${usd(S.vend[i].bal)}</span></div>`));
+    col.appendChild(el(`<div class="sm" style="margin:4px 0 8px">${vd[4]}</div>`));
+    const ctrl=el(`<div class="row" style="border-top:none;padding:7px 0"><span class="sm">In real balance</span><div class="sp"></div></div>`);
+    ctrl.appendChild(sw(S.vend[i].on,()=>{S.vend[i].on=!S.vend[i].on;save();render();}));
+    col.appendChild(ctrl);
+    const br=el(`<div class="row" style="padding:7px 0"><span class="sm">Balance</span><div class="sp"></div></div>`);
+    br.appendChild(money(S.vend[i].bal,t=>{S.vend[i].bal=t;save();render();}));
+    col.appendChild(br);
+    if(vd[1]!=="card"){
+      col.appendChild(el(`<div class="mlab" style="margin-top:9px">Invoices</div>`));
+      const sf=el(`<div class="scrollface"></div>`);
+      sf.appendChild(el(`<div class="sm" style="padding:8px 0">No invoices loaded yet — drop a statement and they’ll list here for verification and job assignment.</div>`));
+      col.appendChild(sf);
+    } else {
+      col.appendChild(el(`<div class="sm" style="margin-top:9px;opacity:.75">Charges arrive via store-run receipts; statements true up the balance. No invoice list.</div>`));
+    }
+    grid.appendChild(col);
   });
-  v.appendChild(el(`<div class="note">Amex balance grows automatically as store receipts land; statements true it up. Koopman/Maki/Heritage: drop a statement in SharePoint or the invoice email and Atlas reads balance + 30/60/90 aging into here. Live Amex/bank feeds: work order #14–15.</div>`));
+  v.appendChild(grid);
+  v.appendChild(el(`<div class="note">Vendors sit side by side. Koopman, Maki, Heritage (and the new accounts to come) will list their invoices here for the verification + job-assignment process once statements and the live feed are connected. Amex has no invoice list — it’s a card.</div>`));
 }
 
 /* ------------ render ------------ */
@@ -727,7 +768,7 @@ function vPaid(v){
   v.appendChild(el(`<div class="note">Your running record of payments that have posted at the bank. These no longer affect the real balance — your live Bank cash figure already reflects them. Use &#8617; if one was marked cleared by mistake.</div>`));
 }
 
-const SECTIONS=[["dash","Overview",vDash],["recvt","Receivables",vRecvT],["rec","Recurring",vRec],["sub","Subcontractors",vSub],["mat","Materials",vMat],["vend","Vendor Accounts",vVend],["clr","Not Yet Cleared",vNotCleared],["paid","Running Payments",vPaid]];
+const SECTIONS=[["dash","Overview",vDash],["cost","Cost Inbox",vCost],["recvt","Receivables",vRecvT],["rec","Recurring",vRec],["sub","Subcontractors",vSub],["mat","Materials",vMat],["vend","Vendor Accounts",vVend],["clr","Not Yet Cleared",vNotCleared],["paid","Running Payments",vPaid],["appr","Approvals",vAppr]];
 const ICONS={
   dash:'<rect x="4" y="13" width="4" height="7" rx="1"></rect><rect x="10" y="9" width="4" height="11" rx="1"></rect><rect x="16" y="4" width="4" height="16" rx="1"></rect>',
   recvt:'<path d="M12 3v9"></path><path d="M8.5 9.5L12 13l3.5-3.5"></path><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path>',
@@ -736,7 +777,10 @@ const ICONS={
   mat:'<path d="M4 7l8-3.5L20 7v10l-8 3.5L4 17z"></path><path d="M4 7l8 3.5L20 7M12 10.5V20"></path>',
   vend:'<path d="M4 9.5l8-5 8 5"></path><path d="M5 9.5V19M9.5 9.5V19M14.5 9.5V19M19 9.5V19"></path><path d="M3.5 19.5h17"></path>',
   paid:'<path d="M5 4h14v16l-2.5-1.6L14 20l-2-1.6L10 20l-2.5-1.6L5 20z"></path><path d="M9 9.5l2 2 4-4.5"></path>',
-  clr:'<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 1.7"></path>'
+  clr:'<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 1.7"></path>',
+  appr:'<path d="M5 4h11l3 3v13H5z"></path><path d="M9 12l2 2 4-4.5"></path>',
+  owe:'<path d="M12 4v16M6 8h12M6 8l-2.5 5a2.5 2.5 0 0 0 5 0zM18 8l-2.5 5a2.5 2.5 0 0 0 5 0z"></path>',
+  cost:'<path d="M4 13l2.4-7h11.2L20 13"></path><path d="M4 13h4.5l1.4 2.2h4.2L15.5 13H20v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"></path>'
 };
 function liveT(t){return PAY.filter(p=>p[6]===t&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]])).reduce((s,p)=>s+p[3],0);}
 function secValue(k){
@@ -748,33 +792,169 @@ function secValue(k){
   if(k==="vend")return usd(vendOn());
   if(k==="clr")return usd(paidNotCleared());
   if(k==="paid")return "";
+  if(k==="appr")return String(QUEUE.filter(q=>{const st=S.q[q[0]]||{};return !st.done&&!st.removed;}).length);
+  if(k==="cost")return String(costItems().filter(it=>!it.job).length);
   return "";
 }
-function metaLabel(k){return {dash:"REAL BALANCE",recvt:"TOGGLED ON",rec:"TOGGLED ON",sub:"OPEN",mat:"OPEN",vend:"TOGGLED ON",clr:"IN FLIGHT",paid:""}[k]||"";}
+function metaLabel(k){return {dash:"REAL BALANCE",recvt:"TOGGLED ON",rec:"TOGGLED ON",sub:"OPEN",mat:"OPEN",vend:"TOGGLED ON",clr:"IN FLIGHT",paid:"",appr:"TO REVIEW",cost:"NEED A JOB"}[k]||"";}
 function secBadge(k){
+  if(k==="cost"){const n=costItems().filter(it=>!it.job).length;return n?`<span class="tbadge">${n} need a job</span>`:"";}
   if(k==="sub"||k==="mat"){const od=PAY.filter(p=>p[6]===k&&p[5]&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]])).length;return od?`<span class="tbadge">${od} overdue</span>`:"";}
   return "";
 }
 function openSec(k){S.view=k;save();render();window.scrollTo({top:0,behavior:"smooth"});}
 function goHome(){S.view="home";save();render();window.scrollTo({top:0,behavior:"smooth"});}
+function vOwe(v){
+  const grid=el(`<div class="owegrid"></div>`);
+  [["sub","Subcontractors"],["mat","Materials"]].forEach(([type,head])=>{
+    const rows=PAY.filter(p=>p[6]===type&&!(S.pd&&S.pd[p[0]])&&!(S.paid&&S.paid[p[0]]));
+    const tot=rows.reduce((s,p)=>s+((S.pay[p[0]]&&S.pay[p[0]].on)?p[3]:0),0);
+    const col=el(`<div class="t" style="cursor:default"></div>`);
+    col.appendChild(el(`<div style="display:flex;align-items:baseline;gap:8px"><div class="ttl" style="font-size:17px">${head}</div><div class="sp"></div><span class="tnum tgold">${usd(tot)}</span></div>`));
+    col.appendChild(el(`<div class="mlab" style="margin:6px 0 2px">Toggle = count in real balance</div>`));
+    const sf=el(`<div class="scrollface"></div>`);
+    if(!rows.length)sf.appendChild(el(`<div class="sm" style="padding:8px 0">No open ${head.toLowerCase()} bills.</div>`));
+    rows.forEach(p=>{
+      const row=el(`<div class="row"><div style="flex:1;min-width:110px"><div class="name">${p[1]}</div><div class="sm">#${p[2]} · ${p[9]||"no job yet"}</div></div><span class="amt">${usd(p[3])}</span></div>`);
+      const swrap=el(`<span style="width:40px;display:flex;justify-content:center"></span>`);
+      swrap.appendChild(sw(S.pay[p[0]].on,()=>{S.pay[p[0]].on=!S.pay[p[0]].on;save();render();}));
+      row.appendChild(swrap);
+      sf.appendChild(row);
+    });
+    col.appendChild(sf);
+    grid.appendChild(col);
+  });
+  v.appendChild(grid);
+  v.appendChild(el(`<div class="note">The combined \u201cwe owe\u201d view — Subcontractors on the left, Materials on the right. Toggle a bill on to count it in the real balance.</div>`));
+}
+function jobOptions(cur){const opts=["— pick the job —",...jobList()];if(cur&&!opts.includes(cur))opts.splice(1,0,cur);return opts.map(j=>`<option ${j===cur?"selected":""}>${j}</option>`).join("");}
+function vAppr(v){
+  if(!S.q)S.q={};
+  const open=QUEUE.filter(q=>{const st=S.q[q[0]]||{};return !st.done&&!st.removed;});
+  const tot=open.reduce((s,q)=>s+(q[3]||0),0);
+  v.appendChild(el(`<div class="stats"><div class="stat hi"><div class="v">${usd(tot)}</div><div class="l">Awaiting approval · ${open.length}</div></div></div>`));
+  v.appendChild(el(`<div class="banner">Kept here for now so you can confirm they’re intact. These move to your dashboard and Dan’s once those are built.</div>`));
+  const c=el(`<div class="card"></div>`);
+  QUEUE.forEach(q=>{
+    const st=S.q[q[0]]||(S.q[q[0]]={job:q[5]||"",done:false});
+    if(st.removed)return;
+    if(st.done){c.appendChild(el(`<div class="row"><div style="flex:1"><span class="name">${q[1]} · #${q[2]}</span></div><span class="ok">APPROVED ✓ ${(st.job||"").toUpperCase()}</span></div>`));return;}
+    const row=el(`<div class="row" style="flex-direction:column;align-items:stretch;gap:6px"></div>`);
+    row.appendChild(el(`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="name">${q[1]} · #${q[2]}</span><span class="sm">${q[4]}</span>${q[7]?`<span class="tag t-warn">${q[7]}</span>`:""}<div class="sp"></div><span class="amt">${usd(q[3])}</span></div>`));
+    const ctl=el(`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="lab">Job</span></div>`);
+    const sel=el(`<select class="${st.job?"":"unset"}">${jobOptions(st.job)}</select>`);
+    sel.onchange=()=>{st.job=sel.value.startsWith("—")?"":sel.value;sel.className=st.job?"":"unset";save();};
+    ctl.appendChild(sel);
+    ctl.appendChild(el(`<div class="sp"></div>`));
+    if(q[8]){const vb=el(`<button class="btn ghost">View ↗</button>`);vb.onclick=()=>openInvoice(q[8]);ctl.appendChild(vb);}
+    const ab=el(`<button class="btn gold">Approve</button>`);
+    ab.onclick=()=>{if(!st.job){alert("Pick the job first");return;}if(confirm(`Approve ${q[1]} #${q[2]} (${usd(q[3])}) for ${st.job}?`)){st.done=true;save();render();}};
+    const del=el(`<button class="btn ghost" style="color:var(--alert);border-color:rgba(229,115,106,.4)">✕</button>`);
+    del.onclick=()=>{if(confirm(`Remove ${q[1]} #${q[2]} from approvals?`)){st.removed=true;save();render();}};
+    ctl.appendChild(ab);ctl.appendChild(del);
+    row.appendChild(ctl);
+    c.appendChild(row);
+  });
+  v.appendChild(c);
+}
+function guessMethod(p){
+  if(S.paid&&S.paid[p[0]]&&S.paid[p[0]].method)return S.paid[p[0]].method;
+  const v=(p[1]||"").toLowerCase();
+  if(v.indexOf("service plus")>-1)return "debit";
+  if(v.indexOf("koopman")>-1||v.indexOf("maki")>-1||v.indexOf("heritage")>-1)return "account";
+  return "";
+}
+function costItems(){
+  if(!S.method)S.method={};if(!S.pj)S.pj={};if(!S.pa)S.pa={};
+  if(!S.rcptJob)S.rcptJob={};if(!S.rcptMethod)S.rcptMethod={};if(!S.rcptPa)S.rcptPa={};
+  const items=[];
+  PAY.filter(p=>!(S.pd&&S.pd[p[0]])).forEach(p=>{
+    const job=(p[9]&&p[9]!=="")?p[9]:(S.pj[p[0]]||"");
+    const method=(S.method[p[0]]!==undefined)?S.method[p[0]]:guessMethod(p);
+    items.push({kind:"pay",id:p[0],vendor:p[1],inv:p[2],amt:p[3],job,method,url:S.pa[p[0]]||p[10],p});
+  });
+  RECEIPTS.forEach(r=>{
+    const job=(S.rcptJob[r[0]]!==undefined)?S.rcptJob[r[0]]:(r[5]||"");
+    const method=(S.rcptMethod[r[0]]!==undefined)?S.rcptMethod[r[0]]:r[3];
+    items.push({kind:"rcpt",id:r[0],vendor:r[1],inv:r[2],amt:r[4],job,method,url:S.rcptPa[r[0]]||null,r});
+  });
+  return items;
+}
+function costRow(it){
+  const row=el(`<div class="row costrow ${it.job?"":"nojob"}" style="align-items:center"></div>`);
+  row.appendChild(el(`<div style="flex:1;min-width:150px"><div class="name">${it.vendor}</div><div class="sm">${(it.inv&&it.inv!=="—")?("#"+it.inv+" · "):""}${it.kind==="rcpt"?"receipt":"invoice"}${it.job?"":' · <span style="color:#FF6B6B;font-weight:700">needs a job</span>'}</div></div>`));
+  const mWrap=el(`<span style="width:150px"></span>`);
+  const M=[["","— method —"],["amex","American Express"],["debit","Debit"],["ach","ACH"],["check","Check"],["account","On account"]];
+  const msel=el(`<select style="width:100%">${M.map(o=>`<option value="${o[0]}" ${it.method===o[0]?"selected":""}>${o[1]}</option>`).join("")}</select>`);
+  msel.onchange=()=>{if(it.kind==="pay")S.method[it.id]=msel.value;else S.rcptMethod[it.id]=msel.value;save();};
+  mWrap.appendChild(msel);row.appendChild(mWrap);
+  const jWrap=el(`<span style="width:210px"></span>`);
+  const opts=[JOB_PLACEHOLDER,...jobList()];if(it.job&&!opts.includes(it.job))opts.splice(1,0,it.job);
+  const jsel=el(`<select class="${it.job?"":"unset"}" style="width:100%">${opts.map(j=>`<option ${j===it.job?"selected":""}>${j}</option>`).join("")}</select>`);
+  jsel.onchange=async()=>{const val=jsel.value.startsWith("—")?"":jsel.value;
+    if(it.kind==="pay"){it.p[9]=val;S.pj[it.id]=val;}else{S.rcptJob[it.id]=val;}
+    save();render();
+    if(it.kind==="pay"&&typeof it.id==="number"&&it.id>0){try{await apiPut("/payables/"+it.id,{job_name:val});}catch(e){}}
+  };
+  jWrap.appendChild(jsel);row.appendChild(jWrap);
+  const aWrap=el(`<span style="width:120px"></span>`);
+  if(it.url){const vb=el(`<button class="btn ghost" style="padding:4px 9px;font-size:10px">View ↗</button>`);vb.onclick=()=>openInvoice(it.url);aWrap.appendChild(vb);}
+  else{
+    const up=el(`<label class="btn ghost" style="padding:4px 9px;font-size:10px;cursor:pointer;margin:0">Upload<input type="file" style="display:none" accept="image/*,application/pdf"></label>`);
+    up.querySelector("input").onchange=e=>{const f=e.target.files[0];if(!f)return;if(f.size>4*1024*1024){alert("File over 4MB — try a smaller scan or photo");return;}const rd=new FileReader();rd.onload=()=>{if(it.kind==="pay")S.pa[it.id]=rd.result;else S.rcptPa[it.id]=rd.result;save();render();};rd.readAsDataURL(f);};
+    aWrap.appendChild(up);
+  }
+  row.appendChild(aWrap);
+  row.appendChild(el(`<span class="amt" style="width:90px;text-align:right">${usd(it.amt)}</span>`));
+  return row;
+}
+function vCost(v){
+  const items=costItems();
+  const noJob=items.filter(it=>!it.job).length;
+  const tot=items.reduce((s,it)=>s+(it.amt||0),0);
+  v.appendChild(el(`<div class="stats"><div class="stat ${noJob?"al":""}"><div class="v">${noJob}</div><div class="l">Need a job</div></div><div class="stat"><div class="v">${items.length}</div><div class="l">Items in inbox</div></div><div class="stat"><div class="v">${usd(tot)}</div><div class="l">Total cost</div></div></div>`));
+  v.appendChild(el(`<div class="note">Every invoice and receipt — subcontractor, material, Amex store run — lands here to be coded. Set the <b>job</b> and the <b>payment method</b>, and tap the attachment to view it. Anything without a job is flagged red. A job set here syncs to the Subcontractors/Materials views and the database. The job list will stay in step with Dan’s dashboard and yours once they’re linked.</div>`));
+  const c=el(`<div class="card"></div>`);
+  c.appendChild(el(`<div class="row" style="padding:6px 0"><span class="lab" style="flex:1;min-width:150px">Vendor</span><span class="lab" style="width:150px">Method</span><span class="lab" style="width:210px">Job</span><span class="lab" style="width:120px">Attachment</span><span class="lab" style="width:90px;text-align:right">Amount</span></div>`));
+  if(!items.length)c.appendChild(el(`<div class="row"><span class="sm">Nothing in the cost inbox yet.</span></div>`));
+  items.forEach(it=>c.appendChild(costRow(it)));
+  v.appendChild(c);
+}
 function renderHomeTile(k,label){
   const span=(k==="dash");
   const t=el(`<div class="t tile ${span?"spanfull":""}" id="home-${k}"></div>`);
   if(k==="dash"){
     const totRecv=(S.rl||[]).reduce((s,r)=>s+(r.amt||0),0);
-    const owe=liveT("sub")+liveT("mat")+vendOn();
-    t.innerHTML=`<span class="klass">instrument</span><div class="ic"><svg viewBox="0 0 24 24">${ICONS.dash}</svg></div><div class="ttl">Overview</div>
-      <div class="fmgrid wide">
-        <div class="fm"><div class="mlab">Bank cash</div><div class="tnum tgold">${usd(S.bank)}</div></div>
-        <div class="fm alt"><div class="mlab">Owed to us</div><div class="tnum">${usd(totRecv)}</div></div>
-        <div class="fm alt"><div class="mlab">We owe (open)</div><div class="tnum">${usd(owe)}</div></div>
-        <div class="fm"><div class="mlab">Real balance</div><div class="tnum tgold">${usd(real())}</div></div>
-      </div>`;
+    const owe=payOn("sub")+payOn("mat");
+    t.innerHTML=`<span class="klass">instrument</span><div class="ic"><svg viewBox="0 0 24 24">${ICONS.dash}</svg></div><div class="ttl">Overview</div><div class="fmgrid wide"></div>`;
+    const fg=t.querySelector(".fmgrid");
+    const mkfm=(lab,val,alt,fn)=>{const f=el(`<div class="fm ${alt?"alt":""}"><div class="mlab">${lab}</div><div class="tnum ${alt?"":"tgold"}">${val}</div></div>`);if(fn){f.style.cursor="pointer";f.onclick=(e)=>{e.stopPropagation();fn();};}return f;};
+    fg.appendChild(mkfm("Bank cash",usd(S.bank),false,()=>{const w=S.bankUpdated?new Date(S.bankUpdated).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"not updated yet";alert("Bank cash last updated: "+w);}));
+    fg.appendChild(mkfm("Owed to us",usd(totRecv),true,()=>openSec("recvt")));
+    fg.appendChild(mkfm("We owe",usd(owe),true,()=>openSec("owe")));
+    fg.appendChild(mkfm("Real balance",usd(real()),false,()=>openSec("dash")));
   } else {
     t.innerHTML=`<span class="klass">tap to open</span><div class="ic"><svg viewBox="0 0 24 24">${ICONS[k]||""}</svg></div><div class="ttl">${label}</div><div class="tmeta"><span class="tnum tgold">${secValue(k)}</span><span class="mlab">${metaLabel(k)}</span>${secBadge(k)}</div>`;
   }
   t.onclick=()=>openSec(k);
   return t;
+}
+let dragKey=null;
+function homeOrder(){
+  const keys=SECTIONS.map(s=>s[0]).filter(k=>k!=="dash");
+  let ord=(S.tileOrder||[]).filter(k=>keys.indexOf(k)>-1);
+  keys.forEach(k=>{if(ord.indexOf(k)<0)ord.push(k);});
+  return ord;
+}
+function makeDraggable(t,key){
+  t.setAttribute("draggable","true");
+  t.setAttribute("title","Drag to reorder · tap to open");
+  t.addEventListener("dragstart",e=>{dragKey=key;t.classList.add("dragging");if(e.dataTransfer){e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",key);}catch(_){}}});
+  t.addEventListener("dragend",()=>{dragKey=null;t.classList.remove("dragging");document.querySelectorAll(".t.dragover").forEach(x=>x.classList.remove("dragover"));});
+  t.addEventListener("dragover",e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect="move";if(dragKey&&dragKey!==key)t.classList.add("dragover");});
+  t.addEventListener("dragleave",()=>t.classList.remove("dragover"));
+  t.addEventListener("drop",e=>{e.preventDefault();t.classList.remove("dragover");if(!dragKey||dragKey===key)return;
+    let ord=homeOrder().filter(k=>k!==dragKey);const idx=ord.indexOf(key);ord.splice(idx<0?ord.length:idx,0,dragKey);S.tileOrder=ord;save();render();});
 }
 function render(){
   const rb=real();
@@ -784,16 +964,23 @@ function render(){
   const v=document.getElementById("view");v.innerHTML="";
   if(S.view==="home"){
     const grid=el(`<div class="grid"></div>`);
-    SECTIONS.forEach(([k,label])=>grid.appendChild(renderHomeTile(k,label)));
+    grid.appendChild(renderHomeTile("dash","Overview"));
+    homeOrder().forEach(k=>{const def=SECTIONS.find(s=>s[0]===k);if(!def)return;const t=renderHomeTile(k,def[1]);makeDraggable(t,k);grid.appendChild(t);});
     v.appendChild(grid);
     return;
   }
-  const def=SECTIONS.find(s=>s[0]===S.view)||SECTIONS[0];
-  const k=def[0],label=def[1],fn=def[2];
+  const SPECIALS={owe:["We Owe",vOwe]};
+  let k=S.view,label,fn;
+  const sdef=SECTIONS.find(s=>s[0]===S.view);
+  if(sdef){label=sdef[1];fn=sdef[2];}
+  else if(SPECIALS[S.view]){label=SPECIALS[S.view][0];fn=SPECIALS[S.view][1];}
+  else{k="dash";label="Overview";fn=vDash;}
   const wrap=el(`<div class="secview"></div>`);
   const bar=el(`<div class="secbar"></div>`);
-  bar.appendChild(el(`<div class="ic"><svg viewBox="0 0 24 24">${ICONS[k]||""}</svg></div>`));
-  bar.appendChild(el(`<div class="ttl">${label}</div>`));
+  bar.appendChild(el(`<div class="ic"><svg viewBox="0 0 24 24">${ICONS[k]||ICONS.mat}</svg></div>`));
+  let titleHTML=label;
+  if(k==="rec")titleHTML=`${label} <span style="font-family:var(--mono);font-size:12px;color:var(--gold);font-weight:400;letter-spacing:.04em">(${usd(recTotal())}/mo)</span>`;
+  bar.appendChild(el(`<div class="ttl">${titleHTML}</div>`));
   wrap.appendChild(bar);
   const body=el(`<div class="tbody"></div>`);fn(body);wrap.appendChild(body);
   v.appendChild(wrap);
